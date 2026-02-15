@@ -16,6 +16,10 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(frameArena);
-        return RenderPacket.Empty(timing.FrameNumber);
+        return RenderPacketMarshaller.Marshal(
+            timing.FrameNumber,
+            frameArena,
+            Array.Empty<DrawCommand>(),
+            Array.Empty<UiDrawCommand>());
     }
 }
