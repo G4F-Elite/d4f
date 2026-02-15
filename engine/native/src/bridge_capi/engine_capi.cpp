@@ -42,12 +42,25 @@ engine_native_status_t engine_destroy(engine_native_engine_t* engine) {
   return ENGINE_NATIVE_STATUS_OK;
 }
 
-engine_native_status_t engine_pump_events(engine_native_engine_t* engine) {
+engine_native_status_t engine_pump_events(engine_native_engine_t* engine,
+                                          engine_native_input_snapshot_t* out_input,
+                                          engine_native_window_events_t* out_events) {
+  if (out_input == nullptr || out_events == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
   if (engine == nullptr) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
   ++engine->state.event_pump_count;
+  out_input->frame_index = engine->state.event_pump_count;
+  out_input->buttons_mask = 0u;
+  out_input->mouse_x = 0.0f;
+  out_input->mouse_y = 0.0f;
+
+  out_events->should_close = 0u;
+  out_events->width = 1280u;
+  out_events->height = 720u;
   return ENGINE_NATIVE_STATUS_OK;
 }
 
