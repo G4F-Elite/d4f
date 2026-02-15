@@ -13,6 +13,27 @@ public struct PhysicsBody
         Vector3 linearVelocity,
         Vector3 angularVelocity,
         bool isActive = true)
+        : this(
+            body,
+            PhysicsBodyType.Dynamic,
+            PhysicsCollider.Default,
+            position,
+            rotation,
+            linearVelocity,
+            angularVelocity,
+            isActive)
+    {
+    }
+
+    public PhysicsBody(
+        BodyHandle body,
+        PhysicsBodyType bodyType,
+        PhysicsCollider collider,
+        Vector3 position,
+        Quaternion rotation,
+        Vector3 linearVelocity,
+        Vector3 angularVelocity,
+        bool isActive = true)
     {
         if (!body.IsValid)
         {
@@ -20,6 +41,8 @@ public struct PhysicsBody
         }
 
         Body = body;
+        BodyType = bodyType;
+        Collider = collider;
         Position = position;
         Rotation = rotation;
         LinearVelocity = linearVelocity;
@@ -28,6 +51,10 @@ public struct PhysicsBody
     }
 
     public BodyHandle Body;
+
+    public PhysicsBodyType BodyType;
+
+    public PhysicsCollider Collider;
 
     public Vector3 Position;
 

@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 1u
+#define ENGINE_NATIVE_API_VERSION 2u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -83,6 +83,13 @@ typedef struct engine_native_body_write {
   float rotation[4];
   float linear_velocity[3];
   float angular_velocity[3];
+  uint8_t body_type;
+  uint8_t collider_shape;
+  uint8_t is_trigger;
+  uint8_t reserved0;
+  float collider_dimensions[3];
+  float friction;
+  float restitution;
 } engine_native_body_write_t;
 
 typedef struct engine_native_body_read {

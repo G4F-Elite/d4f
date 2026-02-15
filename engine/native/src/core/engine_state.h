@@ -61,10 +61,17 @@ class RendererState {
 };
 
 struct PhysicsBodyState {
+  uint8_t body_type = 0u;
+  uint8_t collider_shape = 0u;
+  uint8_t is_trigger = 0u;
+  uint8_t reserved0 = 0u;
   std::array<float, 3> position{0.0f, 0.0f, 0.0f};
   std::array<float, 4> rotation{0.0f, 0.0f, 0.0f, 1.0f};
   std::array<float, 3> linear_velocity{0.0f, 0.0f, 0.0f};
   std::array<float, 3> angular_velocity{0.0f, 0.0f, 0.0f};
+  std::array<float, 3> collider_dimensions{1.0f, 1.0f, 1.0f};
+  float friction = 0.5f;
+  float restitution = 0.1f;
 };
 
 class PhysicsState {

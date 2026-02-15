@@ -87,6 +87,12 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
             syncedEntity,
             new PhysicsBody(
                 new BodyHandle(101),
+                PhysicsBodyType.Kinematic,
+                new PhysicsCollider(
+                    ColliderShapeType.Capsule,
+                    new Vector3(0.4f, 2.0f, 0.4f),
+                    isTrigger: true,
+                    new PhysicsMaterial(0.25f, 0.75f)),
                 new Vector3(1.0f, 2.0f, 3.0f),
                 Quaternion.Identity,
                 new Vector3(4.0f, 5.0f, 6.0f),
@@ -126,6 +132,14 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal((ulong)101, backend.LastPhysicsWrite.Value.Body);
         Assert.Equal(1.0f, backend.LastPhysicsWrite.Value.Position0);
         Assert.Equal(9.0f, backend.LastPhysicsWrite.Value.AngularVelocity2);
+        Assert.Equal((byte)PhysicsBodyType.Kinematic, backend.LastPhysicsWrite.Value.BodyType);
+        Assert.Equal((byte)ColliderShapeType.Capsule, backend.LastPhysicsWrite.Value.ColliderShape);
+        Assert.Equal((byte)1, backend.LastPhysicsWrite.Value.IsTrigger);
+        Assert.Equal(0.4f, backend.LastPhysicsWrite.Value.ColliderDimensions0);
+        Assert.Equal(2.0f, backend.LastPhysicsWrite.Value.ColliderDimensions1);
+        Assert.Equal(0.4f, backend.LastPhysicsWrite.Value.ColliderDimensions2);
+        Assert.Equal(0.25f, backend.LastPhysicsWrite.Value.Friction);
+        Assert.Equal(0.75f, backend.LastPhysicsWrite.Value.Restitution);
 
         Assert.True(world.TryGetComponent(syncedEntity, out PhysicsBody updated));
         Assert.Equal(new Vector3(10.0f, 20.0f, 30.0f), updated.Position);

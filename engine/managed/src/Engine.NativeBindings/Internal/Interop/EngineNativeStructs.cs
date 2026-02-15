@@ -88,6 +88,15 @@ internal struct EngineNativeBodyWrite
     public float AngularVelocity0;
     public float AngularVelocity1;
     public float AngularVelocity2;
+    public byte BodyType;
+    public byte ColliderShape;
+    public byte IsTrigger;
+    public byte Reserved0;
+    public float ColliderDimensions0;
+    public float ColliderDimensions1;
+    public float ColliderDimensions2;
+    public float Friction;
+    public float Restitution;
 }
 
 [StructLayout(LayoutKind.Sequential)]

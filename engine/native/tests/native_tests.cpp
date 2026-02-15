@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include <cstdint>
+#include <cmath>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -103,6 +104,14 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_INVALID_STATE);
   engine_native_body_write_t writes[1]{};
   writes[0].body = 1001u;
+  writes[0].body_type = 1u;
+  writes[0].collider_shape = 0u;
+  writes[0].is_trigger = 0u;
+  writes[0].collider_dimensions[0] = 1.0f;
+  writes[0].collider_dimensions[1] = 1.0f;
+  writes[0].collider_dimensions[2] = 1.0f;
+  writes[0].friction = 0.5f;
+  writes[0].restitution = 0.1f;
   writes[0].position[0] = 2.0f;
   writes[0].rotation[3] = 1.0f;
   writes[0].linear_velocity[0] = 3.0f;
@@ -115,12 +124,23 @@ void TestEngineAndSubsystemFlow() {
          ENGINE_NATIVE_STATUS_OK);
   assert(read_count == 1u);
   assert(reads[0].body == 1001u);
-  assert(reads[0].position[0] == 2.0f);
+  assert(std::fabs(reads[0].position[0] - 2.05f) < 0.001f);
   assert(reads[0].linear_velocity[0] == 3.0f);
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_INVALID_STATE);
 
   assert(physics_sync_from_world(physics, nullptr, 1u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_body_write_t invalid_write[1]{};
+  invalid_write[0].body = 555u;
+  invalid_write[0].body_type = 9u;
+  invalid_write[0].collider_shape = 0u;
+  invalid_write[0].collider_dimensions[0] = 1.0f;
+  invalid_write[0].collider_dimensions[1] = 1.0f;
+  invalid_write[0].collider_dimensions[2] = 1.0f;
+  invalid_write[0].friction = 0.2f;
+  invalid_write[0].restitution = 0.3f;
+  assert(physics_sync_from_world(physics, invalid_write, 1u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

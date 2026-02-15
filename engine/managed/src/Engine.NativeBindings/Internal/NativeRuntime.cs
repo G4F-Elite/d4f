@@ -300,7 +300,16 @@ internal sealed partial class NativeRuntime
                 LinearVelocity2 = body.LinearVelocity.Z,
                 AngularVelocity0 = body.AngularVelocity.X,
                 AngularVelocity1 = body.AngularVelocity.Y,
-                AngularVelocity2 = body.AngularVelocity.Z
+                AngularVelocity2 = body.AngularVelocity.Z,
+                BodyType = (byte)body.BodyType,
+                ColliderShape = (byte)body.Collider.ShapeType,
+                IsTrigger = body.Collider.IsTrigger ? (byte)1 : (byte)0,
+                Reserved0 = 0,
+                ColliderDimensions0 = body.Collider.Dimensions.X,
+                ColliderDimensions1 = body.Collider.Dimensions.Y,
+                ColliderDimensions2 = body.Collider.Dimensions.Z,
+                Friction = body.Collider.Material.Friction,
+                Restitution = body.Collider.Material.Restitution
             });
         }
 

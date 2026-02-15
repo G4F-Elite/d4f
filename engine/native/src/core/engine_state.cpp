@@ -15,6 +15,12 @@ constexpr const char* kScenePassName = "scene";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
 constexpr const char* kFrameColorResourceName = "frame_color";
+constexpr uint8_t kPhysicsBodyTypeStatic = 0u;
+constexpr uint8_t kPhysicsBodyTypeDynamic = 1u;
+constexpr uint8_t kPhysicsBodyTypeKinematic = 2u;
+constexpr uint8_t kColliderShapeBox = 0u;
+constexpr uint8_t kColliderShapeSphere = 1u;
+constexpr uint8_t kColliderShapeCapsule = 2u;
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
@@ -27,6 +33,22 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   }
 
   return "unknown";
+}
+
+bool IsSupportedBodyType(uint8_t body_type) {
+  return body_type == kPhysicsBodyTypeStatic ||
+         body_type == kPhysicsBodyTypeDynamic ||
+         body_type == kPhysicsBodyTypeKinematic;
+}
+
+bool IsSupportedColliderShape(uint8_t collider_shape) {
+  return collider_shape == kColliderShapeBox ||
+         collider_shape == kColliderShapeSphere ||
+         collider_shape == kColliderShapeCapsule;
+}
+
+bool IsUnitRange(float value) {
+  return value >= 0.0f && value <= 1.0f;
 }
 
 }  // namespace
@@ -307,6 +329,18 @@ engine_native_status_t PhysicsState::Step(double dt_seconds) {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
+  const float dt = static_cast<float>(dt_seconds);
+  for (auto& body_pair : bodies_) {
+    PhysicsBodyState& state = body_pair.second;
+    if (state.body_type != kPhysicsBodyTypeDynamic) {
+      continue;
+    }
+
+    for (size_t axis = 0u; axis < 3u; ++axis) {
+      state.position[axis] += state.linear_velocity[axis] * dt;
+    }
+  }
+
   ++step_count_;
   stepped_since_sync_ = true;
   return ENGINE_NATIVE_STATUS_OK;
@@ -328,12 +362,36 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     if (write.body == 0u) {
       return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
     }
+    if (!IsSupportedBodyType(write.body_type) ||
+        !IsSupportedColliderShape(write.collider_shape) || write.is_trigger > 1u ||
+        !IsUnitRange(write.friction) || !IsUnitRange(write.restitution)) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+    if (write.collider_dimensions[0] <= 0.0f || write.collider_dimensions[1] <= 0.0f ||
+        write.collider_dimensions[2] <= 0.0f) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+    if (write.collider_shape == kColliderShapeSphere &&
+        (write.collider_dimensions[0] != write.collider_dimensions[1] ||
+         write.collider_dimensions[1] != write.collider_dimensions[2])) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+    if (write.collider_shape == kColliderShapeCapsule &&
+        write.collider_dimensions[1] <= write.collider_dimensions[0] * 2.0f) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
 
     PhysicsBodyState state;
+    state.body_type = write.body_type;
+    state.collider_shape = write.collider_shape;
+    state.is_trigger = write.is_trigger;
     std::copy_n(write.position, 3, state.position.data());
     std::copy_n(write.rotation, 4, state.rotation.data());
     std::copy_n(write.linear_velocity, 3, state.linear_velocity.data());
     std::copy_n(write.angular_velocity, 3, state.angular_velocity.data());
+    std::copy_n(write.collider_dimensions, 3, state.collider_dimensions.data());
+    state.friction = write.friction;
+    state.restitution = write.restitution;
     bodies_[write.body] = state;
   }
 
