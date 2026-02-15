@@ -10,9 +10,6 @@ namespace Engine.App;
 
 public sealed class GameHost
 {
-    private const int DefaultFrameArenaBytes = 1 * 1024 * 1024;
-    private const int DefaultFrameArenaAlignment = 64;
-
     private readonly World _world;
     private readonly IPlatformFacade _platformFacade;
     private readonly ITimingFacade _timingFacade;
@@ -20,6 +17,8 @@ public sealed class GameHost
     private readonly IUiFacade _uiFacade;
     private readonly IRenderPacketBuilder _renderPacketBuilder;
     private readonly IRenderingFacade _renderingFacade;
+    private readonly GameHostOptions _options;
+    private TimeSpan _physicsAccumulator;
 
     public GameHost(
         World world,
@@ -28,7 +27,8 @@ public sealed class GameHost
         IPhysicsFacade physicsFacade,
         IUiFacade uiFacade,
         IRenderPacketBuilder renderPacketBuilder,
-        IRenderingFacade renderingFacade)
+        IRenderingFacade renderingFacade,
+        GameHostOptions? options = null)
     {
         _world = world ?? throw new ArgumentNullException(nameof(world));
         _platformFacade = platformFacade ?? throw new ArgumentNullException(nameof(platformFacade));
@@ -37,6 +37,7 @@ public sealed class GameHost
         _uiFacade = uiFacade ?? throw new ArgumentNullException(nameof(uiFacade));
         _renderPacketBuilder = renderPacketBuilder ?? throw new ArgumentNullException(nameof(renderPacketBuilder));
         _renderingFacade = renderingFacade ?? throw new ArgumentNullException(nameof(renderingFacade));
+        _options = options ?? GameHostOptions.Default;
     }
 
     public void Run(CancellationToken cancellationToken = default)
@@ -81,16 +82,32 @@ public sealed class GameHost
 
         _world.RunStage(SystemStage.PrePhysics, timing);
 
-        _physicsFacade.SyncToPhysics(_world);
-        _physicsFacade.Step(timing.DeltaTime);
-        _physicsFacade.SyncFromPhysics(_world);
+        _physicsAccumulator += timing.DeltaTime;
+        var substeps = 0;
+
+        while (_physicsAccumulator >= _options.FixedDt && substeps < _options.MaxSubsteps)
+        {
+            if (substeps == 0)
+            {
+                _physicsFacade.SyncToPhysics(_world);
+            }
+
+            _physicsFacade.Step(_options.FixedDt);
+            _physicsAccumulator -= _options.FixedDt;
+            substeps++;
+        }
+
+        if (substeps > 0)
+        {
+            _physicsFacade.SyncFromPhysics(_world);
+        }
 
         _world.RunStage(SystemStage.PostPhysics, timing);
 
         _world.RunStage(SystemStage.UI, timing);
         _uiFacade.Update(_world, timing);
 
-        using var frameArena = _renderingFacade.BeginFrame(DefaultFrameArenaBytes, DefaultFrameArenaAlignment);
+        using var frameArena = _renderingFacade.BeginFrame(_options.FrameArenaBytes, _options.FrameArenaAlignment);
         _world.RunStage(SystemStage.PreRender, timing);
         var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena);
         _renderingFacade.Submit(renderPacket);
