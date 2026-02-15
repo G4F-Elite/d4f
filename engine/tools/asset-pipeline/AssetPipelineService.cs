@@ -4,7 +4,7 @@ namespace Engine.AssetPipeline;
 
 public static class AssetPipelineService
 {
-    private const int PakVersion = 1;
+    private const int PakVersion = 2;
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true
@@ -66,10 +66,23 @@ public static class AssetPipelineService
         }
     }
 
-    public static void WritePak(string outputPakPath, AssetManifest manifest)
+    public static IReadOnlyList<PakEntry> CompileAssets(
+        AssetManifest manifest,
+        string baseDirectory,
+        string outputRootDirectory)
+    {
+        return AssetCompiler.CompileAssets(manifest, baseDirectory, outputRootDirectory);
+    }
+
+    public static void WritePak(string outputPakPath, IReadOnlyList<PakEntry> entries)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPakPath);
-        ArgumentNullException.ThrowIfNull(manifest);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        if (entries.Count == 0)
+        {
+            throw new InvalidDataException("Pak must contain at least one entry.");
+        }
 
         string directory = Path.GetDirectoryName(outputPakPath) ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(directory))
@@ -80,9 +93,20 @@ public static class AssetPipelineService
         PakArchive archive = new(
             Version: PakVersion,
             CreatedAtUtc: DateTime.UtcNow,
-            Entries: manifest.Assets.Select(static x => new PakEntry(x.Path, x.Kind)).ToArray());
+            Entries: entries.ToArray());
 
         File.WriteAllText(outputPakPath, JsonSerializer.Serialize(archive, SerializerOptions));
+    }
+
+    public static void WritePak(string outputPakPath, AssetManifest manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+
+        var compatibilityEntries = manifest.Assets
+            .Select(static x => new PakEntry(x.Path, x.Kind, x.Path, 0))
+            .ToArray();
+
+        WritePak(outputPakPath, compatibilityEntries);
     }
 
     public static PakArchive ReadPak(string pakPath)
@@ -120,6 +144,16 @@ public static class AssetPipelineService
             if (string.IsNullOrWhiteSpace(entry.Kind))
             {
                 throw new InvalidDataException($"Pak entry kind cannot be empty for asset '{entry.Path}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.CompiledPath))
+            {
+                throw new InvalidDataException($"Pak entry compiled path cannot be empty for asset '{entry.Path}'.");
+            }
+
+            if (entry.SizeBytes < 0)
+            {
+                throw new InvalidDataException($"Pak entry size cannot be negative for asset '{entry.Path}'.");
             }
         }
 

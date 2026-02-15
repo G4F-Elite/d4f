@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\assetc\Assetc.csproj" />
+    <ProjectReference Include="..\asset-pipeline\Engine.AssetPipeline.csproj" />
+    <ProjectReference Include="..\..\managed\src\Engine.Scenes\Engine.Scenes.csproj" />
   </ItemGroup>
 
 </Project>

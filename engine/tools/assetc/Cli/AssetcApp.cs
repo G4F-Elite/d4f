@@ -43,10 +43,16 @@ public sealed class AssetcApp
         string manifestPath = Path.GetFullPath(command.ManifestPath);
         string outputPakPath = Path.GetFullPath(command.OutputPakPath);
         string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? throw new InvalidDataException("Manifest path is invalid.");
+        string outputDirectory = Path.GetDirectoryName(outputPakPath) ?? throw new InvalidDataException("Output pak path is invalid.");
+        string compiledRootDirectory = Path.Combine(outputDirectory, "compiled");
 
         AssetManifest manifest = AssetPipelineService.LoadManifest(manifestPath);
         AssetPipelineService.ValidateAssetsExist(manifest, manifestDirectory);
-        AssetPipelineService.WritePak(outputPakPath, manifest);
+        IReadOnlyList<PakEntry> compiledEntries = AssetPipelineService.CompileAssets(
+            manifest,
+            manifestDirectory,
+            compiledRootDirectory);
+        AssetPipelineService.WritePak(outputPakPath, compiledEntries);
 
         _stdout.WriteLine($"Pak created: {outputPakPath}");
         return 0;

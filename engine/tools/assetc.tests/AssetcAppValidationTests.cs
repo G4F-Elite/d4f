@@ -1,4 +1,6 @@
 using Assetc;
+using Engine.AssetPipeline;
+using Engine.Scenes;
 
 namespace Assetc.Tests;
 
@@ -93,6 +95,77 @@ public sealed class AssetcAppValidationTests
 
             Assert.Equal(0, listCode);
             Assert.Contains("texture\ttextures/hero.png", listOutput.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldCompileSceneAsset_WhenManifestContainsSceneKind()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(tempRoot, "scenes"));
+            string scenePath = Path.Combine(tempRoot, "scenes", "level.scene.json");
+            File.WriteAllText(
+                scenePath,
+                """
+                {
+                  "entities": [
+                    { "stableId": 1, "name": "Player" }
+                  ],
+                  "components": [
+                    {
+                      "entityStableId": 1,
+                      "typeId": "Tag",
+                      "payloadBase64": "TWFpbg=="
+                    }
+                  ]
+                }
+                """);
+
+            string manifestPath = Path.Combine(tempRoot, "manifest.json");
+            string pakPath = Path.Combine(tempRoot, "content.pak");
+            File.WriteAllText(
+                manifestPath,
+                """
+                {
+                  "assets": [
+                    {
+                      "path": "scenes/level.scene.json",
+                      "kind": "scene"
+                    }
+                  ]
+                }
+                """);
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            AssetcApp app = new(output, error);
+
+            int buildCode = app.Run(["build", "--manifest", manifestPath, "--output", pakPath]);
+
+            Assert.Equal(0, buildCode);
+            PakArchive pak = AssetPipelineService.ReadPak(pakPath);
+            PakEntry entry = Assert.Single(pak.Entries);
+            Assert.Equal("scene", entry.Kind);
+
+            string compiledFullPath = Path.GetFullPath(
+                Path.Combine(
+                    Path.GetDirectoryName(pakPath)!,
+                    "compiled",
+                    entry.CompiledPath.Replace('/', Path.DirectorySeparatorChar)));
+            Assert.True(File.Exists(compiledFullPath));
+
+            using FileStream compiledStream = File.OpenRead(compiledFullPath);
+            SceneAsset scene = SceneBinaryCodec.ReadScene(compiledStream);
+            Assert.Single(scene.Entities);
+            Assert.Single(scene.Components);
+            Assert.Equal(1u, scene.Entities[0].StableId);
+            Assert.Equal("Tag", scene.Components[0].TypeId);
         }
         finally
         {
