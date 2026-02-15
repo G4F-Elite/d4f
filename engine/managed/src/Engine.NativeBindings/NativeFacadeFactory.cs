@@ -92,6 +92,9 @@ public static class NativeFacadeFactory
             _nativeApi = nativeApi ?? throw new ArgumentNullException(nameof(nativeApi));
         }
 
+        public FrameArena BeginFrame(int requestedBytes, int alignment)
+            => _nativeApi.BeginFrame(requestedBytes, alignment);
+
         public void Submit(RenderPacket packet) => _nativeApi.Submit(packet);
 
         public void Present() => _nativeApi.Present();

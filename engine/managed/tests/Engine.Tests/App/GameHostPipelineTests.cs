@@ -47,6 +47,7 @@ public sealed class GameHostPipelineTests
                 "stage.postphysics",
                 "stage.ui",
                 "ui.facade",
+                "render.begin_frame",
                 "stage.prerender",
                 "render.build",
                 "render.submit",
@@ -207,8 +208,9 @@ public sealed class GameHostPipelineTests
             _execution = execution;
         }
 
-        public RenderPacket Build(World world, in FrameTiming timing)
+        public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena)
         {
+            Assert.NotNull(frameArena);
             _execution.Add("render.build");
             return RenderPacket.Empty(timing.FrameNumber);
         }
@@ -221,6 +223,12 @@ public sealed class GameHostPipelineTests
         public RecordingRenderingFacade(IList<string> execution)
         {
             _execution = execution;
+        }
+
+        public FrameArena BeginFrame(int requestedBytes, int alignment)
+        {
+            _execution.Add("render.begin_frame");
+            return new FrameArena(requestedBytes, alignment);
         }
 
         public void Submit(RenderPacket packet)

@@ -10,6 +10,11 @@ public sealed class NoopRenderingFacade : IRenderingFacade
     {
     }
 
+    public FrameArena BeginFrame(int requestedBytes, int alignment)
+    {
+        return new FrameArena(requestedBytes, alignment);
+    }
+
     public void Submit(RenderPacket packet)
     {
         ArgumentNullException.ThrowIfNull(packet);

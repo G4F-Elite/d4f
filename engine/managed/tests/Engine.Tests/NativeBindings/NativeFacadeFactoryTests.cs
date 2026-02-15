@@ -33,6 +33,7 @@ public sealed class NativeFacadeFactoryTests
         physics.SyncFromPhysics(world);
 
         ui.Update(world, frame1);
+        using var frameArena = rendering.BeginFrame(1024, 64);
         rendering.Submit(RenderPacket.Empty(frame1.FrameNumber));
         rendering.Present();
     }

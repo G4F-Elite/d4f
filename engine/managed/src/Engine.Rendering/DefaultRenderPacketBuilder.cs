@@ -12,9 +12,10 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
     {
     }
 
-    public RenderPacket Build(World world, in FrameTiming timing)
+    public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena)
     {
         ArgumentNullException.ThrowIfNull(world);
+        ArgumentNullException.ThrowIfNull(frameArena);
         return RenderPacket.Empty(timing.FrameNumber);
     }
 }

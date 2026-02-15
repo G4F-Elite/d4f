@@ -10,6 +10,9 @@ namespace Engine.App;
 
 public sealed class GameHost
 {
+    private const int DefaultFrameArenaBytes = 1 * 1024 * 1024;
+    private const int DefaultFrameArenaAlignment = 64;
+
     private readonly World _world;
     private readonly IPlatformFacade _platformFacade;
     private readonly ITimingFacade _timingFacade;
@@ -87,8 +90,9 @@ public sealed class GameHost
         _world.RunStage(SystemStage.UI, timing);
         _uiFacade.Update(_world, timing);
 
+        using var frameArena = _renderingFacade.BeginFrame(DefaultFrameArenaBytes, DefaultFrameArenaAlignment);
         _world.RunStage(SystemStage.PreRender, timing);
-        var renderPacket = _renderPacketBuilder.Build(_world, timing);
+        var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena);
         _renderingFacade.Submit(renderPacket);
         _renderingFacade.Present();
     }

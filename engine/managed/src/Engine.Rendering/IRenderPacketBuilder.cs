@@ -5,5 +5,5 @@ namespace Engine.Rendering;
 
 public interface IRenderPacketBuilder
 {
-    RenderPacket Build(World world, in FrameTiming timing);
+    RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena);
 }
