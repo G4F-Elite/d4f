@@ -1,4 +1,5 @@
 using System;
+using System.Numerics;
 using Engine.Core.Handles;
 
 namespace Engine.Rendering;
@@ -6,6 +7,18 @@ namespace Engine.Rendering;
 public readonly record struct DrawCommand
 {
     public DrawCommand(EntityId entityId, MeshHandle mesh, MaterialHandle material, TextureHandle texture)
+        : this(entityId, mesh, material, texture, Matrix4x4.Identity, material.Value, mesh.Value)
+    {
+    }
+
+    public DrawCommand(
+        EntityId entityId,
+        MeshHandle mesh,
+        MaterialHandle material,
+        TextureHandle texture,
+        Matrix4x4 worldMatrix,
+        uint sortKeyHigh,
+        uint sortKeyLow)
     {
         if (!entityId.IsValid)
         {
@@ -31,6 +44,9 @@ public readonly record struct DrawCommand
         Mesh = mesh;
         Material = material;
         Texture = texture;
+        WorldMatrix = worldMatrix;
+        SortKeyHigh = sortKeyHigh;
+        SortKeyLow = sortKeyLow;
     }
 
     public EntityId EntityId { get; }
@@ -40,4 +56,10 @@ public readonly record struct DrawCommand
     public MaterialHandle Material { get; }
 
     public TextureHandle Texture { get; }
+
+    public Matrix4x4 WorldMatrix { get; }
+
+    public uint SortKeyHigh { get; }
+
+    public uint SortKeyLow { get; }
 }

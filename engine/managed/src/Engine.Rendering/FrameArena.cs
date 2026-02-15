@@ -8,29 +8,48 @@ public sealed unsafe class FrameArena : IDisposable
 {
     private readonly nuint _capacity;
     private readonly nuint _alignment;
+    private readonly bool _ownsBuffer;
     private byte* _buffer;
     private nuint _offset;
 
     public FrameArena(int capacityBytes, int alignment)
     {
-        if (capacityBytes <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(capacityBytes), "Capacity must be positive.");
-        }
-
-        if (alignment <= 0 || !IsPowerOfTwo((nuint)alignment))
-        {
-            throw new ArgumentOutOfRangeException(nameof(alignment), "Alignment must be a positive power of two.");
-        }
-
-        _capacity = (nuint)capacityBytes;
-        _alignment = (nuint)alignment;
+        ValidateCapacityAndAlignment(capacityBytes, alignment, out var capacity, out var normalizedAlignment);
+        _capacity = capacity;
+        _alignment = normalizedAlignment;
+        _ownsBuffer = true;
         _buffer = (byte*)NativeMemory.AlignedAlloc(_capacity, _alignment);
 
         if (_buffer is null)
         {
             throw new OutOfMemoryException($"Failed to allocate frame arena with capacity {_capacity} bytes.");
         }
+    }
+
+    private FrameArena(nuint capacity, nuint alignment, byte* buffer, bool ownsBuffer)
+    {
+        _capacity = capacity;
+        _alignment = alignment;
+        _buffer = buffer;
+        _ownsBuffer = ownsBuffer;
+    }
+
+    public static FrameArena WrapExternalMemory(IntPtr basePointer, int capacityBytes, int alignment)
+    {
+        if (basePointer == IntPtr.Zero)
+        {
+            throw new ArgumentException("Base pointer must be non-zero.", nameof(basePointer));
+        }
+
+        ValidateCapacityAndAlignment(capacityBytes, alignment, out var capacity, out var normalizedAlignment);
+
+        var address = checked((nuint)basePointer);
+        if ((address & (normalizedAlignment - 1)) != 0)
+        {
+            throw new ArgumentException("Base pointer must satisfy the requested alignment.", nameof(basePointer));
+        }
+
+        return new FrameArena(capacity, normalizedAlignment, (byte*)basePointer, ownsBuffer: false);
     }
 
     public int CapacityBytes => checked((int)_capacity);
@@ -96,7 +115,11 @@ public sealed unsafe class FrameArena : IDisposable
             return;
         }
 
-        NativeMemory.AlignedFree(_buffer);
+        if (_ownsBuffer)
+        {
+            NativeMemory.AlignedFree(_buffer);
+        }
+
         _buffer = null;
         _offset = 0;
     }
@@ -110,6 +133,26 @@ public sealed unsafe class FrameArena : IDisposable
     private static bool IsPowerOfTwo(nuint value)
     {
         return value != 0 && (value & (value - 1)) == 0;
+    }
+
+    private static void ValidateCapacityAndAlignment(
+        int capacityBytes,
+        int alignment,
+        out nuint capacity,
+        out nuint normalizedAlignment)
+    {
+        if (capacityBytes <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(capacityBytes), "Capacity must be positive.");
+        }
+
+        if (alignment <= 0 || !IsPowerOfTwo((nuint)alignment))
+        {
+            throw new ArgumentOutOfRangeException(nameof(alignment), "Alignment must be a positive power of two.");
+        }
+
+        capacity = (nuint)capacityBytes;
+        normalizedAlignment = (nuint)alignment;
     }
 
     private void ThrowIfDisposed()

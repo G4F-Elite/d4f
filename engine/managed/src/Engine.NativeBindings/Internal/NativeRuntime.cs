@@ -4,11 +4,12 @@ using System.Runtime.InteropServices;
 using Engine.Core.Handles;
 using Engine.ECS;
 using Engine.NativeBindings.Internal.Interop;
+using Engine.Physics;
 using Engine.Rendering;
 
 namespace Engine.NativeBindings.Internal;
 
-internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INativeRenderingApi, IDisposable
+internal sealed partial class NativeRuntime : INativePlatformApi, INativePhysicsApi, INativeRenderingApi, IDisposable
 {
     private readonly INativeInteropApi _interop;
     private IntPtr _engine;
@@ -105,7 +106,8 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
         ArgumentNullException.ThrowIfNull(world);
         ThrowIfDisposed();
 
-        var readCapacity = checked((uint)world.AliveEntityCount);
+        var bodyToEntity = BuildBodyEntityMap(world);
+        var readCapacity = checked((uint)bodyToEntity.Count);
         var reads = readCapacity == 0 ? Array.Empty<EngineNativeBodyRead>() : new EngineNativeBodyRead[readCapacity];
         var pinnedReads = default(GCHandle);
 
@@ -119,8 +121,35 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
             }
 
             NativeStatusGuard.ThrowIfFailed(
-                _interop.PhysicsSyncToWorld(_physics, readsPtr, readCapacity, out _),
+                _interop.PhysicsSyncToWorld(_physics, readsPtr, readCapacity, out var readCount),
                 "physics_sync_to_world");
+
+            if (readCount > readCapacity)
+            {
+                throw new InvalidOperationException(
+                    $"Native physics returned read count {readCount}, exceeding capacity {readCapacity}.");
+            }
+
+            for (var i = 0; i < readCount; i++)
+            {
+                var read = reads[i];
+                if (!bodyToEntity.TryGetValue(read.Body, out var entity))
+                {
+                    continue;
+                }
+
+                if (!world.TryGetComponent(entity, out PhysicsBody body))
+                {
+                    continue;
+                }
+
+                body.Position = new(read.Position0, read.Position1, read.Position2);
+                body.Rotation = new(read.Rotation0, read.Rotation1, read.Rotation2, read.Rotation3);
+                body.LinearVelocity = new(read.LinearVelocity0, read.LinearVelocity1, read.LinearVelocity2);
+                body.AngularVelocity = new(read.AngularVelocity0, read.AngularVelocity1, read.AngularVelocity2);
+                body.IsActive = read.IsActive != 0;
+                world.SetComponent(entity, body);
+            }
         }
         finally
         {
@@ -148,7 +177,7 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
             throw new InvalidOperationException("Native renderer_begin_frame returned null frame memory.");
         }
 
-        return new FrameArena(requestedBytes, alignment);
+        return FrameArena.WrapExternalMemory(frameMemory, requestedBytes, alignment);
     }
 
     public void Submit(RenderPacket packet)
@@ -156,24 +185,39 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
         ArgumentNullException.ThrowIfNull(packet);
         ThrowIfDisposed();
 
-        var drawItems = BuildDrawItems(packet);
+        var drawItemsPtr = packet.NativeDrawItemsPointer;
+        var drawItemsCount = packet.NativeDrawItemCount;
+        var uiItemsPtr = packet.NativeUiDrawItemsPointer;
+        var uiItemsCount = packet.NativeUiDrawItemCount;
+
+        var drawItems = drawItemsCount == 0 ? BuildDrawItems(packet.DrawCommands) : Array.Empty<EngineNativeDrawItem>();
+        var uiItems = uiItemsCount == 0 ? BuildUiItems(packet.UiDrawCommands) : Array.Empty<EngineNativeUiDrawItem>();
+
         var pinnedDrawItems = default(GCHandle);
+        var pinnedUiItems = default(GCHandle);
 
         try
         {
-            var drawItemsPtr = IntPtr.Zero;
             if (drawItems.Length > 0)
             {
                 pinnedDrawItems = GCHandle.Alloc(drawItems, GCHandleType.Pinned);
                 drawItemsPtr = pinnedDrawItems.AddrOfPinnedObject();
+                drawItemsCount = drawItems.Length;
+            }
+
+            if (uiItems.Length > 0)
+            {
+                pinnedUiItems = GCHandle.Alloc(uiItems, GCHandleType.Pinned);
+                uiItemsPtr = pinnedUiItems.AddrOfPinnedObject();
+                uiItemsCount = uiItems.Length;
             }
 
             var nativePacket = new EngineNativeRenderPacket
             {
                 DrawItems = drawItemsPtr,
-                DrawItemCount = checked((uint)drawItems.Length),
-                UiItems = IntPtr.Zero,
-                UiItemCount = 0
+                DrawItemCount = checked((uint)drawItemsCount),
+                UiItems = uiItemsPtr,
+                UiItemCount = checked((uint)uiItemsCount)
             };
 
             NativeStatusGuard.ThrowIfFailed(
@@ -185,6 +229,11 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
             if (pinnedDrawItems.IsAllocated)
             {
                 pinnedDrawItems.Free();
+            }
+
+            if (pinnedUiItems.IsAllocated)
+            {
+                pinnedUiItems.Free();
             }
         }
     }
@@ -213,45 +262,41 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
 
     private static EngineNativeBodyWrite[] BuildBodyWrites(World world)
     {
-        var writes = new List<EngineNativeBodyWrite>(world.AliveEntityCount);
+        var writes = new List<EngineNativeBodyWrite>(world.GetComponentCount<PhysicsBody>());
 
-        foreach (var entity in world.EnumerateAliveEntities())
+        foreach (var (_, body) in world.Query<PhysicsBody>())
         {
             writes.Add(new EngineNativeBodyWrite
             {
-                Body = EncodeEntityHandle(entity),
-                Rotation3 = 1.0f
+                Body = EncodeBodyHandle(body.Body),
+                Position0 = body.Position.X,
+                Position1 = body.Position.Y,
+                Position2 = body.Position.Z,
+                Rotation0 = body.Rotation.X,
+                Rotation1 = body.Rotation.Y,
+                Rotation2 = body.Rotation.Z,
+                Rotation3 = body.Rotation.W,
+                LinearVelocity0 = body.LinearVelocity.X,
+                LinearVelocity1 = body.LinearVelocity.Y,
+                LinearVelocity2 = body.LinearVelocity.Z,
+                AngularVelocity0 = body.AngularVelocity.X,
+                AngularVelocity1 = body.AngularVelocity.Y,
+                AngularVelocity2 = body.AngularVelocity.Z
             });
         }
 
         return writes.Count == 0 ? Array.Empty<EngineNativeBodyWrite>() : writes.ToArray();
     }
 
-    private static EngineNativeDrawItem[] BuildDrawItems(RenderPacket packet)
+    private static Dictionary<ulong, EntityId> BuildBodyEntityMap(World world)
     {
-        if (packet.DrawCommands.Count == 0)
+        var map = new Dictionary<ulong, EntityId>(world.GetComponentCount<PhysicsBody>());
+        foreach (var (entity, body) in world.Query<PhysicsBody>())
         {
-            return Array.Empty<EngineNativeDrawItem>();
+            map[EncodeBodyHandle(body.Body)] = entity;
         }
 
-        var drawItems = new EngineNativeDrawItem[packet.DrawCommands.Count];
-        for (var i = 0; i < packet.DrawCommands.Count; i++)
-        {
-            var command = packet.DrawCommands[i];
-            drawItems[i] = new EngineNativeDrawItem
-            {
-                Mesh = command.Mesh.Value,
-                Material = command.Material.Value,
-                World00 = 1.0f,
-                World11 = 1.0f,
-                World22 = 1.0f,
-                World33 = 1.0f,
-                SortKeyHigh = command.Material.Value,
-                SortKeyLow = command.Mesh.Value
-            };
-        }
-
-        return drawItems;
+        return map;
     }
 
     private Exception? TryDestroyEngine()
@@ -281,13 +326,13 @@ internal sealed class NativeRuntime : INativePlatformApi, INativePhysicsApi, INa
         }
     }
 
-    private static ulong EncodeEntityHandle(EntityId entity)
+    private static ulong EncodeBodyHandle(BodyHandle body)
     {
-        if (!entity.IsValid)
+        if (!body.IsValid)
         {
-            throw new ArgumentException("Entity id must be valid.", nameof(entity));
+            throw new ArgumentException("Body handle must be valid.", nameof(body));
         }
 
-        return ((ulong)entity.Generation << 32) | (uint)(entity.Index + 1);
+        return body.Value;
     }
 }

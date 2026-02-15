@@ -1,23 +1,23 @@
+using System.Runtime.InteropServices;
+
 namespace Engine.Rendering;
 
-public readonly record struct NativeUiDrawItem
+[StructLayout(LayoutKind.Sequential)]
+public struct NativeUiDrawItem
 {
-    public NativeUiDrawItem(uint drawListId, uint textureId, int indexOffset, int elementCount)
-    {
-        DrawListId = drawListId;
-        TextureId = textureId;
-        IndexOffset = indexOffset;
-        ElementCount = elementCount;
-    }
-
-    public uint DrawListId { get; }
-
-    public uint TextureId { get; }
-
-    public int IndexOffset { get; }
-
-    public int ElementCount { get; }
+    public ulong Texture;
+    public uint VertexOffset;
+    public uint VertexCount;
+    public uint IndexOffset;
+    public uint IndexCount;
 
     public static NativeUiDrawItem From(in UiDrawCommand command)
-        => new(command.DrawListId, command.TextureId, command.IndexOffset, command.ElementCount);
+        => new()
+        {
+            Texture = command.Texture.Value,
+            VertexOffset = command.VertexOffset,
+            VertexCount = command.VertexCount,
+            IndexOffset = command.IndexOffset,
+            IndexCount = command.IndexCount
+        };
 }

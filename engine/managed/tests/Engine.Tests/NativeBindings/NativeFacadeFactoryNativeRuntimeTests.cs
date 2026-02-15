@@ -1,9 +1,11 @@
 using System;
-using System.Collections.Generic;
+using System.Numerics;
+using System.Runtime.InteropServices;
 using Engine.Core.Handles;
 using Engine.ECS;
 using Engine.NativeBindings;
 using Engine.NativeBindings.Internal.Interop;
+using Engine.Physics;
 using Engine.Rendering;
 using Xunit;
 
@@ -22,6 +24,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.True(nativeSet.Platform.PumpEvents());
 
         using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
+        Assert.Equal(backend.RendererBeginFrameMemory, frameArena.BasePointer);
         nativeSet.Rendering.Submit(CreatePacket(entity));
         nativeSet.Rendering.Present();
 
@@ -68,6 +71,138 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     }
 
     [Fact]
+    public void NativeRuntimePhysicsSync_UsesPhysicsBodyComponents()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        var syncedEntity = world.CreateEntity();
+        var ignoredEntity = world.CreateEntity();
+
+        world.AddComponent(
+            syncedEntity,
+            new PhysicsBody(
+                new BodyHandle(101),
+                new Vector3(1.0f, 2.0f, 3.0f),
+                Quaternion.Identity,
+                new Vector3(4.0f, 5.0f, 6.0f),
+                new Vector3(7.0f, 8.0f, 9.0f),
+                isActive: true));
+        world.AddComponent(ignoredEntity, new DummyComponent(13));
+
+        backend.PhysicsReadsToReturn =
+        [
+            new EngineNativeBodyRead
+            {
+                Body = 101,
+                Position0 = 10.0f,
+                Position1 = 20.0f,
+                Position2 = 30.0f,
+                Rotation0 = 0.0f,
+                Rotation1 = 0.0f,
+                Rotation2 = 0.0f,
+                Rotation3 = 1.0f,
+                LinearVelocity0 = 40.0f,
+                LinearVelocity1 = 50.0f,
+                LinearVelocity2 = 60.0f,
+                AngularVelocity0 = 70.0f,
+                AngularVelocity1 = 80.0f,
+                AngularVelocity2 = 90.0f,
+                IsActive = 1
+            }
+        ];
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        nativeSet.Physics.SyncToPhysics(world);
+        nativeSet.Physics.SyncFromPhysics(world);
+
+        Assert.Equal((uint)1, backend.LastPhysicsWriteCount);
+        Assert.True(backend.LastPhysicsWrite.HasValue);
+        Assert.Equal((ulong)101, backend.LastPhysicsWrite.Value.Body);
+        Assert.Equal(1.0f, backend.LastPhysicsWrite.Value.Position0);
+        Assert.Equal(9.0f, backend.LastPhysicsWrite.Value.AngularVelocity2);
+
+        Assert.True(world.TryGetComponent(syncedEntity, out PhysicsBody updated));
+        Assert.Equal(new Vector3(10.0f, 20.0f, 30.0f), updated.Position);
+        Assert.Equal(new Vector3(40.0f, 50.0f, 60.0f), updated.LinearVelocity);
+        Assert.Equal(new Vector3(70.0f, 80.0f, 90.0f), updated.AngularVelocity);
+        Assert.True(updated.IsActive);
+    }
+
+    [Fact]
+    public void NativeRuntimeSubmit_UsesPacketNativePointersWhenProvided()
+    {
+        var backend = new FakeNativeInteropApi();
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
+
+        var drawBuffer = Marshal.AllocHGlobal(Marshal.SizeOf<NativeDrawItem>());
+        var uiBuffer = Marshal.AllocHGlobal(Marshal.SizeOf<NativeUiDrawItem>());
+
+        try
+        {
+            var packet = RenderPacket.CreateNative(
+                0,
+                Array.Empty<DrawCommand>(),
+                Array.Empty<UiDrawCommand>(),
+                drawBuffer,
+                1,
+                uiBuffer,
+                1);
+
+            nativeSet.Rendering.Submit(packet);
+
+            Assert.Equal(drawBuffer, backend.LastRendererSubmitPacket.DrawItems);
+            Assert.Equal((uint)1, backend.LastRendererSubmitPacket.DrawItemCount);
+            Assert.Equal(uiBuffer, backend.LastRendererSubmitPacket.UiItems);
+            Assert.Equal((uint)1, backend.LastRendererSubmitPacket.UiItemCount);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(drawBuffer);
+            Marshal.FreeHGlobal(uiBuffer);
+        }
+    }
+
+    [Fact]
+    public void NativeRuntimeSubmit_FallsBackToManagedCommandsWhenNativePointersMissing()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        var entity = world.CreateEntity();
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
+
+        var draw = new DrawCommand(entity, new MeshHandle(10), new MaterialHandle(20), new TextureHandle(30));
+        var ui = new UiDrawCommand(new TextureHandle(40), 5, 6, 7, 8);
+        var packet = new RenderPacket(0, [draw], [ui]);
+
+        nativeSet.Rendering.Submit(packet);
+
+        Assert.NotEqual(IntPtr.Zero, backend.LastRendererSubmitPacket.DrawItems);
+        Assert.Equal((uint)1, backend.LastRendererSubmitPacket.DrawItemCount);
+        Assert.NotEqual(IntPtr.Zero, backend.LastRendererSubmitPacket.UiItems);
+        Assert.Equal((uint)1, backend.LastRendererSubmitPacket.UiItemCount);
+
+        Assert.True(backend.LastSubmittedDrawItem.HasValue);
+        var submittedDraw = backend.LastSubmittedDrawItem.Value;
+        Assert.Equal((ulong)10, submittedDraw.Mesh);
+        Assert.Equal((ulong)20, submittedDraw.Material);
+        Assert.Equal(1.0f, submittedDraw.World00);
+        Assert.Equal(1.0f, submittedDraw.World11);
+        Assert.Equal(1.0f, submittedDraw.World22);
+        Assert.Equal(1.0f, submittedDraw.World33);
+
+        Assert.True(backend.LastSubmittedUiItem.HasValue);
+        var submittedUi = backend.LastSubmittedUiItem.Value;
+        Assert.Equal((ulong)40, submittedUi.Texture);
+        Assert.Equal((uint)5, submittedUi.VertexOffset);
+        Assert.Equal((uint)6, submittedUi.VertexCount);
+        Assert.Equal((uint)7, submittedUi.IndexOffset);
+        Assert.Equal((uint)8, submittedUi.IndexCount);
+    }
+
+    [Fact]
     public void NativeRuntimeDisposeMakesFacadesUnusable()
     {
         var backend = new FakeNativeInteropApi();
@@ -98,148 +233,5 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     {
         var drawCommand = new DrawCommand(entity, new MeshHandle(10), new MaterialHandle(20), new TextureHandle(30));
         return new RenderPacket(0, [drawCommand]);
-    }
-
-    private sealed class FakeNativeInteropApi : INativeInteropApi
-    {
-        private readonly IntPtr _engineHandle = new(101);
-        private readonly IntPtr _rendererHandle = new(202);
-        private readonly IntPtr _physicsHandle = new(303);
-
-        public List<string> Calls { get; } = [];
-
-        public EngineNativeStatus EngineCreateStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus EngineDestroyStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus EnginePumpEventsStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus EngineGetRendererStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus EngineGetPhysicsStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus RendererBeginFrameStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus RendererSubmitStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus RendererPresentStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus PhysicsStepStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus PhysicsSyncFromWorldStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus PhysicsSyncToWorldStatus { get; set; } = EngineNativeStatus.Ok;
-
-        public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
-        {
-            Calls.Add("engine_create");
-            engine = EngineCreateStatus == EngineNativeStatus.Ok ? _engineHandle : IntPtr.Zero;
-            return EngineCreateStatus;
-        }
-
-        public EngineNativeStatus EngineDestroy(IntPtr engine)
-        {
-            Calls.Add("engine_destroy");
-            return EngineDestroyStatus;
-        }
-
-        public EngineNativeStatus EnginePumpEvents(
-            IntPtr engine,
-            out EngineNativeInputSnapshot input,
-            out EngineNativeWindowEvents windowEvents)
-        {
-            Calls.Add("engine_pump_events");
-
-            input = new EngineNativeInputSnapshot
-            {
-                FrameIndex = 1,
-                ButtonsMask = 0,
-                MouseX = 0,
-                MouseY = 0
-            };
-
-            windowEvents = new EngineNativeWindowEvents
-            {
-                ShouldClose = 0,
-                Width = 1280,
-                Height = 720
-            };
-
-            return EnginePumpEventsStatus;
-        }
-
-        public EngineNativeStatus EngineGetRenderer(IntPtr engine, out IntPtr renderer)
-        {
-            Calls.Add("engine_get_renderer");
-            renderer = EngineGetRendererStatus == EngineNativeStatus.Ok ? _rendererHandle : IntPtr.Zero;
-            return EngineGetRendererStatus;
-        }
-
-        public EngineNativeStatus EngineGetPhysics(IntPtr engine, out IntPtr physics)
-        {
-            Calls.Add("engine_get_physics");
-            physics = EngineGetPhysicsStatus == EngineNativeStatus.Ok ? _physicsHandle : IntPtr.Zero;
-            return EngineGetPhysicsStatus;
-        }
-
-        public EngineNativeStatus RendererBeginFrame(
-            IntPtr renderer,
-            nuint requestedBytes,
-            nuint alignment,
-            out IntPtr frameMemory)
-        {
-            Calls.Add("renderer_begin_frame");
-            frameMemory = RendererBeginFrameStatus == EngineNativeStatus.Ok ? new IntPtr(404) : IntPtr.Zero;
-            return RendererBeginFrameStatus;
-        }
-
-        public EngineNativeStatus RendererSubmit(IntPtr renderer, in EngineNativeRenderPacket packet)
-        {
-            Calls.Add("renderer_submit");
-            return RendererSubmitStatus;
-        }
-
-        public EngineNativeStatus RendererPresent(IntPtr renderer)
-        {
-            Calls.Add("renderer_present");
-            return RendererPresentStatus;
-        }
-
-        public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
-        {
-            Calls.Add("physics_step");
-            return PhysicsStepStatus;
-        }
-
-        public EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount)
-        {
-            Calls.Add("physics_sync_from_world");
-            return PhysicsSyncFromWorldStatus;
-        }
-
-        public EngineNativeStatus PhysicsSyncToWorld(
-            IntPtr physics,
-            IntPtr reads,
-            uint readCapacity,
-            out uint readCount)
-        {
-            Calls.Add("physics_sync_to_world");
-            readCount = 0;
-            return PhysicsSyncToWorldStatus;
-        }
-
-        public int CountCall(string callName)
-        {
-            var count = 0;
-            foreach (var call in Calls)
-            {
-                if (string.Equals(call, callName, StringComparison.Ordinal))
-                {
-                    count++;
-                }
-            }
-
-            return count;
-        }
     }
 }

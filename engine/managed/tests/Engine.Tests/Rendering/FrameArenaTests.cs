@@ -1,4 +1,5 @@
 using System;
+using System.Runtime.InteropServices;
 using Engine.Rendering;
 using Xunit;
 
@@ -55,5 +56,39 @@ public sealed class FrameArenaTests
         Assert.Throws<ObjectDisposedException>(() => arena.Reset());
         Assert.Throws<ObjectDisposedException>(() => arena.Alloc<byte>(1));
         Assert.Throws<ObjectDisposedException>(() => _ = arena.BasePointer);
+    }
+
+    [Fact]
+    public void WrapExternalMemory_ValidatesArguments()
+    {
+        Assert.Throws<ArgumentException>(() => FrameArena.WrapExternalMemory(IntPtr.Zero, 64, 16));
+        Assert.Throws<ArgumentOutOfRangeException>(() => FrameArena.WrapExternalMemory(new IntPtr(16), 0, 16));
+        Assert.Throws<ArgumentOutOfRangeException>(() => FrameArena.WrapExternalMemory(new IntPtr(16), 64, 3));
+        Assert.Throws<ArgumentException>(() => FrameArena.WrapExternalMemory(new IntPtr(3), 64, 4));
+    }
+
+    [Fact]
+    public void WrapExternalMemory_DoesNotOwnWrappedBuffer()
+    {
+        var memory = Marshal.AllocHGlobal(128);
+
+        try
+        {
+            using (var arena = FrameArena.WrapExternalMemory(memory, 128, 1))
+            {
+                var bytes = arena.Alloc<byte>(4);
+                bytes[0] = 10;
+                bytes[1] = 20;
+                bytes[2] = 30;
+                bytes[3] = 40;
+            }
+
+            Marshal.WriteByte(memory, 0, 99);
+            Assert.Equal(99, Marshal.ReadByte(memory, 0));
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(memory);
+        }
     }
 }

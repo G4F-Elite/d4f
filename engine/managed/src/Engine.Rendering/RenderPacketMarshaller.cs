@@ -31,34 +31,27 @@ public static unsafe class RenderPacketMarshaller
     }
 
     private static NativeBatch MarshalDrawBatch(IReadOnlyList<DrawCommand> drawCommands, FrameArena frameArena)
-    {
-        var count = drawCommands.Count;
-        if (count == 0)
-        {
-            return NativeBatch.Empty;
-        }
-
-        var nativeItems = frameArena.Alloc<NativeDrawItem>(count);
-        for (var i = 0; i < count; i++)
-        {
-            nativeItems[i] = NativeDrawItem.From(drawCommands[i]);
-        }
-
-        return new NativeBatch(GetSpanPointer(nativeItems), count);
-    }
+        => MarshalBatch(drawCommands, frameArena, static command => NativeDrawItem.From(command));
 
     private static NativeBatch MarshalUiDrawBatch(IReadOnlyList<UiDrawCommand> uiDrawCommands, FrameArena frameArena)
+        => MarshalBatch(uiDrawCommands, frameArena, static command => NativeUiDrawItem.From(command));
+
+    private static NativeBatch MarshalBatch<TCommand, TNative>(
+        IReadOnlyList<TCommand> commands,
+        FrameArena frameArena,
+        Func<TCommand, TNative> convert)
+        where TNative : unmanaged
     {
-        var count = uiDrawCommands.Count;
+        var count = commands.Count;
         if (count == 0)
         {
             return NativeBatch.Empty;
         }
 
-        var nativeItems = frameArena.Alloc<NativeUiDrawItem>(count);
+        var nativeItems = frameArena.Alloc<TNative>(count);
         for (var i = 0; i < count; i++)
         {
-            nativeItems[i] = NativeUiDrawItem.From(uiDrawCommands[i]);
+            nativeItems[i] = convert(commands[i]);
         }
 
         return new NativeBatch(GetSpanPointer(nativeItems), count);

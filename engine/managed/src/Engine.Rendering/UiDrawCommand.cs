@@ -1,37 +1,46 @@
 using System;
+using Engine.Core.Handles;
 
 namespace Engine.Rendering;
 
 public readonly record struct UiDrawCommand
 {
-    public UiDrawCommand(uint drawListId, uint textureId, int indexOffset, int elementCount)
+    public UiDrawCommand(TextureHandle texture, uint vertexOffset, uint vertexCount, uint indexOffset, uint indexCount)
     {
-        if (drawListId == 0)
+        if (!texture.IsValid)
         {
-            throw new ArgumentOutOfRangeException(nameof(drawListId), "Draw list id must be non-zero.");
+            throw new ArgumentException("Texture handle must be valid.", nameof(texture));
         }
 
-        if (indexOffset < 0)
+        if (vertexCount == 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(indexOffset), "Index offset cannot be negative.");
+            throw new ArgumentOutOfRangeException(nameof(vertexCount), "Vertex count must be positive.");
         }
 
-        if (elementCount <= 0)
+        if (indexCount == 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(elementCount), "Element count must be positive.");
+            throw new ArgumentOutOfRangeException(nameof(indexCount), "Index count must be positive.");
         }
 
-        DrawListId = drawListId;
-        TextureId = textureId;
+        Texture = texture;
+        VertexOffset = vertexOffset;
+        VertexCount = vertexCount;
         IndexOffset = indexOffset;
-        ElementCount = elementCount;
+        IndexCount = indexCount;
     }
 
-    public uint DrawListId { get; }
+    public UiDrawCommand(uint texture, uint vertexOffset, uint vertexCount, uint indexOffset, uint indexCount)
+        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount)
+    {
+    }
 
-    public uint TextureId { get; }
+    public TextureHandle Texture { get; }
 
-    public int IndexOffset { get; }
+    public uint VertexOffset { get; }
 
-    public int ElementCount { get; }
+    public uint VertexCount { get; }
+
+    public uint IndexOffset { get; }
+
+    public uint IndexCount { get; }
 }
