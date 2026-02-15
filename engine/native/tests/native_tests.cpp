@@ -118,6 +118,21 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_sync_from_world(physics, writes, 1u) == ENGINE_NATIVE_STATUS_OK);
   assert(physics_step(physics, 0.0) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_OK);
+  engine_native_raycast_query_t query{};
+  query.origin[0] = 0.0f;
+  query.origin[1] = 0.0f;
+  query.origin[2] = 0.0f;
+  query.direction[0] = 1.0f;
+  query.direction[1] = 0.0f;
+  query.direction[2] = 0.0f;
+  query.max_distance = 10.0f;
+  query.include_triggers = 1u;
+  engine_native_raycast_hit_t raycast_hit{};
+  assert(physics_raycast(physics, &query, &raycast_hit) == ENGINE_NATIVE_STATUS_OK);
+  assert(raycast_hit.has_hit == 1u);
+  assert(raycast_hit.body == 1001u);
+  assert(std::fabs(raycast_hit.distance - 1.55f) < 0.001f);
+
   engine_native_body_read_t reads[2]{};
   uint32_t read_count = 0u;
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
@@ -141,6 +156,17 @@ void TestEngineAndSubsystemFlow() {
   invalid_write[0].friction = 0.2f;
   invalid_write[0].restitution = 0.3f;
   assert(physics_sync_from_world(physics, invalid_write, 1u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_raycast_query_t invalid_query{};
+  invalid_query.direction[0] = 0.0f;
+  invalid_query.direction[1] = 0.0f;
+  invalid_query.direction[2] = 0.0f;
+  invalid_query.max_distance = 10.0f;
+  assert(physics_raycast(physics, nullptr, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_raycast(physics, &invalid_query, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_raycast(physics, &query, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

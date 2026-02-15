@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 2u
+#define ENGINE_NATIVE_API_VERSION 3u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -101,6 +101,27 @@ typedef struct engine_native_body_read {
   uint8_t is_active;
 } engine_native_body_read_t;
 
+typedef struct engine_native_raycast_query {
+  float origin[3];
+  float direction[3];
+  float max_distance;
+  uint8_t include_triggers;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
+} engine_native_raycast_query_t;
+
+typedef struct engine_native_raycast_hit {
+  uint8_t has_hit;
+  uint8_t is_trigger;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  engine_native_resource_handle_t body;
+  float distance;
+  float point[3];
+  float normal[3];
+} engine_native_raycast_hit_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -152,6 +173,11 @@ ENGINE_NATIVE_API engine_native_status_t physics_sync_to_world(
     engine_native_body_read_t* reads,
     uint32_t read_capacity,
     uint32_t* out_read_count);
+
+ENGINE_NATIVE_API engine_native_status_t physics_raycast(
+    engine_native_physics_t* physics,
+    const engine_native_raycast_query_t* query,
+    engine_native_raycast_hit_t* out_hit);
 
 #ifdef __cplusplus
 }

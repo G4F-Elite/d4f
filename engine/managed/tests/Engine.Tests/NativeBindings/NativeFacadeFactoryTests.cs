@@ -2,6 +2,7 @@ using System;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.NativeBindings;
+using Engine.Physics;
 using Engine.Rendering;
 using Xunit;
 
@@ -31,6 +32,7 @@ public sealed class NativeFacadeFactoryTests
         physics.SyncToPhysics(world);
         physics.Step(TimeSpan.FromMilliseconds(8));
         physics.SyncFromPhysics(world);
+        Assert.False(physics.Raycast(new PhysicsRaycastQuery(default, new(1, 0, 0), 10.0f), out _));
 
         ui.Update(world, frame1);
         using var frameArena = rendering.BeginFrame(1024, 64);

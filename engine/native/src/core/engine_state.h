@@ -82,6 +82,8 @@ class PhysicsState {
   engine_native_status_t SyncToWorld(engine_native_body_read_t* reads,
                                      uint32_t read_capacity,
                                      uint32_t* out_read_count);
+  engine_native_status_t Raycast(const engine_native_raycast_query_t& query,
+                                 engine_native_raycast_hit_t* out_hit) const;
 
   uint64_t step_count() const { return step_count_; }
   size_t body_count() const { return bodies_.size(); }

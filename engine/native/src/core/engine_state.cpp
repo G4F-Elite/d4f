@@ -316,7 +316,6 @@ void RendererState::ResetFrameState() {
   frame_graph_.Clear();
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();
-  last_executed_rhi_passes_.clear();
   frame_open_ = false;
   frame_storage_.clear();
 }

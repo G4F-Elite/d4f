@@ -36,4 +36,9 @@ internal interface INativeInteropApi
         IntPtr reads,
         uint readCapacity,
         out uint readCount);
+
+    EngineNativeStatus PhysicsRaycast(
+        IntPtr physics,
+        in EngineNativeRaycastQuery query,
+        out EngineNativeRaycastHit hit);
 }

@@ -10,4 +10,6 @@ public interface IPhysicsFacade
     void Step(TimeSpan deltaTime);
 
     void SyncFromPhysics(World world);
+
+    bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit);
 }

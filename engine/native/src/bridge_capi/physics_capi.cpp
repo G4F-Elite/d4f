@@ -50,4 +50,18 @@ engine_native_status_t physics_sync_to_world(engine_native_physics_t* physics,
   return physics->state->SyncToWorld(reads, read_capacity, out_read_count);
 }
 
+engine_native_status_t physics_raycast(engine_native_physics_t* physics,
+                                       const engine_native_raycast_query_t* query,
+                                       engine_native_raycast_hit_t* out_hit) {
+  const engine_native_status_t status = ValidatePhysics(physics);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (query == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return physics->state->Raycast(*query, out_hit);
+}
+
 }  // extern "C"

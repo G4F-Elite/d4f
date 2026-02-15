@@ -27,6 +27,10 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeBodyRead[] PhysicsReadsToReturn { get; set; } = Array.Empty<EngineNativeBodyRead>();
 
+    public EngineNativeRaycastQuery? LastPhysicsRaycastQuery { get; private set; }
+
+    public EngineNativeRaycastHit PhysicsRaycastHitToReturn { get; set; }
+
     public EngineNativeStatus EngineCreateStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EngineDestroyStatus { get; set; } = EngineNativeStatus.Ok;
@@ -48,6 +52,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus PhysicsSyncFromWorldStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsSyncToWorldStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus PhysicsRaycastStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
     {
@@ -164,6 +170,17 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
         readCount = writableCount;
         return PhysicsSyncToWorldStatus;
+    }
+
+    public EngineNativeStatus PhysicsRaycast(
+        IntPtr physics,
+        in EngineNativeRaycastQuery query,
+        out EngineNativeRaycastHit hit)
+    {
+        Calls.Add("physics_raycast");
+        LastPhysicsRaycastQuery = query;
+        hit = PhysicsRaycastHitToReturn;
+        return PhysicsRaycastStatus;
     }
 
     public int CountCall(string callName)

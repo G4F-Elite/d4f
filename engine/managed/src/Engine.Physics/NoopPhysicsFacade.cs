@@ -28,4 +28,10 @@ public sealed class NoopPhysicsFacade : IPhysicsFacade
     {
         ArgumentNullException.ThrowIfNull(world);
     }
+
+    public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
+    {
+        hit = default;
+        return false;
+    }
 }

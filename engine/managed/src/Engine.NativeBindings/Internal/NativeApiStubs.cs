@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using Engine.Core.Timing;
 using Engine.ECS;
+using Engine.Physics;
 using Engine.Rendering;
 
 namespace Engine.NativeBindings.Internal;
@@ -46,6 +47,12 @@ internal sealed class NativePhysicsApiStub : INativePhysicsApi
     public void SyncFromPhysics(World world)
     {
         ArgumentNullException.ThrowIfNull(world);
+    }
+
+    public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
+    {
+        hit = default;
+        return false;
     }
 }
 

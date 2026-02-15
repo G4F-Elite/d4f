@@ -179,6 +179,44 @@ internal sealed partial class NativeRuntime
         }
     }
 
+    public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
+    {
+        ThrowIfDisposed();
+
+        var nativeQuery = new EngineNativeRaycastQuery
+        {
+            Origin0 = query.Origin.X,
+            Origin1 = query.Origin.Y,
+            Origin2 = query.Origin.Z,
+            Direction0 = query.Direction.X,
+            Direction1 = query.Direction.Y,
+            Direction2 = query.Direction.Z,
+            MaxDistance = query.MaxDistance,
+            IncludeTriggers = query.IncludeTriggers ? (byte)1 : (byte)0,
+            Reserved0 = 0,
+            Reserved1 = 0,
+            Reserved2 = 0
+        };
+
+        NativeStatusGuard.ThrowIfFailed(
+            _interop.PhysicsRaycast(_physics, in nativeQuery, out var nativeHit),
+            "physics_raycast");
+
+        if (nativeHit.HasHit == 0)
+        {
+            hit = default;
+            return false;
+        }
+
+        hit = new PhysicsRaycastHit(
+            DecodeBodyHandle(nativeHit.Body),
+            nativeHit.Distance,
+            new(nativeHit.Point0, nativeHit.Point1, nativeHit.Point2),
+            new(nativeHit.Normal0, nativeHit.Normal1, nativeHit.Normal2),
+            nativeHit.IsTrigger != 0);
+        return true;
+    }
+
     public FrameArena BeginFrame(int requestedBytes, int alignment)
     {
         ThrowIfDisposed();
@@ -362,5 +400,15 @@ internal sealed partial class NativeRuntime
         }
 
         return body.Value;
+    }
+
+    private static BodyHandle DecodeBodyHandle(ulong body)
+    {
+        if (body == 0u || body > uint.MaxValue)
+        {
+            throw new InvalidOperationException($"Native physics returned invalid body handle '{body}'.");
+        }
+
+        return new BodyHandle((uint)body);
     }
 }

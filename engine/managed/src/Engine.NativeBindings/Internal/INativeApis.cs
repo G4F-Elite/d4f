@@ -1,6 +1,7 @@
 using System;
 using Engine.Core.Timing;
 using Engine.ECS;
+using Engine.Physics;
 using Engine.Rendering;
 
 namespace Engine.NativeBindings.Internal;
@@ -22,6 +23,8 @@ internal interface INativePhysicsApi
     void Step(TimeSpan deltaTime);
 
     void SyncFromPhysics(World world);
+
+    bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit);
 }
 
 internal interface INativeUiApi

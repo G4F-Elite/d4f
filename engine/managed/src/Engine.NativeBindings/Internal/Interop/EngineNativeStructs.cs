@@ -118,3 +118,36 @@ internal struct EngineNativeBodyRead
     public float AngularVelocity2;
     public byte IsActive;
 }
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeRaycastQuery
+{
+    public float Origin0;
+    public float Origin1;
+    public float Origin2;
+    public float Direction0;
+    public float Direction1;
+    public float Direction2;
+    public float MaxDistance;
+    public byte IncludeTriggers;
+    public byte Reserved0;
+    public byte Reserved1;
+    public byte Reserved2;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeRaycastHit
+{
+    public byte HasHit;
+    public byte IsTrigger;
+    public byte Reserved0;
+    public byte Reserved1;
+    public ulong Body;
+    public float Distance;
+    public float Point0;
+    public float Point1;
+    public float Point2;
+    public float Normal0;
+    public float Normal1;
+    public float Normal2;
+}

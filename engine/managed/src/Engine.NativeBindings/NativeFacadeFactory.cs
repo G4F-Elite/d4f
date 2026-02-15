@@ -76,6 +76,9 @@ public static class NativeFacadeFactory
         public void Step(TimeSpan deltaTime) => _nativeApi.Step(deltaTime);
 
         public void SyncFromPhysics(World world) => _nativeApi.SyncFromPhysics(world);
+
+        public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
+            => _nativeApi.Raycast(query, out hit);
     }
 
     private sealed class NativeUiFacade : IUiFacade

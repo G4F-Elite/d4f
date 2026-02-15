@@ -56,6 +56,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out uint readCount)
         => NativeMethods.PhysicsSyncToWorld(physics, reads, readCapacity, out readCount);
 
+    public EngineNativeStatus PhysicsRaycast(
+        IntPtr physics,
+        in EngineNativeRaycastQuery query,
+        out EngineNativeRaycastHit hit)
+        => NativeMethods.PhysicsRaycast(physics, in query, out hit);
+
     private static partial class NativeMethods
     {
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_create")]
@@ -123,5 +129,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             IntPtr reads,
             uint readCapacity,
             out uint outReadCount);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_raycast")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus PhysicsRaycast(
+            IntPtr physics,
+            in EngineNativeRaycastQuery query,
+            out EngineNativeRaycastHit hit);
     }
 }

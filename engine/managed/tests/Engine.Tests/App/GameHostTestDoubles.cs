@@ -149,6 +149,13 @@ internal sealed class RecordingPhysicsFacade : IPhysicsFacade
         SyncFromCallCount++;
         _execution.Add("physics.sync.from");
     }
+
+    public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
+    {
+        hit = default;
+        _execution.Add("physics.raycast");
+        return false;
+    }
 }
 
 internal sealed class RecordingUiFacade : IUiFacade

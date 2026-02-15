@@ -149,6 +149,70 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     }
 
     [Fact]
+    public void NativeRuntimePhysicsRaycast_UsesInteropAndMapsHit()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            PhysicsRaycastHitToReturn = new EngineNativeRaycastHit
+            {
+                HasHit = 1,
+                IsTrigger = 1,
+                Body = 77,
+                Distance = 12.5f,
+                Point0 = 1.0f,
+                Point1 = 2.0f,
+                Point2 = 3.0f,
+                Normal0 = 0.0f,
+                Normal1 = 1.0f,
+                Normal2 = 0.0f
+            }
+        };
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        var query = new PhysicsRaycastQuery(
+            new Vector3(-1.0f, 0.0f, 0.0f),
+            new Vector3(1.0f, 0.0f, 0.0f),
+            100.0f,
+            includeTriggers: true);
+
+        bool hasHit = nativeSet.Physics.Raycast(query, out PhysicsRaycastHit hit);
+
+        Assert.True(hasHit);
+        Assert.Equal(new BodyHandle(77), hit.Body);
+        Assert.Equal(12.5f, hit.Distance);
+        Assert.Equal(new Vector3(1.0f, 2.0f, 3.0f), hit.Point);
+        Assert.Equal(new Vector3(0.0f, 1.0f, 0.0f), hit.Normal);
+        Assert.True(hit.IsTrigger);
+
+        Assert.True(backend.LastPhysicsRaycastQuery.HasValue);
+        EngineNativeRaycastQuery nativeQuery = backend.LastPhysicsRaycastQuery.Value;
+        Assert.Equal(-1.0f, nativeQuery.Origin0);
+        Assert.Equal(1.0f, nativeQuery.Direction0);
+        Assert.Equal(100.0f, nativeQuery.MaxDistance);
+        Assert.Equal((byte)1, nativeQuery.IncludeTriggers);
+    }
+
+    [Fact]
+    public void NativeRuntimePhysicsRaycast_ReturnsFalseWhenNoHit()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            PhysicsRaycastHitToReturn = new EngineNativeRaycastHit
+            {
+                HasHit = 0
+            }
+        };
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        bool hasHit = nativeSet.Physics.Raycast(
+            new PhysicsRaycastQuery(Vector3.Zero, Vector3.UnitY, 5.0f),
+            out PhysicsRaycastHit hit);
+
+        Assert.False(hasHit);
+        Assert.Equal(default, hit);
+    }
+
+    [Fact]
     public void NativeRuntimeSubmit_UsesPacketNativePointersWhenProvided()
     {
         var backend = new FakeNativeInteropApi();
