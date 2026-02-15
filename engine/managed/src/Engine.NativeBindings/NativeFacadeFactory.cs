@@ -3,6 +3,7 @@ using Engine.Core.Abstractions;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.NativeBindings.Internal;
+using Engine.NativeBindings.Internal.Interop;
 using Engine.Physics;
 using Engine.Rendering;
 using Engine.UI;
@@ -11,6 +12,9 @@ namespace Engine.NativeBindings;
 
 public static class NativeFacadeFactory
 {
+    public static NativeFacadeSet CreateNativeFacadeSet()
+        => CreateNativeFacadeSet(DffNativeInteropApi.Instance);
+
     public static IPlatformFacade CreatePlatformFacade() => new NativePlatformFacade(new NativePlatformApiStub());
 
     public static ITimingFacade CreateTimingFacade() => new NativeTimingFacade(new NativeTimingApiStub());
@@ -30,6 +34,9 @@ public static class NativeFacadeFactory
     internal static IUiFacade CreateUiFacade(INativeUiApi nativeApi) => new NativeUiFacade(nativeApi);
 
     internal static IRenderingFacade CreateRenderingFacade(INativeRenderingApi nativeApi) => new NativeRenderingFacade(nativeApi);
+
+    internal static NativeFacadeSet CreateNativeFacadeSet(INativeInteropApi interop)
+        => new(new NativeRuntime(interop));
 
     private sealed class NativePlatformFacade : IPlatformFacade
     {
