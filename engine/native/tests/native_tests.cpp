@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "bridge_capi/bridge_state.h"
 #include "core/resource_table.h"
 #include "engine_native.h"
 #include "platform/platform_state_tests.h"
@@ -41,6 +42,8 @@ void TestEngineAndSubsystemFlow() {
   assert(engine_pump_events(engine, &input, &events) == ENGINE_NATIVE_STATUS_OK);
   assert(input.frame_index == 1u);
   assert(events.should_close == 0u);
+  const auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
+  assert(internal_engine->state.platform.pump_count() == 1u);
 
   engine_native_renderer_t* renderer = nullptr;
   engine_native_physics_t* physics = nullptr;
@@ -72,6 +75,12 @@ void TestEngineAndSubsystemFlow() {
   assert(frame_memory != nullptr);
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(internal_engine->state.rhi_device.present_count() == 1u);
+  const auto clear_color = internal_engine->state.renderer.last_clear_color();
+  assert(clear_color[0] == 0.05f);
+  assert(clear_color[1] == 0.07f);
+  assert(clear_color[2] == 0.10f);
+  assert(clear_color[3] == 1.0f);
 
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_INVALID_STATE);
 
