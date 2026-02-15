@@ -1,0 +1,8 @@
+{
+  "assets": [
+    {
+      "path": "assets/example.txt",
+      "kind": "text"
+    }
+  ]
+}
