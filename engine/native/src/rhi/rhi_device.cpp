@@ -9,6 +9,9 @@ engine_native_status_t RhiDevice::BeginFrame() {
 
   frame_open_ = true;
   clear_called_in_frame_ = false;
+  present_pass_called_in_frame_ = false;
+  execute_pass_used_in_frame_ = false;
+  executed_passes_.clear();
   return ENGINE_NATIVE_STATUS_OK;
 }
 
@@ -16,10 +19,44 @@ engine_native_status_t RhiDevice::Clear(const std::array<float, 4>& color) {
   if (!frame_open_) {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
+  if (present_pass_called_in_frame_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
 
   last_clear_color_ = color;
   clear_called_in_frame_ = true;
+  executed_passes_.push_back(PassKind::kClear);
   return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RhiDevice::ExecutePass(PassKind pass_kind) {
+  if (!frame_open_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  if (present_pass_called_in_frame_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  execute_pass_used_in_frame_ = true;
+
+  switch (pass_kind) {
+    case PassKind::kClear:
+      clear_called_in_frame_ = true;
+      executed_passes_.push_back(PassKind::kClear);
+      return ENGINE_NATIVE_STATUS_OK;
+
+    case PassKind::kPresent:
+      if (!clear_called_in_frame_) {
+        return ENGINE_NATIVE_STATUS_INVALID_STATE;
+      }
+
+      present_pass_called_in_frame_ = true;
+      executed_passes_.push_back(PassKind::kPresent);
+      return ENGINE_NATIVE_STATUS_OK;
+  }
+
+  return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
 }
 
 engine_native_status_t RhiDevice::EndFrame() {
@@ -31,8 +68,17 @@ engine_native_status_t RhiDevice::EndFrame() {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
+  // Keep the legacy Clear()->EndFrame() flow for subsystems that do not use
+  // explicit pass execution yet. When ExecutePass() is used, present is
+  // mandatory before ending the frame.
+  if (execute_pass_used_in_frame_ && !present_pass_called_in_frame_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
   frame_open_ = false;
   clear_called_in_frame_ = false;
+  present_pass_called_in_frame_ = false;
+  execute_pass_used_in_frame_ = false;
   ++present_count_;
   return ENGINE_NATIVE_STATUS_OK;
 }
