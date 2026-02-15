@@ -12,8 +12,9 @@ namespace dff::native::rhi {
 class RhiDevice {
  public:
   enum class PassKind : uint8_t {
-    kClear = 0u,
-    kPresent = 1u,
+    kSceneOpaque = 0u,
+    kUiOverlay = 1u,
+    kPresent = 2u,
   };
 
   engine_native_status_t BeginFrame();
@@ -36,7 +37,6 @@ class RhiDevice {
   bool frame_open_ = false;
   bool clear_called_in_frame_ = false;
   bool present_pass_called_in_frame_ = false;
-  bool execute_pass_used_in_frame_ = false;
   uint64_t present_count_ = 0;
   std::array<float, 4> last_clear_color_{0.0f, 0.0f, 0.0f, 1.0f};
   std::vector<PassKind> executed_passes_;

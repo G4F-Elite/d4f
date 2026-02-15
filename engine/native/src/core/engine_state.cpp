@@ -4,8 +4,32 @@
 #include <cstdint>
 #include <limits>
 #include <new>
+#include <string>
+#include <vector>
 
 namespace dff::native {
+
+namespace {
+
+constexpr const char* kScenePassName = "scene";
+constexpr const char* kUiPassName = "ui";
+constexpr const char* kPresentPassName = "present";
+constexpr const char* kFrameColorResourceName = "frame_color";
+
+const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
+  switch (pass_kind) {
+    case rhi::RhiDevice::PassKind::kSceneOpaque:
+      return kScenePassName;
+    case rhi::RhiDevice::PassKind::kUiOverlay:
+      return kUiPassName;
+    case rhi::RhiDevice::PassKind::kPresent:
+      return kPresentPassName;
+  }
+
+  return "unknown";
+}
+
+}  // namespace
 
 EngineState::EngineState() {
   renderer.AttachDevice(&rhi_device);
@@ -61,21 +85,18 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   frame_capacity_ = requested_bytes;
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
+  last_executed_rhi_passes_.clear();
 
   engine_native_status_t status = rhi_device_->BeginFrame();
   if (status != ENGINE_NATIVE_STATUS_OK) {
-    frame_memory_ = nullptr;
-    frame_capacity_ = 0u;
-    frame_storage_.clear();
+    ResetFrameState();
     return status;
   }
 
   status = rhi_device_->Clear(last_clear_color_);
   if (status != ENGINE_NATIVE_STATUS_OK) {
     static_cast<void>(rhi_device_->EndFrame());
-    frame_memory_ = nullptr;
-    frame_capacity_ = 0u;
-    frame_storage_.clear();
+    ResetFrameState();
     return status;
   }
 
@@ -97,11 +118,21 @@ engine_native_status_t RendererState::Submit(
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
+  if (packet.draw_item_count >
+          std::numeric_limits<uint32_t>::max() - submitted_draw_count_ ||
+      packet.ui_item_count >
+          std::numeric_limits<uint32_t>::max() - submitted_ui_count_) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const uint32_t total_draw_count = submitted_draw_count_ + packet.draw_item_count;
+  const uint32_t total_ui_count = submitted_ui_count_ + packet.ui_item_count;
+
   const size_t draw_bytes =
-      static_cast<size_t>(packet.draw_item_count) *
+      static_cast<size_t>(total_draw_count) *
       static_cast<size_t>(sizeof(engine_native_draw_item_t));
   const size_t ui_bytes =
-      static_cast<size_t>(packet.ui_item_count) *
+      static_cast<size_t>(total_ui_count) *
       static_cast<size_t>(sizeof(engine_native_ui_draw_item_t));
 
   if (draw_bytes > frame_capacity_ || ui_bytes > frame_capacity_ ||
@@ -110,8 +141,8 @@ engine_native_status_t RendererState::Submit(
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
-  submitted_draw_count_ += packet.draw_item_count;
-  submitted_ui_count_ += packet.ui_item_count;
+  submitted_draw_count_ = total_draw_count;
+  submitted_ui_count_ = total_ui_count;
   return ENGINE_NATIVE_STATUS_OK;
 }
 
@@ -123,18 +154,149 @@ engine_native_status_t RendererState::Present() {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
-  const engine_native_status_t status = rhi_device_->EndFrame();
+  engine_native_status_t status = BuildFrameGraph();
   if (status != ENGINE_NATIVE_STATUS_OK) {
     return status;
   }
 
+  status = ExecuteCompiledFrameGraph();
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  status = rhi_device_->EndFrame();
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  ResetFrameState();
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::BuildFrameGraph() {
+  frame_graph_.Clear();
+  compiled_pass_order_.clear();
+  pass_kinds_by_id_.clear();
+
+  render::RenderPassId scene_pass = 0u;
+  render::RenderPassId ui_pass = 0u;
+  render::RenderPassId present_pass = 0u;
+
+  engine_native_status_t status = ENGINE_NATIVE_STATUS_OK;
+  if (submitted_draw_count_ > 0u) {
+    status = AddGraphPass(
+        kScenePassName, rhi::RhiDevice::PassKind::kSceneOpaque, &scene_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddWrite(scene_pass, kFrameColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+  }
+
+  if (submitted_ui_count_ > 0u) {
+    status =
+        AddGraphPass(kUiPassName, rhi::RhiDevice::PassKind::kUiOverlay, &ui_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddWrite(ui_pass, kFrameColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    if (submitted_draw_count_ > 0u) {
+      status = frame_graph_.AddRead(ui_pass, kFrameColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+    }
+  }
+
+  status = AddGraphPass(
+      kPresentPassName, rhi::RhiDevice::PassKind::kPresent, &present_pass);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  if (submitted_draw_count_ > 0u || submitted_ui_count_ > 0u) {
+    status = frame_graph_.AddRead(present_pass, kFrameColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+  }
+
+  std::string compile_error;
+  status = frame_graph_.Compile(&compiled_pass_order_, &compile_error);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::ExecuteCompiledFrameGraph() {
+  if (rhi_device_ == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  last_executed_rhi_passes_.clear();
+  last_executed_rhi_passes_.reserve(compiled_pass_order_.size());
+
+  for (render::RenderPassId pass_id : compiled_pass_order_) {
+    const size_t pass_index = static_cast<size_t>(pass_id);
+    if (pass_index >= pass_kinds_by_id_.size()) {
+      return ENGINE_NATIVE_STATUS_INTERNAL_ERROR;
+    }
+
+    const rhi::RhiDevice::PassKind pass_kind = pass_kinds_by_id_[pass_index];
+    const engine_native_status_t status = rhi_device_->ExecutePass(pass_kind);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    last_executed_rhi_passes_.push_back(PassNameForKind(pass_kind));
+  }
+
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::AddGraphPass(
+    const char* pass_name,
+    rhi::RhiDevice::PassKind pass_kind,
+    render::RenderPassId* out_pass_id) {
+  if (pass_name == nullptr || out_pass_id == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const engine_native_status_t status = frame_graph_.AddPass(pass_name, out_pass_id);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  const size_t pass_index = static_cast<size_t>(*out_pass_id);
+  if (pass_index >= pass_kinds_by_id_.size()) {
+    pass_kinds_by_id_.resize(pass_index + 1u, rhi::RhiDevice::PassKind::kPresent);
+  }
+
+  pass_kinds_by_id_[pass_index] = pass_kind;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+void RendererState::ResetFrameState() {
   frame_memory_ = nullptr;
   frame_capacity_ = 0u;
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
+  frame_graph_.Clear();
+  compiled_pass_order_.clear();
+  pass_kinds_by_id_.clear();
+  last_executed_rhi_passes_.clear();
   frame_open_ = false;
   frame_storage_.clear();
-  return ENGINE_NATIVE_STATUS_OK;
 }
 
 engine_native_status_t PhysicsState::Step(double dt_seconds) {

@@ -1,6 +1,9 @@
 #include <assert.h>
 
 #include <cstdint>
+#include <initializer_list>
+#include <string>
+#include <vector>
 
 #include "bridge_capi/bridge_state.h"
 #include "core/resource_table.h"
@@ -10,6 +13,17 @@
 #include "rhi/rhi_device_tests.h"
 
 namespace {
+
+void AssertPassOrder(const std::vector<std::string>& actual,
+                     std::initializer_list<const char*> expected) {
+  assert(actual.size() == expected.size());
+
+  size_t index = 0u;
+  for (const char* expected_name : expected) {
+    assert(actual[index] == expected_name);
+    ++index;
+  }
+}
 
 void TestEngineCreateValidation() {
   engine_native_engine_t* engine = nullptr;
@@ -75,6 +89,8 @@ void TestEngineAndSubsystemFlow() {
   assert(frame_memory != nullptr);
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"scene", "present"});
   assert(internal_engine->state.rhi_device.present_count() == 1u);
   const auto clear_color = internal_engine->state.renderer.last_clear_color();
   assert(clear_color[0] == 0.05f);
@@ -108,6 +124,98 @@ void TestEngineAndSubsystemFlow() {
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+}
+
+void TestRendererPassOrderForDrawAndUiScenarios() {
+  engine_native_create_desc_t create_desc{
+      .api_version = ENGINE_NATIVE_API_VERSION,
+      .user_data = nullptr};
+
+  engine_native_engine_t* engine = nullptr;
+  assert(engine_create(&create_desc, &engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(engine != nullptr);
+
+  auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
+
+  engine_native_renderer_t* renderer = nullptr;
+  assert(engine_get_renderer(engine, &renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer != nullptr);
+
+  void* frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_draw_item_t draw_batch_a[1]{};
+  draw_batch_a[0].mesh = 1u;
+  draw_batch_a[0].material = 2u;
+
+  engine_native_draw_item_t draw_batch_b[1]{};
+  draw_batch_b[0].mesh = 3u;
+  draw_batch_b[0].material = 4u;
+
+  engine_native_render_packet_t draw_packet_a{
+      .draw_items = draw_batch_a,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u};
+  engine_native_render_packet_t draw_packet_b{
+      .draw_items = draw_batch_b,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u};
+
+  assert(renderer_submit(renderer, &draw_packet_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_submit(renderer, &draw_packet_b) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"scene", "present"});
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_ui_draw_item_t ui_batch[2]{};
+  ui_batch[0].texture = 10u;
+  ui_batch[0].vertex_count = 6u;
+  ui_batch[0].index_count = 6u;
+  ui_batch[1].texture = 11u;
+  ui_batch[1].vertex_count = 6u;
+  ui_batch[1].index_count = 6u;
+
+  engine_native_render_packet_t ui_packet{
+      .draw_items = nullptr,
+      .draw_item_count = 0u,
+      .ui_items = ui_batch,
+      .ui_item_count = 2u};
+
+  assert(renderer_submit(renderer, &ui_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"ui", "present"});
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_draw_item_t draw_batch[1]{};
+  draw_batch[0].mesh = 20u;
+  draw_batch[0].material = 30u;
+
+  engine_native_render_packet_t draw_and_ui_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = ui_batch,
+      .ui_item_count = 2u};
+
+  assert(renderer_submit(renderer, &draw_and_ui_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"scene", "ui", "present"});
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
@@ -150,6 +258,7 @@ void TestResourceTableGeneration() {
 int main() {
   TestEngineCreateValidation();
   TestEngineAndSubsystemFlow();
+  TestRendererPassOrderForDrawAndUiScenarios();
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();
   dff::native::tests::RunRhiDeviceTests();
