@@ -9,11 +9,15 @@
 #include <vector>
 
 #include "engine_native.h"
+#include "platform/platform_state.h"
+#include "rhi/rhi_device.h"
 
 namespace dff::native {
 
 class RendererState {
  public:
+  void AttachDevice(rhi::RhiDevice* device) { rhi_device_ = device; }
+
   engine_native_status_t BeginFrame(size_t requested_bytes,
                                     size_t alignment,
                                     void** out_frame_memory);
@@ -23,16 +27,22 @@ class RendererState {
   bool is_frame_open() const { return frame_open_; }
   uint32_t submitted_draw_count() const { return submitted_draw_count_; }
   uint32_t submitted_ui_count() const { return submitted_ui_count_; }
+  uint64_t present_count() const {
+    return rhi_device_ == nullptr ? 0u : rhi_device_->present_count();
+  }
+  const std::array<float, 4>& last_clear_color() const { return last_clear_color_; }
 
  private:
   static bool IsPowerOfTwo(size_t value);
 
+  rhi::RhiDevice* rhi_device_ = nullptr;
   bool frame_open_ = false;
   std::vector<uint8_t> frame_storage_;
   void* frame_memory_ = nullptr;
   size_t frame_capacity_ = 0;
   uint32_t submitted_draw_count_ = 0;
   uint32_t submitted_ui_count_ = 0;
+  std::array<float, 4> last_clear_color_{0.05f, 0.07f, 0.10f, 1.0f};
 };
 
 struct PhysicsBodyState {
@@ -62,9 +72,12 @@ class PhysicsState {
 };
 
 struct EngineState {
+  EngineState();
+
+  platform::PlatformState platform;
+  rhi::RhiDevice rhi_device;
   RendererState renderer;
   PhysicsState physics;
-  uint64_t event_pump_count = 0;
 };
 
 }  // namespace dff::native

@@ -4,7 +4,9 @@
 
 #include "core/resource_table.h"
 #include "engine_native.h"
+#include "platform/platform_state_tests.h"
 #include "render/render_graph_tests.h"
+#include "rhi/rhi_device_tests.h"
 
 namespace {
 
@@ -140,6 +142,8 @@ int main() {
   TestEngineCreateValidation();
   TestEngineAndSubsystemFlow();
   TestResourceTableGeneration();
+  dff::native::tests::RunPlatformStateTests();
+  dff::native::tests::RunRhiDeviceTests();
   dff::native::tests::RunRenderGraphTests();
 
   assert(engine_destroy(nullptr) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

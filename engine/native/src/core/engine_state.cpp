@@ -7,6 +7,10 @@
 
 namespace dff::native {
 
+EngineState::EngineState() {
+  renderer.AttachDevice(&rhi_device);
+}
+
 bool RendererState::IsPowerOfTwo(size_t value) {
   return value != 0u && (value & (value - 1u)) == 0u;
 }
@@ -21,6 +25,9 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   *out_frame_memory = nullptr;
 
   if (frame_open_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+  if (rhi_device_ == nullptr) {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
@@ -54,6 +61,24 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   frame_capacity_ = requested_bytes;
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
+
+  engine_native_status_t status = rhi_device_->BeginFrame();
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    frame_memory_ = nullptr;
+    frame_capacity_ = 0u;
+    frame_storage_.clear();
+    return status;
+  }
+
+  status = rhi_device_->Clear(last_clear_color_);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    static_cast<void>(rhi_device_->EndFrame());
+    frame_memory_ = nullptr;
+    frame_capacity_ = 0u;
+    frame_storage_.clear();
+    return status;
+  }
+
   frame_open_ = true;
   *out_frame_memory = frame_memory_;
   return ENGINE_NATIVE_STATUS_OK;
@@ -93,6 +118,14 @@ engine_native_status_t RendererState::Submit(
 engine_native_status_t RendererState::Present() {
   if (!frame_open_) {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+  if (rhi_device_ == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  const engine_native_status_t status = rhi_device_->EndFrame();
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
   }
 
   frame_memory_ = nullptr;
