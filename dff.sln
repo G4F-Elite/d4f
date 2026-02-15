@@ -47,6 +47,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.UI", "engine\managed
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.Tests", "engine\managed\tests\Engine.Tests\Engine.Tests.csproj", "{475A28B0-3431-4572-B164-542DE44EFD30}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.Scenes", "engine\managed\src\Engine.Scenes\Engine.Scenes.csproj", "{C1117E47-D727-4999-A277-E3D7FD8F1081}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -213,6 +215,18 @@ Global
 		{475A28B0-3431-4572-B164-542DE44EFD30}.Release|x64.Build.0 = Release|Any CPU
 		{475A28B0-3431-4572-B164-542DE44EFD30}.Release|x86.ActiveCfg = Release|Any CPU
 		{475A28B0-3431-4572-B164-542DE44EFD30}.Release|x86.Build.0 = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|x64.Build.0 = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Debug|x86.Build.0 = Debug|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x64.ActiveCfg = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x64.Build.0 = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x86.ActiveCfg = Release|Any CPU
+		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -239,5 +253,6 @@ Global
 		{A84D395F-F2FE-4A02-8545-DFEF63E27E4B} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 		{D0672B24-9CEC-4ED0-B4D5-9401877EFEAD} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 		{475A28B0-3431-4572-B164-542DE44EFD30} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
+		{C1117E47-D727-4999-A277-E3D7FD8F1081} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 	EndGlobalSection
 EndGlobal
