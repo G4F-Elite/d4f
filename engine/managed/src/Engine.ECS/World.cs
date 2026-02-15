@@ -5,11 +5,12 @@ using Engine.Core.Timing;
 
 namespace Engine.ECS;
 
-public sealed class World
+public sealed partial class World
 {
     private readonly List<EntitySlot> _entitySlots = [];
     private readonly Stack<int> _freeIndices = [];
     private readonly Dictionary<SystemStage, StageSystems> _systems = CreateStageSystemMap();
+    private readonly ComponentStorage _componentStorage = new();
     private int _nextRegistrationOrder;
     private int _aliveCount;
 
@@ -84,6 +85,7 @@ public sealed class World
         slot.IsAlive = false;
         slot.Generation = NextGeneration(slot.Generation);
         _entitySlots[entity.Index] = slot;
+        _componentStorage.RemoveAll(entity.Index);
         _freeIndices.Push(entity.Index);
         _aliveCount--;
     }
