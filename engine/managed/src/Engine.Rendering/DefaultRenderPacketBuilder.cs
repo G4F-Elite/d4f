@@ -16,10 +16,32 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(frameArena);
+        IReadOnlyList<UiDrawCommand> uiCommands = CollectUiCommands(world);
+
         return RenderPacketMarshaller.Marshal(
             timing.FrameNumber,
             frameArena,
             Array.Empty<DrawCommand>(),
-            Array.Empty<UiDrawCommand>());
+            uiCommands);
+    }
+
+    private static IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)
+    {
+        List<UiDrawCommand>? aggregate = null;
+
+        foreach (var (_, batch) in world.Query<UiRenderBatch>())
+        {
+            if (batch.Commands.Count == 0)
+            {
+                continue;
+            }
+
+            aggregate ??= new List<UiDrawCommand>(batch.Commands.Count);
+            aggregate.AddRange(batch.Commands);
+        }
+
+        return aggregate is null
+            ? Array.Empty<UiDrawCommand>()
+            : aggregate;
     }
 }
