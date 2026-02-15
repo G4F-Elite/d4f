@@ -7,6 +7,7 @@ add_library(dff_native SHARED
   src/bridge_capi/renderer_capi.cpp
   src/bridge_capi/physics_capi.cpp
   src/core/engine_state.cpp
+  src/render/render_graph.cpp
 )
 
 target_compile_features(dff_native PUBLIC cxx_std_20)
@@ -28,6 +29,8 @@ include(CTest)
 if(BUILD_TESTING)
   add_executable(dff_native_tests
     tests/native_tests.cpp
+    tests/render/render_graph_tests.cpp
+    src/render/render_graph.cpp
   )
 
   target_compile_features(dff_native_tests PRIVATE cxx_std_20)
@@ -35,6 +38,7 @@ if(BUILD_TESTING)
   target_include_directories(dff_native_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
   )
 
   target_link_libraries(dff_native_tests PRIVATE dff_native)

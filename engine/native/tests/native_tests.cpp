@@ -4,6 +4,7 @@
 
 #include "core/resource_table.h"
 #include "engine_native.h"
+#include "render/render_graph_tests.h"
 
 namespace {
 
@@ -139,6 +140,7 @@ int main() {
   TestEngineCreateValidation();
   TestEngineAndSubsystemFlow();
   TestResourceTableGeneration();
+  dff::native::tests::RunRenderGraphTests();
 
   assert(engine_destroy(nullptr) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   return 0;
