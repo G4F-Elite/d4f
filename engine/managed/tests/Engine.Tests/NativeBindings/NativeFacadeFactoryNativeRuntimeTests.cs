@@ -22,6 +22,11 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
 
         Assert.True(nativeSet.Platform.PumpEvents());
+        var frame0 = nativeSet.Timing.NextFrameTiming();
+        var frame1 = nativeSet.Timing.NextFrameTiming();
+        Assert.Equal(0, frame0.FrameNumber);
+        Assert.Equal(1, frame1.FrameNumber);
+        Assert.True(frame1.TotalTime >= frame0.TotalTime);
 
         using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
         Assert.Equal(backend.RendererBeginFrameMemory, frameArena.BasePointer);

@@ -15,7 +15,7 @@ public sealed class NativeFacadeSet : IDisposable
     {
         _runtime = runtime ?? throw new ArgumentNullException(nameof(runtime));
         Platform = NativeFacadeFactory.CreatePlatformFacade(runtime);
-        Timing = NativeFacadeFactory.CreateTimingFacade(new NativeTimingApiStub());
+        Timing = NativeFacadeFactory.CreateTimingFacade(runtime);
         Physics = NativeFacadeFactory.CreatePhysicsFacade(runtime);
         Ui = NativeFacadeFactory.CreateUiFacade(new NativeUiApiStub());
         Rendering = NativeFacadeFactory.CreateRenderingFacade(runtime);

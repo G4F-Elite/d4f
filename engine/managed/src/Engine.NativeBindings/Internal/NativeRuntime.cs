@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Engine.Core.Handles;
+using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.NativeBindings.Internal.Interop;
 using Engine.Physics;
@@ -9,9 +11,13 @@ using Engine.Rendering;
 
 namespace Engine.NativeBindings.Internal;
 
-internal sealed partial class NativeRuntime : INativePlatformApi, INativePhysicsApi, INativeRenderingApi, IDisposable
+internal sealed partial class NativeRuntime
+    : INativePlatformApi, INativeTimingApi, INativePhysicsApi, INativeRenderingApi, IDisposable
 {
     private readonly INativeInteropApi _interop;
+    private readonly Stopwatch _clock = Stopwatch.StartNew();
+    private TimeSpan _previousElapsed = TimeSpan.Zero;
+    private long _frameNumber;
     private IntPtr _engine;
     private IntPtr _renderer;
     private IntPtr _physics;
@@ -55,6 +61,19 @@ internal sealed partial class NativeRuntime : INativePlatformApi, INativePhysics
             "engine_pump_events");
 
         return windowEvents.ShouldClose == 0;
+    }
+
+    public FrameTiming NextFrameTiming()
+    {
+        ThrowIfDisposed();
+
+        var now = _clock.Elapsed;
+        var delta = now - _previousElapsed;
+        _previousElapsed = now;
+
+        var timing = new FrameTiming(_frameNumber, delta, now);
+        _frameNumber++;
+        return timing;
     }
 
     public void SyncToPhysics(World world)
