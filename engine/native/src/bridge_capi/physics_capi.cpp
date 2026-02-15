@@ -64,4 +64,34 @@ engine_native_status_t physics_raycast(engine_native_physics_t* physics,
   return physics->state->Raycast(*query, out_hit);
 }
 
+engine_native_status_t physics_sweep(engine_native_physics_t* physics,
+                                     const engine_native_sweep_query_t* query,
+                                     engine_native_sweep_hit_t* out_hit) {
+  const engine_native_status_t status = ValidatePhysics(physics);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (query == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return physics->state->Sweep(*query, out_hit);
+}
+
+engine_native_status_t physics_overlap(engine_native_physics_t* physics,
+                                       const engine_native_overlap_query_t* query,
+                                       engine_native_overlap_hit_t* hits,
+                                       uint32_t hit_capacity,
+                                       uint32_t* out_hit_count) {
+  const engine_native_status_t status = ValidatePhysics(physics);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (query == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return physics->state->Overlap(*query, hits, hit_capacity, out_hit_count);
+}
+
 }  // extern "C"

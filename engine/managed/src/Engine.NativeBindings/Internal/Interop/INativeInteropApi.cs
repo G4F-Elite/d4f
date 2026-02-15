@@ -41,4 +41,16 @@ internal interface INativeInteropApi
         IntPtr physics,
         in EngineNativeRaycastQuery query,
         out EngineNativeRaycastHit hit);
+
+    EngineNativeStatus PhysicsSweep(
+        IntPtr physics,
+        in EngineNativeSweepQuery query,
+        out EngineNativeSweepHit hit);
+
+    EngineNativeStatus PhysicsOverlap(
+        IntPtr physics,
+        in EngineNativeOverlapQuery query,
+        IntPtr hits,
+        uint hitCapacity,
+        out uint hitCount);
 }

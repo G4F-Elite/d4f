@@ -54,6 +54,17 @@ internal sealed class NativePhysicsApiStub : INativePhysicsApi
         hit = default;
         return false;
     }
+
+    public bool Sweep(in PhysicsSweepQuery query, out PhysicsSweepHit hit)
+    {
+        hit = default;
+        return false;
+    }
+
+    public int Overlap(in PhysicsOverlapQuery query, Span<PhysicsOverlapHit> hits)
+    {
+        return 0;
+    }
 }
 
 internal sealed class NativeUiApiStub : INativeUiApi

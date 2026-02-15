@@ -156,6 +156,19 @@ internal sealed class RecordingPhysicsFacade : IPhysicsFacade
         _execution.Add("physics.raycast");
         return false;
     }
+
+    public bool Sweep(in PhysicsSweepQuery query, out PhysicsSweepHit hit)
+    {
+        hit = default;
+        _execution.Add("physics.sweep");
+        return false;
+    }
+
+    public int Overlap(in PhysicsOverlapQuery query, Span<PhysicsOverlapHit> hits)
+    {
+        _execution.Add("physics.overlap");
+        return 0;
+    }
 }
 
 internal sealed class RecordingUiFacade : IUiFacade

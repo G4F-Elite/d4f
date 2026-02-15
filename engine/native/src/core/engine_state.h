@@ -84,6 +84,12 @@ class PhysicsState {
                                      uint32_t* out_read_count);
   engine_native_status_t Raycast(const engine_native_raycast_query_t& query,
                                  engine_native_raycast_hit_t* out_hit) const;
+  engine_native_status_t Sweep(const engine_native_sweep_query_t& query,
+                               engine_native_sweep_hit_t* out_hit) const;
+  engine_native_status_t Overlap(const engine_native_overlap_query_t& query,
+                                 engine_native_overlap_hit_t* hits,
+                                 uint32_t hit_capacity,
+                                 uint32_t* out_hit_count) const;
 
   uint64_t step_count() const { return step_count_; }
   size_t body_count() const { return bodies_.size(); }

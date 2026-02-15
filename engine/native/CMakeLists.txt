@@ -8,6 +8,7 @@ add_library(dff_native SHARED
   src/bridge_capi/physics_capi.cpp
   src/core/engine_state.cpp
   src/core/physics_raycast.cpp
+  src/core/physics_queries.cpp
   src/platform/platform_state.cpp
   src/render/render_graph.cpp
   src/rhi/rhi_device.cpp

@@ -33,6 +33,13 @@ public sealed class NativeFacadeFactoryTests
         physics.Step(TimeSpan.FromMilliseconds(8));
         physics.SyncFromPhysics(world);
         Assert.False(physics.Raycast(new PhysicsRaycastQuery(default, new(1, 0, 0), 10.0f), out _));
+        Assert.False(physics.Sweep(
+            new PhysicsSweepQuery(default, new(0, 1, 0), 10.0f, ColliderShapeType.Box, new(1, 1, 1)),
+            out _));
+        Span<PhysicsOverlapHit> overlapHits = stackalloc PhysicsOverlapHit[4];
+        Assert.Equal(0, physics.Overlap(
+            new PhysicsOverlapQuery(default, ColliderShapeType.Sphere, new(1, 1, 1)),
+            overlapHits));
 
         ui.Update(world, frame1);
         using var frameArena = rendering.BeginFrame(1024, 64);

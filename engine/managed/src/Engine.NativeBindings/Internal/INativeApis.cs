@@ -25,6 +25,10 @@ internal interface INativePhysicsApi
     void SyncFromPhysics(World world);
 
     bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit);
+
+    bool Sweep(in PhysicsSweepQuery query, out PhysicsSweepHit hit);
+
+    int Overlap(in PhysicsOverlapQuery query, Span<PhysicsOverlapHit> hits);
 }
 
 internal interface INativeUiApi

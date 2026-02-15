@@ -79,6 +79,12 @@ public static class NativeFacadeFactory
 
         public bool Raycast(in PhysicsRaycastQuery query, out PhysicsRaycastHit hit)
             => _nativeApi.Raycast(query, out hit);
+
+        public bool Sweep(in PhysicsSweepQuery query, out PhysicsSweepHit hit)
+            => _nativeApi.Sweep(query, out hit);
+
+        public int Overlap(in PhysicsOverlapQuery query, Span<PhysicsOverlapHit> hits)
+            => _nativeApi.Overlap(query, hits);
     }
 
     private sealed class NativeUiFacade : IUiFacade

@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 3u
+#define ENGINE_NATIVE_API_VERSION 4u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -122,6 +122,45 @@ typedef struct engine_native_raycast_hit {
   float normal[3];
 } engine_native_raycast_hit_t;
 
+typedef struct engine_native_sweep_query {
+  float origin[3];
+  float direction[3];
+  float max_distance;
+  uint8_t include_triggers;
+  uint8_t shape_type;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  float shape_dimensions[3];
+} engine_native_sweep_query_t;
+
+typedef struct engine_native_sweep_hit {
+  uint8_t has_hit;
+  uint8_t is_trigger;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  engine_native_resource_handle_t body;
+  float distance;
+  float point[3];
+  float normal[3];
+} engine_native_sweep_hit_t;
+
+typedef struct engine_native_overlap_query {
+  float center[3];
+  uint8_t include_triggers;
+  uint8_t shape_type;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  float shape_dimensions[3];
+} engine_native_overlap_query_t;
+
+typedef struct engine_native_overlap_hit {
+  engine_native_resource_handle_t body;
+  uint8_t is_trigger;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
+} engine_native_overlap_hit_t;
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -178,6 +217,18 @@ ENGINE_NATIVE_API engine_native_status_t physics_raycast(
     engine_native_physics_t* physics,
     const engine_native_raycast_query_t* query,
     engine_native_raycast_hit_t* out_hit);
+
+ENGINE_NATIVE_API engine_native_status_t physics_sweep(
+    engine_native_physics_t* physics,
+    const engine_native_sweep_query_t* query,
+    engine_native_sweep_hit_t* out_hit);
+
+ENGINE_NATIVE_API engine_native_status_t physics_overlap(
+    engine_native_physics_t* physics,
+    const engine_native_overlap_query_t* query,
+    engine_native_overlap_hit_t* hits,
+    uint32_t hit_capacity,
+    uint32_t* out_hit_count);
 
 #ifdef __cplusplus
 }

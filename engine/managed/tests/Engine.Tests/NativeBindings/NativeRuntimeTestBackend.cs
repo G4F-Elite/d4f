@@ -31,6 +31,14 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeRaycastHit PhysicsRaycastHitToReturn { get; set; }
 
+    public EngineNativeSweepQuery? LastPhysicsSweepQuery { get; private set; }
+
+    public EngineNativeSweepHit PhysicsSweepHitToReturn { get; set; }
+
+    public EngineNativeOverlapQuery? LastPhysicsOverlapQuery { get; private set; }
+
+    public EngineNativeOverlapHit[] PhysicsOverlapHitsToReturn { get; set; } = Array.Empty<EngineNativeOverlapHit>();
+
     public EngineNativeStatus EngineCreateStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EngineDestroyStatus { get; set; } = EngineNativeStatus.Ok;
@@ -54,6 +62,10 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus PhysicsSyncToWorldStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsRaycastStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus PhysicsSweepStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus PhysicsOverlapStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
     {
@@ -181,6 +193,38 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         LastPhysicsRaycastQuery = query;
         hit = PhysicsRaycastHitToReturn;
         return PhysicsRaycastStatus;
+    }
+
+    public EngineNativeStatus PhysicsSweep(
+        IntPtr physics,
+        in EngineNativeSweepQuery query,
+        out EngineNativeSweepHit hit)
+    {
+        Calls.Add("physics_sweep");
+        LastPhysicsSweepQuery = query;
+        hit = PhysicsSweepHitToReturn;
+        return PhysicsSweepStatus;
+    }
+
+    public EngineNativeStatus PhysicsOverlap(
+        IntPtr physics,
+        in EngineNativeOverlapQuery query,
+        IntPtr hits,
+        uint hitCapacity,
+        out uint hitCount)
+    {
+        Calls.Add("physics_overlap");
+        LastPhysicsOverlapQuery = query;
+
+        var writableCount = Math.Min((uint)PhysicsOverlapHitsToReturn.Length, hitCapacity);
+        for (var i = 0u; i < writableCount; i++)
+        {
+            var destination = hits + checked((int)(i * (uint)Marshal.SizeOf<EngineNativeOverlapHit>()));
+            Marshal.StructureToPtr(PhysicsOverlapHitsToReturn[i], destination, fDeleteOld: false);
+        }
+
+        hitCount = writableCount;
+        return PhysicsOverlapStatus;
     }
 
     public int CountCall(string callName)

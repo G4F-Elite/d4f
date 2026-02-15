@@ -213,6 +213,105 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     }
 
     [Fact]
+    public void NativeRuntimePhysicsSweep_UsesInteropAndMapsHit()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            PhysicsSweepHitToReturn = new EngineNativeSweepHit
+            {
+                HasHit = 1,
+                IsTrigger = 0,
+                Body = 88,
+                Distance = 8.0f,
+                Point0 = 5.0f,
+                Point1 = 6.0f,
+                Point2 = 7.0f,
+                Normal0 = 0.0f,
+                Normal1 = 0.0f,
+                Normal2 = 1.0f
+            }
+        };
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        var query = new PhysicsSweepQuery(
+            new Vector3(1.0f, 1.0f, 1.0f),
+            new Vector3(0.0f, 0.0f, 2.0f),
+            30.0f,
+            ColliderShapeType.Capsule,
+            new Vector3(0.5f, 2.0f, 0.5f),
+            includeTriggers: true);
+
+        bool hasHit = nativeSet.Physics.Sweep(query, out PhysicsSweepHit hit);
+
+        Assert.True(hasHit);
+        Assert.Equal(new BodyHandle(88), hit.Body);
+        Assert.Equal(8.0f, hit.Distance);
+        Assert.Equal(new Vector3(5.0f, 6.0f, 7.0f), hit.Point);
+        Assert.Equal(Vector3.UnitZ, hit.Normal);
+        Assert.False(hit.IsTrigger);
+
+        Assert.True(backend.LastPhysicsSweepQuery.HasValue);
+        EngineNativeSweepQuery nativeQuery = backend.LastPhysicsSweepQuery.Value;
+        Assert.Equal(1.0f, nativeQuery.Origin0);
+        Assert.Equal(1.0f, nativeQuery.Direction2);
+        Assert.Equal(30.0f, nativeQuery.MaxDistance);
+        Assert.Equal((byte)1, nativeQuery.IncludeTriggers);
+        Assert.Equal((byte)ColliderShapeType.Capsule, nativeQuery.ShapeType);
+        Assert.Equal(0.5f, nativeQuery.ShapeDimensions0);
+        Assert.Equal(2.0f, nativeQuery.ShapeDimensions1);
+        Assert.Equal(0.5f, nativeQuery.ShapeDimensions2);
+    }
+
+    [Fact]
+    public void NativeRuntimePhysicsOverlap_UsesInteropAndMapsHits()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            PhysicsOverlapHitsToReturn =
+            [
+                new EngineNativeOverlapHit
+                {
+                    Body = 1001,
+                    IsTrigger = 0
+                },
+                new EngineNativeOverlapHit
+                {
+                    Body = 1002,
+                    IsTrigger = 1
+                }
+            ]
+        };
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        Span<PhysicsOverlapHit> hits = stackalloc PhysicsOverlapHit[2];
+
+        int hitCount = nativeSet.Physics.Overlap(
+            new PhysicsOverlapQuery(
+                new Vector3(9.0f, 8.0f, 7.0f),
+                ColliderShapeType.Box,
+                new Vector3(3.0f, 4.0f, 5.0f),
+                includeTriggers: true),
+            hits);
+
+        Assert.Equal(2, hitCount);
+        Assert.Equal(new BodyHandle(1001), hits[0].Body);
+        Assert.False(hits[0].IsTrigger);
+        Assert.Equal(new BodyHandle(1002), hits[1].Body);
+        Assert.True(hits[1].IsTrigger);
+
+        Assert.True(backend.LastPhysicsOverlapQuery.HasValue);
+        EngineNativeOverlapQuery nativeQuery = backend.LastPhysicsOverlapQuery.Value;
+        Assert.Equal(9.0f, nativeQuery.Center0);
+        Assert.Equal(8.0f, nativeQuery.Center1);
+        Assert.Equal(7.0f, nativeQuery.Center2);
+        Assert.Equal((byte)1, nativeQuery.IncludeTriggers);
+        Assert.Equal((byte)ColliderShapeType.Box, nativeQuery.ShapeType);
+        Assert.Equal(3.0f, nativeQuery.ShapeDimensions0);
+        Assert.Equal(4.0f, nativeQuery.ShapeDimensions1);
+        Assert.Equal(5.0f, nativeQuery.ShapeDimensions2);
+    }
+
+    [Fact]
     public void NativeRuntimeSubmit_UsesPacketNativePointersWhenProvided()
     {
         var backend = new FakeNativeInteropApi();

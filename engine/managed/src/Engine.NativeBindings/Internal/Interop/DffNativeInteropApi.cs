@@ -62,6 +62,20 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out EngineNativeRaycastHit hit)
         => NativeMethods.PhysicsRaycast(physics, in query, out hit);
 
+    public EngineNativeStatus PhysicsSweep(
+        IntPtr physics,
+        in EngineNativeSweepQuery query,
+        out EngineNativeSweepHit hit)
+        => NativeMethods.PhysicsSweep(physics, in query, out hit);
+
+    public EngineNativeStatus PhysicsOverlap(
+        IntPtr physics,
+        in EngineNativeOverlapQuery query,
+        IntPtr hits,
+        uint hitCapacity,
+        out uint hitCount)
+        => NativeMethods.PhysicsOverlap(physics, in query, hits, hitCapacity, out hitCount);
+
     private static partial class NativeMethods
     {
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_create")]
@@ -136,5 +150,21 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             IntPtr physics,
             in EngineNativeRaycastQuery query,
             out EngineNativeRaycastHit hit);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sweep")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus PhysicsSweep(
+            IntPtr physics,
+            in EngineNativeSweepQuery query,
+            out EngineNativeSweepHit hit);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_overlap")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus PhysicsOverlap(
+            IntPtr physics,
+            in EngineNativeOverlapQuery query,
+            IntPtr hits,
+            uint hitCapacity,
+            out uint hitCount);
     }
 }

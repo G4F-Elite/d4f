@@ -132,6 +132,41 @@ void TestEngineAndSubsystemFlow() {
   assert(raycast_hit.has_hit == 1u);
   assert(raycast_hit.body == 1001u);
   assert(std::fabs(raycast_hit.distance - 1.55f) < 0.001f);
+  engine_native_sweep_query_t sweep_query{};
+  sweep_query.origin[0] = 0.0f;
+  sweep_query.origin[1] = 0.0f;
+  sweep_query.origin[2] = 0.0f;
+  sweep_query.direction[0] = 1.0f;
+  sweep_query.direction[1] = 0.0f;
+  sweep_query.direction[2] = 0.0f;
+  sweep_query.max_distance = 10.0f;
+  sweep_query.include_triggers = 1u;
+  sweep_query.shape_type = 1u;
+  sweep_query.shape_dimensions[0] = 1.0f;
+  sweep_query.shape_dimensions[1] = 1.0f;
+  sweep_query.shape_dimensions[2] = 1.0f;
+  engine_native_sweep_hit_t sweep_hit{};
+  assert(physics_sweep(physics, &sweep_query, &sweep_hit) == ENGINE_NATIVE_STATUS_OK);
+  assert(sweep_hit.has_hit == 1u);
+  assert(sweep_hit.body == 1001u);
+  assert(std::fabs(sweep_hit.distance - 0.684f) < 0.01f);
+
+  engine_native_overlap_query_t overlap_query{};
+  overlap_query.center[0] = 2.05f;
+  overlap_query.center[1] = 0.0f;
+  overlap_query.center[2] = 0.0f;
+  overlap_query.include_triggers = 1u;
+  overlap_query.shape_type = 0u;
+  overlap_query.shape_dimensions[0] = 1.0f;
+  overlap_query.shape_dimensions[1] = 1.0f;
+  overlap_query.shape_dimensions[2] = 1.0f;
+  engine_native_overlap_hit_t overlap_hits[1]{};
+  uint32_t overlap_count = 0u;
+  assert(physics_overlap(physics, &overlap_query, overlap_hits, 1u, &overlap_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(overlap_count == 1u);
+  assert(overlap_hits[0].body == 1001u);
+  assert(overlap_hits[0].is_trigger == 0u);
 
   engine_native_body_read_t reads[2]{};
   uint32_t read_count = 0u;
@@ -162,11 +197,39 @@ void TestEngineAndSubsystemFlow() {
   invalid_query.direction[1] = 0.0f;
   invalid_query.direction[2] = 0.0f;
   invalid_query.max_distance = 10.0f;
+  engine_native_sweep_query_t invalid_sweep_query{};
+  invalid_sweep_query.direction[0] = 0.0f;
+  invalid_sweep_query.direction[1] = 0.0f;
+  invalid_sweep_query.direction[2] = 0.0f;
+  invalid_sweep_query.max_distance = 10.0f;
+  invalid_sweep_query.shape_type = 0u;
+  invalid_sweep_query.shape_dimensions[0] = 1.0f;
+  invalid_sweep_query.shape_dimensions[1] = 1.0f;
+  invalid_sweep_query.shape_dimensions[2] = 1.0f;
+  engine_native_overlap_query_t invalid_overlap_query{};
+  invalid_overlap_query.shape_type = 1u;
+  invalid_overlap_query.shape_dimensions[0] = 1.0f;
+  invalid_overlap_query.shape_dimensions[1] = 2.0f;
+  invalid_overlap_query.shape_dimensions[2] = 1.0f;
   assert(physics_raycast(physics, nullptr, &raycast_hit) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_raycast(physics, &invalid_query, &raycast_hit) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_raycast(physics, &query, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_sweep(physics, nullptr, &sweep_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_sweep(physics, &invalid_sweep_query, &sweep_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_sweep(physics, &sweep_query, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_overlap(physics, nullptr, overlap_hits, 1u, &overlap_count) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_overlap(physics, &invalid_overlap_query, overlap_hits, 1u,
+                         &overlap_count) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_overlap(physics, &overlap_query, nullptr, 1u, &overlap_count) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_overlap(physics, &overlap_query, overlap_hits, 1u, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
