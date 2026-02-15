@@ -39,6 +39,12 @@ internal static class AssetCompiler
     {
         switch (kind)
         {
+            case "texture":
+                CompiledAssetWriter.WriteTexture(sourcePath, compiledFullPath);
+                return;
+            case "mesh":
+                CompiledAssetWriter.WriteMesh(sourcePath, compiledFullPath);
+                return;
             case "scene":
                 CompileScene(sourcePath, compiledFullPath);
                 return;
@@ -46,7 +52,7 @@ internal static class AssetCompiler
                 CompilePrefab(sourcePath, compiledFullPath);
                 return;
             default:
-                File.Copy(sourcePath, compiledFullPath, overwrite: true);
+                CompiledAssetWriter.WriteRaw(sourcePath, compiledFullPath);
                 return;
         }
     }
@@ -55,16 +61,40 @@ internal static class AssetCompiler
     {
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(sourcePath));
         SceneAsset scene = ParseSceneAsset(document.RootElement, sourcePath);
-        using FileStream output = File.Create(compiledFullPath);
-        SceneBinaryCodec.WriteScene(output, scene);
+        string tempBinaryPath = Path.GetTempFileName();
+        try
+        {
+            using (FileStream output = File.Create(tempBinaryPath))
+            {
+                SceneBinaryCodec.WriteScene(output, scene);
+            }
+
+            CompiledAssetWriter.WrapAsSceneBinary(tempBinaryPath, compiledFullPath);
+        }
+        finally
+        {
+            File.Delete(tempBinaryPath);
+        }
     }
 
     private static void CompilePrefab(string sourcePath, string compiledFullPath)
     {
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(sourcePath));
         PrefabAsset prefab = ParsePrefabAsset(document.RootElement, sourcePath);
-        using FileStream output = File.Create(compiledFullPath);
-        SceneBinaryCodec.WritePrefab(output, prefab);
+        string tempBinaryPath = Path.GetTempFileName();
+        try
+        {
+            using (FileStream output = File.Create(tempBinaryPath))
+            {
+                SceneBinaryCodec.WritePrefab(output, prefab);
+            }
+
+            CompiledAssetWriter.WrapAsPrefabBinary(tempBinaryPath, compiledFullPath);
+        }
+        finally
+        {
+            File.Delete(tempBinaryPath);
+        }
     }
 
     private static SceneAsset ParseSceneAsset(JsonElement root, string sourcePath)

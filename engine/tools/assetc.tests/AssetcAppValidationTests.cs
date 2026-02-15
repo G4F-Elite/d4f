@@ -152,6 +152,7 @@ public sealed class AssetcAppValidationTests
             PakArchive pak = AssetPipelineService.ReadPak(pakPath);
             PakEntry entry = Assert.Single(pak.Entries);
             Assert.Equal("scene", entry.Kind);
+            Assert.True(entry.SizeBytes > 0);
 
             string compiledFullPath = Path.GetFullPath(
                 Path.Combine(
@@ -161,7 +162,17 @@ public sealed class AssetcAppValidationTests
             Assert.True(File.Exists(compiledFullPath));
 
             using FileStream compiledStream = File.OpenRead(compiledFullPath);
-            SceneAsset scene = SceneBinaryCodec.ReadScene(compiledStream);
+            using BinaryReader reader = new(compiledStream);
+            uint magic = reader.ReadUInt32();
+            uint version = reader.ReadUInt32();
+            ulong payloadSize = reader.ReadUInt64();
+            byte[] payload = reader.ReadBytes(checked((int)payloadSize));
+
+            Assert.Equal(CompiledAssetFormat.SceneMagic, magic);
+            Assert.Equal(CompiledAssetFormat.SceneVersion, version);
+
+            using MemoryStream sceneStream = new(payload);
+            SceneAsset scene = SceneBinaryCodec.ReadScene(sceneStream);
             Assert.Single(scene.Entities);
             Assert.Single(scene.Components);
             Assert.Equal(1u, scene.Entities[0].StableId);
