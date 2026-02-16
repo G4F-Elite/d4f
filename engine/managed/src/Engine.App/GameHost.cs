@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using Engine.Core.Abstractions;
+using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.Physics;
 using Engine.Rendering;
@@ -88,6 +89,9 @@ public sealed class GameHost
             throw new InvalidOperationException($"Timing facade returned a negative frame delta: {timing.DeltaTime}.");
         }
 
+        timing = ResolveFrameTiming(timing);
+        TimeSpan physicsFixedDt = ResolvePhysicsFixedDt();
+
         long frameStart = Stopwatch.GetTimestamp();
 
         long stageStart = Stopwatch.GetTimestamp();
@@ -103,15 +107,15 @@ public sealed class GameHost
         var substeps = 0;
 
         stageStart = Stopwatch.GetTimestamp();
-        while (_physicsAccumulator >= _options.FixedDt && substeps < _options.MaxSubsteps)
+        while (_physicsAccumulator >= physicsFixedDt && substeps < _options.MaxSubsteps)
         {
             if (substeps == 0)
             {
                 _physicsFacade.SyncToPhysics(_world);
             }
 
-            _physicsFacade.Step(_options.FixedDt);
-            _physicsAccumulator -= _options.FixedDt;
+            _physicsFacade.Step(physicsFixedDt);
+            _physicsAccumulator -= physicsFixedDt;
             substeps++;
         }
 
@@ -154,5 +158,30 @@ public sealed class GameHost
             totalCpuTime,
             substeps,
             renderingStats);
+    }
+
+    private FrameTiming ResolveFrameTiming(in FrameTiming sourceTiming)
+    {
+        DeterministicModeOptions deterministic = _options.DeterministicMode;
+        if (!deterministic.Enabled)
+        {
+            return sourceTiming;
+        }
+
+        TimeSpan resolvedDelta = deterministic.FixedDeltaTimeOverride ?? _options.FixedDt;
+        TimeSpan resolvedTotal = TimeSpan.FromTicks(
+            checked((sourceTiming.FrameNumber + 1) * resolvedDelta.Ticks));
+        return new FrameTiming(sourceTiming.FrameNumber, resolvedDelta, resolvedTotal);
+    }
+
+    private TimeSpan ResolvePhysicsFixedDt()
+    {
+        DeterministicModeOptions deterministic = _options.DeterministicMode;
+        if (deterministic.Enabled && deterministic.FixedDeltaTimeOverride.HasValue)
+        {
+            return deterministic.FixedDeltaTimeOverride.Value;
+        }
+
+        return _options.FixedDt;
     }
 }

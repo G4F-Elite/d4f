@@ -14,13 +14,24 @@ public sealed class GameHostOptionsTests
             maxSubsteps: 6,
             frameArenaBytes: 4096,
             frameArenaAlignment: 128,
-            maxAccumulatedTime: TimeSpan.FromMilliseconds(60));
+            maxAccumulatedTime: TimeSpan.FromMilliseconds(60),
+            deterministicMode: new DeterministicModeOptions(
+                enabled: true,
+                seed: 42,
+                fixedDeltaTimeOverride: TimeSpan.FromMilliseconds(16),
+                disableAutoExposure: true,
+                disableJitterEffects: true));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
         Assert.Equal(4096, options.FrameArenaBytes);
         Assert.Equal(128, options.FrameArenaAlignment);
         Assert.Equal(TimeSpan.FromMilliseconds(60), options.MaxAccumulatedTime);
+        Assert.True(options.DeterministicMode.Enabled);
+        Assert.Equal(42UL, options.DeterministicMode.Seed);
+        Assert.Equal(TimeSpan.FromMilliseconds(16), options.DeterministicMode.FixedDeltaTimeOverride);
+        Assert.True(options.DeterministicMode.DisableAutoExposure);
+        Assert.True(options.DeterministicMode.DisableJitterEffects);
     }
 
     [Fact]
@@ -34,6 +45,7 @@ public sealed class GameHostOptionsTests
         Assert.True(options.FrameArenaAlignment > 0);
         Assert.Equal(0, options.FrameArenaAlignment & (options.FrameArenaAlignment - 1));
         Assert.True(options.MaxAccumulatedTime >= options.FixedDt);
+        Assert.False(options.DeterministicMode.Enabled);
     }
 
     [Fact]
@@ -85,5 +97,16 @@ public sealed class GameHostOptionsTests
             frameArenaBytes: 2048,
             frameArenaAlignment: 64,
             maxAccumulatedTime: TimeSpan.FromMilliseconds(8)));
+    }
+
+    [Fact]
+    public void DeterministicModeOptions_RejectsInvalidFixedDeltaOverride()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new DeterministicModeOptions(
+            enabled: true,
+            seed: 1,
+            fixedDeltaTimeOverride: TimeSpan.Zero,
+            disableAutoExposure: true,
+            disableJitterEffects: true));
     }
 }
