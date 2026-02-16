@@ -46,6 +46,7 @@ engine_native_status_t RhiDevice::ExecutePass(PassKind pass_kind) {
     case PassKind::kPbrOpaque:
     case PassKind::kBloom:
     case PassKind::kTonemap:
+    case PassKind::kColorGrading:
     case PassKind::kUiOverlay:
       executed_passes_.push_back(pass_kind);
       return ENGINE_NATIVE_STATUS_OK;

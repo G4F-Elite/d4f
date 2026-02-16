@@ -36,7 +36,8 @@ void TestBuildCanonicalFrameGraphCombinations() {
   assert(error.empty());
   AssertKindsOrder(
       output,
-      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom, PassKind::kTonemap,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom,
+       PassKind::kTonemap, PassKind::kColorGrading,
        PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
@@ -51,7 +52,8 @@ void TestBuildCanonicalFrameGraphCombinations() {
   assert(error.empty());
   AssertKindsOrder(
       output,
-      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom, PassKind::kTonemap,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom,
+       PassKind::kTonemap, PassKind::kColorGrading,
        PassKind::kUiOverlay, PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(

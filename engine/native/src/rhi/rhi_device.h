@@ -19,6 +19,7 @@ class RhiDevice {
     kPbrOpaque = 4u,
     kTonemap = 5u,
     kBloom = 6u,
+    kColorGrading = 7u,
   };
 
   engine_native_status_t BeginFrame();

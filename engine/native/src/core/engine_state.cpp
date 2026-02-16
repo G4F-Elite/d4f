@@ -31,6 +31,8 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
       return "bloom";
     case rhi::RhiDevice::PassKind::kTonemap:
       return "tonemap";
+    case rhi::RhiDevice::PassKind::kColorGrading:
+      return "color_grading";
     case rhi::RhiDevice::PassKind::kSceneOpaque:
       return "scene";
     case rhi::RhiDevice::PassKind::kUiOverlay:
