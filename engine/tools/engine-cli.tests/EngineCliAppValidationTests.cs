@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Engine.Cli;
 
 namespace Engine.Cli.Tests;
@@ -62,7 +63,7 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
-    public void Run_ShouldCreateProjectStructure_WhenInitValid()
+    public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();
         try
@@ -71,7 +72,7 @@ public sealed class EngineCliAppValidationTests
             using var error = new StringWriter();
             EngineCliApp app = new(output, error);
 
-            int code = app.Run(["init", "--name", "DemoGame", "--output", tempRoot]);
+            int code = app.Run(["new", "--name", "DemoGame", "--output", tempRoot]);
 
             Assert.Equal(0, code);
             string projectRoot = Path.Combine(tempRoot, "DemoGame");
@@ -95,47 +96,236 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
-    public void Run_ShouldPackCompiledAssetsAndManifest()
+    public void Run_ShouldBakeCompiledAssetsAndManifest()
     {
         string tempRoot = CreateTempDirectory();
         try
         {
-            string assetsDirectory = Path.Combine(tempRoot, "assets");
-            Directory.CreateDirectory(assetsDirectory);
-            File.WriteAllText(Path.Combine(assetsDirectory, "example.txt"), "content");
+            PrepareAssetManifest(tempRoot);
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(["bake", "--project", tempRoot, "--manifest", "assets/manifest.json"]);
+
+            Assert.Equal(0, code);
+            Assert.True(File.Exists(Path.Combine(tempRoot, "build", "content", "Game.pak")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "build", "content", "compiled", "text", "example.txt.bin")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "build", "content", "compiled.manifest.bin")));
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldCreatePreviewArtifactsManifest()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareAssetManifest(tempRoot);
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(
+            [
+                "preview",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--out", "artifacts/preview"
+            ]);
+
+            Assert.Equal(0, code);
+            string previewRoot = Path.Combine(tempRoot, "artifacts", "preview");
+            string manifestPath = Path.Combine(previewRoot, "manifest.json");
+            Assert.True(File.Exists(manifestPath));
+
+            using JsonDocument manifest = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            JsonElement artifacts = manifest.RootElement.GetProperty("artifacts");
+            Assert.True(artifacts.GetArrayLength() >= 1);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldCreateTestArtifacts_WhenDotnetTestSucceeds()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Debug"]);
+
+            Assert.Equal(0, code);
+            Assert.Single(runner.Invocations);
+            CommandInvocation invocation = runner.Invocations[0];
+            Assert.Equal("dotnet", invocation.ExecutablePath);
+            Assert.Contains("test", invocation.Arguments);
+            Assert.Contains("-c", invocation.Arguments);
+            Assert.Contains("Debug", invocation.Arguments);
+
+            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "manifest.json")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.png")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "dumps", "albedo-0001.png")));
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailTest_WhenDotnetTestFails()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            var runner = new RecordingCommandRunner { ExitCode = 3 };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests"]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("dotnet test failed with exit code 3", error.ToString(), StringComparison.Ordinal);
+            Assert.Single(runner.Invocations);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRequiredFilesMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(["doctor", "--project", tempRoot]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Missing required path", error.ToString(), StringComparison.Ordinal);
+            Assert.Equal(2, runner.Invocations.Count);
+            Assert.Equal("dotnet", runner.Invocations[0].ExecutablePath);
+            Assert.Equal("cmake", runner.Invocations[1].ExecutablePath);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenChecksSucceed()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(tempRoot, "assets"));
+            Directory.CreateDirectory(Path.Combine(tempRoot, "src"));
+            File.WriteAllText(Path.Combine(tempRoot, "project.json"), "{}");
+            File.WriteAllText(Path.Combine(tempRoot, "assets", "manifest.json"), """
+            {
+              "version": 1,
+              "assets": [
+                { "path": "example.txt", "kind": "text" }
+              ]
+            }
+            """);
+
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(["doctor", "--project", tempRoot]);
+
+            Assert.Equal(0, code);
+            Assert.Equal(2, runner.Invocations.Count);
+            Assert.Contains("Doctor checks passed.", output.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldCreateApiDump_WhenHeaderValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string headerPath = Path.Combine(tempRoot, "engine_native.h");
             File.WriteAllText(
-                Path.Combine(assetsDirectory, "manifest.json"),
+                headerPath,
                 """
-                {
-                  "version": 1,
-                  "assets": [
-                    {
-                      "path": "example.txt",
-                      "kind": "text"
-                    }
-                  ]
-                }
+                #define ENGINE_NATIVE_API_VERSION 9u
+                ENGINE_NATIVE_API int engine_create(const void* desc);
                 """);
 
             using var output = new StringWriter();
             using var error = new StringWriter();
             EngineCliApp app = new(output, error);
 
-            int code = app.Run(["pack", "--project", tempRoot, "--manifest", "assets/manifest.json"]);
+            int code = app.Run(
+            [
+                "api",
+                "dump",
+                "--header", headerPath,
+                "--out", Path.Combine(tempRoot, "api", "dump.json")
+            ]);
 
             Assert.Equal(0, code);
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "content.pak")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "compiled", "text", "example.txt.bin")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "compiled.manifest.bin")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "Game.pak")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled", "text", "example.txt.bin")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
+            string dumpPath = Path.Combine(tempRoot, "api", "dump.json");
+            Assert.True(File.Exists(dumpPath));
+            string json = File.ReadAllText(dumpPath);
+            Assert.Contains("\"apiVersion\": 9", json, StringComparison.Ordinal);
+            Assert.Contains("\"name\": \"engine_create\"", json, StringComparison.Ordinal);
         }
         finally
         {
             Directory.Delete(tempRoot, true);
         }
+    }
+
+    private static void PrepareAssetManifest(string rootPath)
+    {
+        string assetsDirectory = Path.Combine(rootPath, "assets");
+        Directory.CreateDirectory(assetsDirectory);
+        File.WriteAllText(Path.Combine(assetsDirectory, "example.txt"), "content");
+        File.WriteAllText(
+            Path.Combine(assetsDirectory, "manifest.json"),
+            """
+            {
+              "version": 1,
+              "assets": [
+                {
+                  "path": "example.txt",
+                  "kind": "text"
+                }
+              ]
+            }
+            """);
     }
 
     private static string CreateTempDirectory()
@@ -144,4 +334,24 @@ public sealed class EngineCliAppValidationTests
         Directory.CreateDirectory(path);
         return path;
     }
+
+    private sealed class RecordingCommandRunner : IExternalCommandRunner
+    {
+        public List<CommandInvocation> Invocations { get; } = [];
+
+        public int ExitCode { get; init; }
+
+        public int Run(
+            string executablePath,
+            IReadOnlyList<string> arguments,
+            string workingDirectory,
+            TextWriter stdout,
+            TextWriter stderr)
+        {
+            Invocations.Add(new CommandInvocation(executablePath, arguments.ToArray(), workingDirectory));
+            return ExitCode;
+        }
+    }
+
+    private sealed record CommandInvocation(string ExecutablePath, string[] Arguments, string WorkingDirectory);
 }

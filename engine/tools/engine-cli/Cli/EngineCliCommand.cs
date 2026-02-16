@@ -4,9 +4,30 @@ public abstract record EngineCliCommand;
 
 public sealed record InitCommand(string Name, string OutputDirectory) : EngineCliCommand;
 
+public sealed record NewCommand(string Name, string OutputDirectory) : EngineCliCommand;
+
 public sealed record BuildCommand(string ProjectDirectory, string Configuration) : EngineCliCommand;
 
 public sealed record RunCommand(string ProjectDirectory, string Configuration) : EngineCliCommand;
+
+public sealed record BakeCommand(
+    string ProjectDirectory,
+    string ManifestPath,
+    string OutputPakPath) : EngineCliCommand;
+
+public sealed record PreviewCommand(
+    string ProjectDirectory,
+    string ManifestPath,
+    string OutputDirectory) : EngineCliCommand;
+
+public sealed record TestCommand(
+    string ProjectDirectory,
+    string ArtifactsDirectory,
+    string Configuration) : EngineCliCommand;
+
+public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
+
+public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 
 public sealed record PackCommand(
     string ProjectDirectory,

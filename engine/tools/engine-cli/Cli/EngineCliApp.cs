@@ -1,11 +1,9 @@
-using System.IO.Compression;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 using Engine.AssetPipeline;
 
 namespace Engine.Cli;
 
-public sealed class EngineCliApp
+public sealed partial class EngineCliApp
 {
     private static readonly Regex ProjectNameRegex = new("^[A-Za-z0-9_-]+$", RegexOptions.Compiled);
     private readonly TextWriter _stdout;
@@ -37,10 +35,16 @@ public sealed class EngineCliApp
         {
             return parseResult.Command switch
             {
+                NewCommand cmd => HandleNew(cmd),
                 InitCommand cmd => HandleInit(cmd),
                 BuildCommand cmd => HandleBuild(cmd),
                 RunCommand cmd => HandleRun(cmd),
+                BakeCommand cmd => HandleBake(cmd),
+                PreviewCommand cmd => HandlePreview(cmd),
+                TestCommand cmd => HandleTest(cmd),
                 PackCommand cmd => HandlePack(cmd),
+                DoctorCommand cmd => HandleDoctor(cmd),
+                ApiDumpCommand cmd => HandleApiDump(cmd),
                 _ => throw new NotSupportedException("Unsupported command type.")
             };
         }
@@ -51,23 +55,33 @@ public sealed class EngineCliApp
         }
     }
 
+    private int HandleNew(NewCommand command)
+    {
+        return HandleCreateProject(command.Name, command.OutputDirectory);
+    }
+
     private int HandleInit(InitCommand command)
     {
-        if (!ProjectNameRegex.IsMatch(command.Name))
+        return HandleCreateProject(command.Name, command.OutputDirectory);
+    }
+
+    private int HandleCreateProject(string name, string outputDirectoryInput)
+    {
+        if (!ProjectNameRegex.IsMatch(name))
         {
             _stderr.WriteLine("Project name must contain only letters, numbers, '-' or '_'.");
             return 1;
         }
 
-        string outputDirectory = Path.GetFullPath(command.OutputDirectory);
-        string projectDirectory = Path.Combine(outputDirectory, command.Name);
+        string outputDirectory = Path.GetFullPath(outputDirectoryInput);
+        string projectDirectory = Path.Combine(outputDirectory, name);
         if (Directory.Exists(projectDirectory))
         {
             _stderr.WriteLine($"Project directory already exists: {projectDirectory}");
             return 1;
         }
 
-        ProjectTemplateInitializer.InitializeProject(projectDirectory, command.Name);
+        ProjectTemplateInitializer.InitializeProject(projectDirectory, name);
 
         _stdout.WriteLine($"Project initialized at: {projectDirectory}");
         return 0;
@@ -118,7 +132,7 @@ public sealed class EngineCliApp
         return 0;
     }
 
-    private int HandlePack(PackCommand command)
+    private int HandleBake(BakeCommand command)
     {
         string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
         if (!Directory.Exists(projectDirectory))
@@ -127,219 +141,137 @@ public sealed class EngineCliApp
             return 1;
         }
 
-        string manifestPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ManifestPath);
-        string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? projectDirectory;
-        AssetManifest manifest = AssetPipelineService.LoadManifest(manifestPath);
-        AssetPipelineService.ValidateAssetsExist(manifest, manifestDirectory);
+        BakedContentOutput baked = BakePipeline.BakeProject(
+            projectDirectory,
+            command.ManifestPath,
+            command.OutputPakPath);
 
-        string outputPakPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.OutputPakPath);
-        string outputDirectory = Path.GetDirectoryName(outputPakPath) ?? projectDirectory;
-        string compiledRootDirectory = Path.Combine(outputDirectory, "compiled");
-        IReadOnlyList<PakEntry> compiledEntries = AssetPipelineService.CompileAssets(
-            manifest,
-            manifestDirectory,
-            compiledRootDirectory);
-        AssetPipelineService.WritePak(outputPakPath, compiledEntries);
-        string compiledManifestPath = Path.Combine(outputDirectory, AssetPipelineService.CompiledManifestFileName);
-        AssetPipelineService.WriteCompiledManifest(compiledManifestPath, compiledEntries);
-
-        string packageRoot = Path.Combine(outputDirectory, "package");
-        string appDirectory = Path.Combine(packageRoot, "App");
-        string contentDirectory = Path.Combine(packageRoot, "Content");
-        string contentCompiledDirectory = Path.Combine(contentDirectory, "compiled");
-
-        Directory.CreateDirectory(appDirectory);
-        Directory.CreateDirectory(contentDirectory);
-
-        File.Copy(outputPakPath, Path.Combine(contentDirectory, "Game.pak"), overwrite: true);
-        File.Copy(compiledManifestPath, Path.Combine(contentDirectory, AssetPipelineService.CompiledManifestFileName), overwrite: true);
-        CopyDirectory(compiledRootDirectory, contentCompiledDirectory);
-
-        string? publishProjectPath = ResolvePublishProjectPath(projectDirectory, command.PublishProjectPath);
-        if (publishProjectPath is not null)
-        {
-            RunDotnetPublish(projectDirectory, command, publishProjectPath, appDirectory);
-        }
-        else
-        {
-            _stdout.WriteLine("Publish skipped: runtime .csproj was not found and '--publish-project' is not set.");
-        }
-
-        CopyNativeLibrary(projectDirectory, command, appDirectory);
-        WritePackConfig(packageRoot, command);
-
-        if (!string.IsNullOrWhiteSpace(command.ZipOutputPath))
-        {
-            string zipOutputPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ZipOutputPath);
-            CreateZipArchive(packageRoot, zipOutputPath);
-            _stdout.WriteLine($"Package archive created: {zipOutputPath}");
-        }
-
-        _stdout.WriteLine($"Pak created: {outputPakPath}");
-        _stdout.WriteLine($"Compiled manifest created: {compiledManifestPath}");
-        _stdout.WriteLine($"Portable package prepared: {packageRoot}");
+        _stdout.WriteLine($"Pak created: {baked.OutputPakPath}");
+        _stdout.WriteLine($"Compiled manifest created: {baked.CompiledManifestPath}");
         return 0;
     }
 
-    private static string? ResolvePublishProjectPath(string projectDirectory, string? configuredPath)
+    private int HandlePreview(PreviewCommand command)
     {
-        if (!string.IsNullOrWhiteSpace(configuredPath))
+        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
+        if (!Directory.Exists(projectDirectory))
         {
-            string fullConfiguredPath = AssetPipelineService.ResolveRelativePath(projectDirectory, configuredPath);
-            if (!File.Exists(fullConfiguredPath))
-            {
-                throw new FileNotFoundException($"Publish project file was not found: {fullConfiguredPath}", fullConfiguredPath);
-            }
-
-            return fullConfiguredPath;
+            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
+            return 1;
         }
 
-        string srcDirectory = Path.Combine(projectDirectory, "src");
-        if (!Directory.Exists(srcDirectory))
-        {
-            return null;
-        }
+        string outputDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.OutputDirectory);
+        string previewPakPath = Path.Combine(outputDirectory, "preview-content.pak");
+        BakedContentOutput baked = BakePipeline.BakeProject(
+            projectDirectory,
+            command.ManifestPath,
+            previewPakPath);
+        string artifactsManifestPath = PreviewArtifactGenerator.Generate(outputDirectory, baked.CompiledEntries);
 
-        string[] runtimeProjects = Directory.GetFiles(srcDirectory, "*Runtime*.csproj", SearchOption.AllDirectories);
-        if (runtimeProjects.Length > 0)
-        {
-            Array.Sort(runtimeProjects, StringComparer.OrdinalIgnoreCase);
-            return runtimeProjects[0];
-        }
-
-        string[] projects = Directory.GetFiles(srcDirectory, "*.csproj", SearchOption.AllDirectories);
-        if (projects.Length == 0)
-        {
-            return null;
-        }
-
-        Array.Sort(projects, StringComparer.OrdinalIgnoreCase);
-        return projects[0];
+        _stdout.WriteLine($"Preview artifacts created: {outputDirectory}");
+        _stdout.WriteLine($"Preview manifest created: {artifactsManifestPath}");
+        return 0;
     }
 
-    private void RunDotnetPublish(
-        string projectDirectory,
-        PackCommand command,
-        string publishProjectPath,
-        string appDirectory)
+    private int HandleTest(TestCommand command)
     {
-        Directory.CreateDirectory(appDirectory);
+        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
+        if (!Directory.Exists(projectDirectory))
+        {
+            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
+            return 1;
+        }
 
         string[] arguments =
         [
-            "publish",
-            publishProjectPath,
+            "test",
+            projectDirectory,
             "-c",
             command.Configuration,
-            "-r",
-            command.RuntimeIdentifier,
-            "--self-contained",
-            "true",
-            "-o",
-            appDirectory
+            "--nologo"
         ];
 
         int exitCode = _commandRunner.Run("dotnet", arguments, projectDirectory, _stdout, _stderr);
         if (exitCode != 0)
         {
-            throw new InvalidDataException($"dotnet publish failed with exit code {exitCode}.");
-        }
-    }
-
-    private void CopyNativeLibrary(string projectDirectory, PackCommand command, string appDirectory)
-    {
-        string? nativeLibraryPath = ResolveNativeLibraryPath(projectDirectory, command);
-        if (nativeLibraryPath is null)
-        {
-            _stdout.WriteLine("Native library copy skipped: native DLL was not found.");
-            return;
+            _stderr.WriteLine($"dotnet test failed with exit code {exitCode}.");
+            return 1;
         }
 
-        Directory.CreateDirectory(appDirectory);
-        string destinationPath = Path.Combine(appDirectory, Path.GetFileName(nativeLibraryPath));
-        File.Copy(nativeLibraryPath, destinationPath, overwrite: true);
+        string artifactsDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ArtifactsDirectory);
+        string artifactsManifestPath = TestArtifactGenerator.Generate(artifactsDirectory);
+        _stdout.WriteLine($"Test artifacts created: {artifactsDirectory}");
+        _stdout.WriteLine($"Test manifest created: {artifactsManifestPath}");
+        return 0;
     }
 
-    private static string? ResolveNativeLibraryPath(string projectDirectory, PackCommand command)
+    private int HandleDoctor(DoctorCommand command)
     {
-        if (!string.IsNullOrWhiteSpace(command.NativeLibraryPath))
+        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
+        if (!Directory.Exists(projectDirectory))
         {
-            string configuredPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.NativeLibraryPath);
-            if (!File.Exists(configuredPath))
+            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
+            return 1;
+        }
+
+        string[] requiredPaths =
+        [
+            Path.Combine(projectDirectory, "project.json"),
+            Path.Combine(projectDirectory, "assets", "manifest.json"),
+            Path.Combine(projectDirectory, "src")
+        ];
+
+        var failures = new List<string>();
+        foreach (string requiredPath in requiredPaths)
+        {
+            bool exists = requiredPath.EndsWith("src", StringComparison.OrdinalIgnoreCase)
+                ? Directory.Exists(requiredPath)
+                : File.Exists(requiredPath);
+            if (!exists)
             {
-                throw new FileNotFoundException($"Native library was not found: {configuredPath}", configuredPath);
+                failures.Add($"Missing required path: {requiredPath}");
+            }
+        }
+
+        if (!RunToolVersionCheck("dotnet", projectDirectory))
+        {
+            failures.Add("dotnet CLI is unavailable or returned a non-zero exit code.");
+        }
+
+        if (!RunToolVersionCheck("cmake", projectDirectory))
+        {
+            failures.Add("cmake is unavailable or returned a non-zero exit code.");
+        }
+
+        if (failures.Count > 0)
+        {
+            foreach (string failure in failures)
+            {
+                _stderr.WriteLine(failure);
             }
 
-            return configuredPath;
+            return 1;
         }
 
-        string autoPath = Path.GetFullPath(
-            Path.Combine(
-                Environment.CurrentDirectory,
-                "engine",
-                "native",
-                "build",
-                command.Configuration,
-                "dff_native.dll"));
-        return File.Exists(autoPath) ? autoPath : null;
+        _stdout.WriteLine("Doctor checks passed.");
+        return 0;
     }
 
-    private static void WritePackConfig(string packageRoot, PackCommand command)
+    private bool RunToolVersionCheck(string executable, string workingDirectory)
     {
-        string configDirectory = Path.Combine(packageRoot, "config");
-        Directory.CreateDirectory(configDirectory);
-
-        var config = new
-        {
-            runtime = command.RuntimeIdentifier,
-            configuration = command.Configuration,
-            contentPak = "Content/Game.pak",
-            compiledManifest = $"Content/{AssetPipelineService.CompiledManifestFileName}",
-            appDirectory = "App",
-            generatedAtUtc = DateTime.UtcNow
-        };
-
-        string configPath = Path.Combine(configDirectory, "runtime.json");
-        string json = JsonSerializer.Serialize(config, new JsonSerializerOptions
-        {
-            WriteIndented = true
-        });
-        File.WriteAllText(configPath, json);
+        int exitCode = _commandRunner.Run(
+            executable,
+            ["--version"],
+            workingDirectory,
+            _stdout,
+            _stderr);
+        return exitCode == 0;
     }
 
-    private static void CreateZipArchive(string packageRoot, string zipOutputPath)
+    private int HandleApiDump(ApiDumpCommand command)
     {
-        string zipDirectory = Path.GetDirectoryName(zipOutputPath) ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(zipDirectory))
-        {
-            Directory.CreateDirectory(zipDirectory);
-        }
-
-        if (File.Exists(zipOutputPath))
-        {
-            File.Delete(zipOutputPath);
-        }
-
-        ZipFile.CreateFromDirectory(packageRoot, zipOutputPath, CompressionLevel.Optimal, includeBaseDirectory: false);
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
-    {
-        if (!Directory.Exists(sourceDirectory))
-        {
-            throw new DirectoryNotFoundException($"Directory was not found: {sourceDirectory}");
-        }
-
-        Directory.CreateDirectory(destinationDirectory);
-
-        foreach (string filePath in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-        {
-            string relativePath = Path.GetRelativePath(sourceDirectory, filePath);
-            string destinationPath = Path.Combine(destinationDirectory, relativePath);
-            string destinationParent = Path.GetDirectoryName(destinationPath)
-                ?? throw new InvalidDataException($"Destination path is invalid: {destinationPath}");
-            Directory.CreateDirectory(destinationParent);
-            File.Copy(filePath, destinationPath, overwrite: true);
-        }
+        string outputPath = NativeApiDumpService.Dump(command.HeaderPath, command.OutputPath);
+        _stdout.WriteLine($"Native API dump created: {outputPath}");
+        return 0;
     }
 }
