@@ -11,10 +11,14 @@ namespace dff::native {
 
 namespace {
 
-constexpr const char* kScenePassName = "scene";
+constexpr const char* kShadowPassName = "shadow";
+constexpr const char* kPbrPassName = "pbr_opaque";
+constexpr const char* kTonemapPassName = "tonemap";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
-constexpr const char* kFrameColorResourceName = "frame_color";
+constexpr const char* kShadowMapResourceName = "shadow_map";
+constexpr const char* kHdrColorResourceName = "hdr_color";
+constexpr const char* kLdrColorResourceName = "ldr_color";
 constexpr uint8_t kPhysicsBodyTypeStatic = 0u;
 constexpr uint8_t kPhysicsBodyTypeDynamic = 1u;
 constexpr uint8_t kPhysicsBodyTypeKinematic = 2u;
@@ -24,8 +28,14 @@ constexpr uint8_t kColliderShapeCapsule = 2u;
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
+    case rhi::RhiDevice::PassKind::kShadowMap:
+      return kShadowPassName;
+    case rhi::RhiDevice::PassKind::kPbrOpaque:
+      return kPbrPassName;
+    case rhi::RhiDevice::PassKind::kTonemap:
+      return kTonemapPassName;
     case rhi::RhiDevice::PassKind::kSceneOpaque:
-      return kScenePassName;
+      return "scene";
     case rhi::RhiDevice::PassKind::kUiOverlay:
       return kUiPassName;
     case rhi::RhiDevice::PassKind::kPresent:
@@ -200,41 +210,78 @@ engine_native_status_t RendererState::BuildFrameGraph() {
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();
 
-  render::RenderPassId scene_pass = 0u;
+  render::RenderPassId shadow_pass = 0u;
+  render::RenderPassId pbr_pass = 0u;
+  render::RenderPassId tonemap_pass = 0u;
   render::RenderPassId ui_pass = 0u;
   render::RenderPassId present_pass = 0u;
 
+  const bool has_draws = submitted_draw_count_ > 0u;
+  const bool has_ui = submitted_ui_count_ > 0u;
+
   engine_native_status_t status = ENGINE_NATIVE_STATUS_OK;
-  if (submitted_draw_count_ > 0u) {
+  if (has_draws) {
     status = AddGraphPass(
-        kScenePassName, rhi::RhiDevice::PassKind::kSceneOpaque, &scene_pass);
+        kShadowPassName, rhi::RhiDevice::PassKind::kShadowMap, &shadow_pass);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = frame_graph_.AddWrite(scene_pass, kFrameColorResourceName);
+    status = frame_graph_.AddWrite(shadow_pass, kShadowMapResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status =
+        AddGraphPass(kPbrPassName, rhi::RhiDevice::PassKind::kPbrOpaque, &pbr_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddRead(pbr_pass, kShadowMapResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddWrite(pbr_pass, kHdrColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = AddGraphPass(
+        kTonemapPassName, rhi::RhiDevice::PassKind::kTonemap, &tonemap_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddRead(tonemap_pass, kHdrColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = frame_graph_.AddWrite(tonemap_pass, kLdrColorResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
   }
 
-  if (submitted_ui_count_ > 0u) {
+  if (has_ui) {
     status =
         AddGraphPass(kUiPassName, rhi::RhiDevice::PassKind::kUiOverlay, &ui_pass);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = frame_graph_.AddWrite(ui_pass, kFrameColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
-
-    if (submitted_draw_count_ > 0u) {
-      status = frame_graph_.AddRead(ui_pass, kFrameColorResourceName);
+    if (has_draws) {
+      status = frame_graph_.AddRead(ui_pass, kLdrColorResourceName);
       if (status != ENGINE_NATIVE_STATUS_OK) {
         return status;
       }
+    }
+
+    status = frame_graph_.AddWrite(ui_pass, kLdrColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
     }
   }
 
@@ -244,8 +291,8 @@ engine_native_status_t RendererState::BuildFrameGraph() {
     return status;
   }
 
-  if (submitted_draw_count_ > 0u || submitted_ui_count_ > 0u) {
-    status = frame_graph_.AddRead(present_pass, kFrameColorResourceName);
+  if (has_draws || has_ui) {
+    status = frame_graph_.AddRead(present_pass, kLdrColorResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }

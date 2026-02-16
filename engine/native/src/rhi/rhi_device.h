@@ -15,6 +15,9 @@ class RhiDevice {
     kSceneOpaque = 0u,
     kUiOverlay = 1u,
     kPresent = 2u,
+    kShadowMap = 3u,
+    kPbrOpaque = 4u,
+    kTonemap = 5u,
   };
 
   engine_native_status_t BeginFrame();

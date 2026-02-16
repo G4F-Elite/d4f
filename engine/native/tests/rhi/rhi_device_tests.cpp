@@ -11,7 +11,7 @@ namespace {
 
 using PassKind = dff::native::rhi::RhiDevice::PassKind;
 
-void TestFrameLifecycleWithScenePass() {
+void TestFrameLifecycleWithPbrPipelinePasses() {
   dff::native::rhi::RhiDevice device;
   const std::array<float, 4> clear{0.2f, 0.3f, 0.4f, 1.0f};
 
@@ -20,12 +20,16 @@ void TestFrameLifecycleWithScenePass() {
   assert(device.Clear(clear) == ENGINE_NATIVE_STATUS_OK);
   assert(device.last_clear_color() == clear);
 
-  assert(device.ExecutePass(PassKind::kSceneOpaque) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kShadowMap) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kPbrOpaque) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kTonemap) == ENGINE_NATIVE_STATUS_OK);
   assert(device.ExecutePass(PassKind::kPresent) == ENGINE_NATIVE_STATUS_OK);
 
-  assert(device.executed_passes().size() == 2u);
-  assert(device.executed_passes()[0] == PassKind::kSceneOpaque);
-  assert(device.executed_passes()[1] == PassKind::kPresent);
+  assert(device.executed_passes().size() == 4u);
+  assert(device.executed_passes()[0] == PassKind::kShadowMap);
+  assert(device.executed_passes()[1] == PassKind::kPbrOpaque);
+  assert(device.executed_passes()[2] == PassKind::kTonemap);
+  assert(device.executed_passes()[3] == PassKind::kPresent);
 
   assert(device.EndFrame() == ENGINE_NATIVE_STATUS_OK);
   assert(!device.is_frame_open());
@@ -78,7 +82,7 @@ void TestValidationAndPassOrdering() {
 }  // namespace
 
 void RunRhiDeviceTests() {
-  TestFrameLifecycleWithScenePass();
+  TestFrameLifecycleWithPbrPipelinePasses();
   TestFrameLifecycleWithUiOnlyPass();
   TestValidationAndPassOrdering();
 }

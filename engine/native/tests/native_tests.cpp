@@ -91,7 +91,7 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"scene", "present"});
+                  {"shadow", "pbr_opaque", "tonemap", "present"});
   assert(internal_engine->state.rhi_device.present_count() == 1u);
   const auto clear_color = internal_engine->state.renderer.last_clear_color();
   assert(clear_color[0] == 0.05f);
@@ -280,7 +280,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_packet_b) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"scene", "present"});
+                  {"shadow", "pbr_opaque", "tonemap", "present"});
 
   frame_memory = nullptr;
   assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
@@ -324,7 +324,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_and_ui_packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"scene", "ui", "present"});
+                  {"shadow", "pbr_opaque", "tonemap", "ui", "present"});
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
