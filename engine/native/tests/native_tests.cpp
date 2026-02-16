@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "bridge_capi/bridge_state.h"
+#include "content/content_runtime_tests.h"
 #include "core/resource_table.h"
 #include "engine_native.h"
 #include "platform/platform_state_tests.h"
@@ -374,6 +375,7 @@ int main() {
   TestEngineCreateValidation();
   TestEngineAndSubsystemFlow();
   TestRendererPassOrderForDrawAndUiScenarios();
+  dff::native::tests::RunContentRuntimeTests();
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();
   dff::native::tests::RunFrameGraphBuilderTests();

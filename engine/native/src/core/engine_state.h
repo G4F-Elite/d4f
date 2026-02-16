@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "content/content_runtime.h"
 #include "engine_native.h"
 #include "render/material_system.h"
 #include "platform/platform_state.h"
@@ -110,6 +111,7 @@ struct EngineState {
   EngineState();
 
   platform::PlatformState platform;
+  content::ContentRuntime content;
   rhi::RhiDevice rhi_device;
   RendererState renderer;
   PhysicsState physics;

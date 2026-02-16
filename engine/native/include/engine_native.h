@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 4u
+#define ENGINE_NATIVE_API_VERSION 5u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -184,6 +184,21 @@ ENGINE_NATIVE_API engine_native_status_t engine_get_renderer(
 ENGINE_NATIVE_API engine_native_status_t engine_get_physics(
     engine_native_engine_t* engine,
     engine_native_physics_t** out_physics);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_pak(
+    engine_native_engine_t* engine,
+    const char* pak_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_directory(
+    engine_native_engine_t* engine,
+    const char* directory_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_read_file(
+    engine_native_engine_t* engine,
+    const char* asset_path,
+    void* buffer,
+    size_t buffer_size,
+    size_t* out_size);
 
 ENGINE_NATIVE_API engine_native_status_t renderer_begin_frame(
     engine_native_renderer_t* renderer,

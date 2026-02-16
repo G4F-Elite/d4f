@@ -4,8 +4,10 @@ project(dff_native LANGUAGES C CXX)
 
 add_library(dff_native SHARED
   src/bridge_capi/engine_capi.cpp
+  src/bridge_capi/content_capi.cpp
   src/bridge_capi/renderer_capi.cpp
   src/bridge_capi/physics_capi.cpp
+  src/content/content_runtime.cpp
   src/core/engine_state.cpp
   src/core/physics_raycast.cpp
   src/core/physics_queries.cpp
@@ -36,6 +38,7 @@ include(CTest)
 if(BUILD_TESTING)
   add_executable(dff_native_tests
     tests/native_tests.cpp
+    tests/content/content_runtime_tests.cpp
     tests/platform/platform_state_tests.cpp
     tests/render/frame_graph_builder_tests.cpp
     tests/render/material_system_tests.cpp
