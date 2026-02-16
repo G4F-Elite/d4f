@@ -85,6 +85,28 @@ internal struct EngineNativeRendererFrameStats
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeCaptureRequest
+{
+    public uint Width;
+    public uint Height;
+    public byte IncludeAlpha;
+    public byte Reserved0;
+    public byte Reserved1;
+    public byte Reserved2;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeCaptureResult
+{
+    public uint Width;
+    public uint Height;
+    public uint Stride;
+    public uint Format;
+    public IntPtr Pixels;
+    public nuint PixelBytes;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeBodyWrite
 {
     public ulong Body;

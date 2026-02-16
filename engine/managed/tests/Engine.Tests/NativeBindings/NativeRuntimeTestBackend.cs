@@ -59,6 +59,32 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeRendererFrameStats RendererFrameStatsToReturn { get; set; }
 
+    public EngineNativeStatus CaptureRequestStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus CapturePollStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus CaptureFreeResultStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public ulong CaptureRequestIdToReturn { get; set; } = 1u;
+
+    public EngineNativeCaptureRequest? LastCaptureRequest { get; private set; }
+
+    public ulong LastCapturePollRequestId { get; private set; }
+
+    public byte CapturePollReadyToReturn { get; set; } = 1;
+
+    public uint CaptureResultWidthToReturn { get; set; } = 1u;
+
+    public uint CaptureResultHeightToReturn { get; set; } = 1u;
+
+    public uint CaptureResultStrideToReturn { get; set; } = 4u;
+
+    public uint CaptureResultFormatToReturn { get; set; } = (uint)EngineNativeCaptureFormat.Rgba8Unorm;
+
+    public byte[] CapturePixelsToReturn { get; set; } = [0, 0, 0, 255];
+
+    public bool CaptureResultFreed { get; private set; }
+
     public EngineNativeStatus PhysicsStepStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsSyncFromWorldStatus { get; set; } = EngineNativeStatus.Ok;
@@ -166,6 +192,76 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     {
         Calls.Add("physics_step");
         return PhysicsStepStatus;
+    }
+
+    public EngineNativeStatus CaptureRequest(
+        IntPtr renderer,
+        in EngineNativeCaptureRequest request,
+        out ulong requestId)
+    {
+        Calls.Add("capture_request");
+        LastCaptureRequest = request;
+        requestId = CaptureRequestStatus == EngineNativeStatus.Ok ? CaptureRequestIdToReturn : 0u;
+        return CaptureRequestStatus;
+    }
+
+    public EngineNativeStatus CapturePoll(
+        ulong requestId,
+        out EngineNativeCaptureResult result,
+        out byte isReady)
+    {
+        Calls.Add("capture_poll");
+        LastCapturePollRequestId = requestId;
+        isReady = 0;
+        result = default;
+
+        if (CapturePollStatus != EngineNativeStatus.Ok)
+        {
+            return CapturePollStatus;
+        }
+
+        if (CapturePollReadyToReturn == 0)
+        {
+            return EngineNativeStatus.Ok;
+        }
+
+        isReady = 1;
+        IntPtr pointer = IntPtr.Zero;
+        if (CapturePixelsToReturn.Length > 0)
+        {
+            pointer = Marshal.AllocHGlobal(CapturePixelsToReturn.Length);
+            Marshal.Copy(CapturePixelsToReturn, 0, pointer, CapturePixelsToReturn.Length);
+        }
+
+        result = new EngineNativeCaptureResult
+        {
+            Width = CaptureResultWidthToReturn,
+            Height = CaptureResultHeightToReturn,
+            Stride = CaptureResultStrideToReturn,
+            Format = CaptureResultFormatToReturn,
+            Pixels = pointer,
+            PixelBytes = checked((nuint)CapturePixelsToReturn.Length)
+        };
+        return EngineNativeStatus.Ok;
+    }
+
+    public EngineNativeStatus CaptureFreeResult(ref EngineNativeCaptureResult result)
+    {
+        Calls.Add("capture_free_result");
+        CaptureResultFreed = true;
+
+        if (CaptureFreeResultStatus != EngineNativeStatus.Ok)
+        {
+            return CaptureFreeResultStatus;
+        }
+
+        if (result.Pixels != IntPtr.Zero)
+        {
+            Marshal.FreeHGlobal(result.Pixels);
+        }
+
+        result = default;
+        return EngineNativeStatus.Ok;
     }
 
     public EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount)

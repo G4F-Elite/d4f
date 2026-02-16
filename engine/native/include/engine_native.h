@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 6u
+#define ENGINE_NATIVE_API_VERSION 7u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -87,6 +87,28 @@ typedef struct engine_native_renderer_frame_stats {
   uint64_t pipeline_cache_misses;
   uint64_t pass_mask;
 } engine_native_renderer_frame_stats_t;
+
+typedef enum engine_native_capture_format {
+  ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM = 1
+} engine_native_capture_format_t;
+
+typedef struct engine_native_capture_request {
+  uint32_t width;
+  uint32_t height;
+  uint8_t include_alpha;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
+} engine_native_capture_request_t;
+
+typedef struct engine_native_capture_result {
+  uint32_t width;
+  uint32_t height;
+  uint32_t stride;
+  uint32_t format;
+  const uint8_t* pixels;
+  size_t pixel_bytes;
+} engine_native_capture_result_t;
 
 typedef struct engine_native_body_write {
   engine_native_resource_handle_t body;
@@ -227,6 +249,19 @@ ENGINE_NATIVE_API engine_native_status_t renderer_present(
 ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats(
     engine_native_renderer_t* renderer,
     engine_native_renderer_frame_stats_t* out_stats);
+
+ENGINE_NATIVE_API engine_native_status_t capture_request(
+    engine_native_renderer_t* renderer,
+    const engine_native_capture_request_t* request,
+    uint64_t* out_request_id);
+
+ENGINE_NATIVE_API engine_native_status_t capture_poll(
+    uint64_t request_id,
+    engine_native_capture_result_t* out_result,
+    uint8_t* out_is_ready);
+
+ENGINE_NATIVE_API engine_native_status_t capture_free_result(
+    engine_native_capture_result_t* result);
 
 ENGINE_NATIVE_API engine_native_status_t physics_step(
     engine_native_physics_t* physics,

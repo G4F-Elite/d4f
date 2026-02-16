@@ -31,6 +31,18 @@ internal interface INativeInteropApi
         IntPtr renderer,
         out EngineNativeRendererFrameStats stats);
 
+    EngineNativeStatus CaptureRequest(
+        IntPtr renderer,
+        in EngineNativeCaptureRequest request,
+        out ulong requestId);
+
+    EngineNativeStatus CapturePoll(
+        ulong requestId,
+        out EngineNativeCaptureResult result,
+        out byte isReady);
+
+    EngineNativeStatus CaptureFreeResult(ref EngineNativeCaptureResult result);
+
     EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds);
 
     EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount);

@@ -48,6 +48,21 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out EngineNativeRendererFrameStats stats)
         => NativeMethods.RendererGetLastFrameStats(renderer, out stats);
 
+    public EngineNativeStatus CaptureRequest(
+        IntPtr renderer,
+        in EngineNativeCaptureRequest request,
+        out ulong requestId)
+        => NativeMethods.CaptureRequest(renderer, in request, out requestId);
+
+    public EngineNativeStatus CapturePoll(
+        ulong requestId,
+        out EngineNativeCaptureResult result,
+        out byte isReady)
+        => NativeMethods.CapturePoll(requestId, out result, out isReady);
+
+    public EngineNativeStatus CaptureFreeResult(ref EngineNativeCaptureResult result)
+        => NativeMethods.CaptureFreeResult(ref result);
+
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
         => NativeMethods.PhysicsStep(physics, deltaSeconds);
 
@@ -135,6 +150,25 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus RendererGetLastFrameStats(
             IntPtr renderer,
             out EngineNativeRendererFrameStats outStats);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_request")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus CaptureRequest(
+            IntPtr renderer,
+            in EngineNativeCaptureRequest request,
+            out ulong outRequestId);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_poll")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus CapturePoll(
+            ulong requestId,
+            out EngineNativeCaptureResult outResult,
+            out byte outIsReady);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_free_result")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus CaptureFreeResult(
+            ref EngineNativeCaptureResult result);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

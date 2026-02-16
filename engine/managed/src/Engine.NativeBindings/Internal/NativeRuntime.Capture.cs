@@ -1,0 +1,115 @@
+using System;
+using System.Runtime.InteropServices;
+using Engine.NativeBindings.Internal.Interop;
+
+namespace Engine.NativeBindings.Internal;
+
+internal sealed partial class NativeRuntime
+{
+    internal byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+    {
+        if (width == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "Capture width must be greater than zero.");
+        }
+
+        if (height == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(height), "Capture height must be greater than zero.");
+        }
+
+        ThrowIfDisposed();
+
+        var request = new EngineNativeCaptureRequest
+        {
+            Width = width,
+            Height = height,
+            IncludeAlpha = includeAlpha ? (byte)1 : (byte)0,
+            Reserved0 = 0,
+            Reserved1 = 0,
+            Reserved2 = 0
+        };
+
+        NativeStatusGuard.ThrowIfFailed(
+            _interop.CaptureRequest(_renderer, in request, out var requestId),
+            "capture_request");
+
+        if (requestId == 0u)
+        {
+            throw new InvalidOperationException("Native capture_request returned an invalid request identifier.");
+        }
+
+        EngineNativeCaptureResult result = default;
+        var hasCaptureResult = false;
+
+        try
+        {
+            NativeStatusGuard.ThrowIfFailed(
+                _interop.CapturePoll(requestId, out result, out var isReady),
+                "capture_poll");
+
+            if (isReady == 0u)
+            {
+                throw new InvalidOperationException($"Capture request '{requestId}' is not ready.");
+            }
+
+            hasCaptureResult = true;
+            ValidateCaptureResult(result);
+
+            if (result.Format != (uint)EngineNativeCaptureFormat.Rgba8Unorm)
+            {
+                throw new InvalidOperationException(
+                    $"Unsupported capture format '{result.Format}'.");
+            }
+
+            int byteCount = checked((int)result.PixelBytes);
+            var bytes = new byte[byteCount];
+            if (byteCount > 0)
+            {
+                Marshal.Copy(result.Pixels, bytes, 0, byteCount);
+            }
+
+            return bytes;
+        }
+        finally
+        {
+            if (hasCaptureResult)
+            {
+                NativeStatusGuard.ThrowIfFailed(
+                    _interop.CaptureFreeResult(ref result),
+                    "capture_free_result");
+            }
+        }
+    }
+
+    private static void ValidateCaptureResult(EngineNativeCaptureResult result)
+    {
+        if (result.Width == 0u || result.Height == 0u)
+        {
+            throw new InvalidOperationException(
+                $"Native capture returned invalid dimensions {result.Width}x{result.Height}.");
+        }
+
+        var minStride = checked(result.Width * 4u);
+        if (result.Stride < minStride)
+        {
+            throw new InvalidOperationException(
+                $"Native capture returned stride {result.Stride}, expected at least {minStride}.");
+        }
+
+        nuint expectedByteCount = checked((nuint)result.Stride * result.Height);
+        if (result.PixelBytes != expectedByteCount)
+        {
+            throw new InvalidOperationException(
+                $"Native capture returned {result.PixelBytes} bytes, expected {expectedByteCount}.");
+        }
+
+        bool hasPixels = result.Pixels != IntPtr.Zero;
+        bool hasBytes = result.PixelBytes > 0u;
+        if (hasPixels != hasBytes)
+        {
+            throw new InvalidOperationException(
+                "Native capture returned inconsistent pixel pointer and byte count.");
+        }
+    }
+}
