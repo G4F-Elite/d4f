@@ -80,10 +80,19 @@ or use helper script:
 build-native.bat
 ```
 
+By default, helper `.bat` scripts keep the window open at the end.
+Use `--no-pause` when running from an existing terminal.
+
 ### 1. Initialize a Game Project
 
 ```bash
 dotnet run --project engine/tools/engine-cli -- init --name MyGame --output .
+```
+
+or create a standalone game repository directly:
+
+```bat
+create-game-repo.bat MyGame
 ```
 
 Generated project includes a runtime bootstrap at:
