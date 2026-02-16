@@ -74,9 +74,18 @@ public sealed class EngineCliAppValidationTests
             int code = app.Run(["init", "--name", "DemoGame", "--output", tempRoot]);
 
             Assert.Equal(0, code);
-            Assert.True(Directory.Exists(Path.Combine(tempRoot, "DemoGame", "src")));
-            Assert.True(Directory.Exists(Path.Combine(tempRoot, "DemoGame", "assets")));
-            Assert.True(Directory.Exists(Path.Combine(tempRoot, "DemoGame", "tests")));
+            string projectRoot = Path.Combine(tempRoot, "DemoGame");
+            Assert.True(Directory.Exists(Path.Combine(projectRoot, "src")));
+            Assert.True(Directory.Exists(Path.Combine(projectRoot, "assets")));
+            Assert.True(Directory.Exists(Path.Combine(projectRoot, "tests")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "project.json")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "src", "DemoGame.Runtime", "DemoGame.Runtime.csproj")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "src", "DemoGame.Runtime", "Program.cs")));
+
+            string manifestPath = Path.Combine(projectRoot, "assets", "manifest.json");
+            string manifestJson = File.ReadAllText(manifestPath);
+            Assert.Contains("\"version\": 1", manifestJson, StringComparison.Ordinal);
+            Assert.Contains("\"path\": \"example.txt\"", manifestJson, StringComparison.Ordinal);
         }
         finally
         {

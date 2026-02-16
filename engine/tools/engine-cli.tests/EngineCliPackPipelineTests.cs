@@ -5,6 +5,44 @@ namespace Engine.Cli.Tests;
 public sealed class EngineCliPackPipelineTests
 {
     [Fact]
+    public void Run_ShouldPackProjectInitializedFromTemplate_WithoutManualBootstrap()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int initCode = app.Run(["init", "--name", "DemoGame", "--output", tempRoot]);
+            Assert.Equal(0, initCode);
+
+            string projectRoot = Path.Combine(tempRoot, "DemoGame");
+            int packCode = app.Run(["pack", "--project", projectRoot, "--manifest", "assets/manifest.json"]);
+
+            Assert.Equal(0, packCode);
+            Assert.Single(runner.Invocations);
+            CommandInvocation invocation = runner.Invocations[0];
+            Assert.Equal("dotnet", invocation.ExecutablePath);
+            Assert.Contains("publish", invocation.Arguments);
+            Assert.Contains(
+                invocation.Arguments,
+                arg => string.Equals(
+                    arg,
+                    Path.Combine(projectRoot, "src", "DemoGame.Runtime", "DemoGame.Runtime.csproj"),
+                    StringComparison.OrdinalIgnoreCase));
+
+            Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "Game.pak")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "config", "runtime.json")));
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldInvokePublishAndCopyNativeAndZip_WhenPackOptionsConfigured()
     {
         string tempRoot = CreateTempDirectory();

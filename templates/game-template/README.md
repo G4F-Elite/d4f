@@ -1,8 +1,9 @@
 # game-template
 
-Base game project template.
+Base game project template used by `engine-cli init`.
 
 Structure:
-- `src/` - source files.
-- `assets/` - assets and `manifest.json`.
-- `tests/` - project tests.
+- `project.json` - game metadata with `__GAME_NAME__` token.
+- `src/Game.Runtime/` - bootstrap runtime project (renamed to `<GameName>.Runtime` on init).
+- `assets/` - source assets and valid `manifest.json` (versioned).
+- `tests/` - project tests placeholder.

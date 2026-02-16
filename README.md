@@ -4,6 +4,7 @@
 
 1. Create a new game project:
    `dotnet run --project engine/tools/engine-cli -- init --name MyGame --output .`
+   This creates a ready-to-pack template including `src/MyGame.Runtime/MyGame.Runtime.csproj`.
 2. Prepare assets:
    Create `MyGame/assets/manifest.json` and make sure every file in `assets[].path` exists.
 3. Build the project:

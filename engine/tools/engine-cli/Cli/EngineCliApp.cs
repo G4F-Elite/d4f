@@ -67,37 +67,7 @@ public sealed class EngineCliApp
             return 1;
         }
 
-        Directory.CreateDirectory(projectDirectory);
-        Directory.CreateDirectory(Path.Combine(projectDirectory, "src"));
-        Directory.CreateDirectory(Path.Combine(projectDirectory, "assets"));
-        Directory.CreateDirectory(Path.Combine(projectDirectory, "tests"));
-
-        File.WriteAllText(
-            Path.Combine(projectDirectory, "project.json"),
-            """
-            {
-              "name": "__NAME__",
-              "engineVersion": "0.1.0"
-            }
-            """.Replace("__NAME__", command.Name, StringComparison.Ordinal));
-
-        File.WriteAllText(
-            Path.Combine(projectDirectory, "assets", "manifest.json"),
-            """
-            {
-              "version": 1,
-              "assets": [
-                {
-                  "path": "example.txt",
-                  "kind": "text"
-                }
-              ]
-            }
-            """);
-
-        File.WriteAllText(Path.Combine(projectDirectory, "assets", "example.txt"), "placeholder asset");
-        File.WriteAllText(Path.Combine(projectDirectory, "src", "Main.scene"), "// scene placeholder");
-        File.WriteAllText(Path.Combine(projectDirectory, "tests", "README.md"), "Tests go here.");
+        ProjectTemplateInitializer.InitializeProject(projectDirectory, command.Name);
 
         _stdout.WriteLine($"Project initialized at: {projectDirectory}");
         return 0;
