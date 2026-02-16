@@ -8,6 +8,11 @@ public static partial class EngineCliParser
         "Debug",
         "Release"
     };
+    private static readonly HashSet<string> ValidPackRuntimeIdentifiers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "win-x64",
+        "linux-x64"
+    };
 
     public static EngineCliParseResult Parse(string[] args)
     {
@@ -269,6 +274,10 @@ public static partial class EngineCliParser
         if (string.IsNullOrWhiteSpace(runtimeIdentifier))
         {
             return EngineCliParseResult.Failure("Option '--runtime' cannot be empty.");
+        }
+        if (!ValidPackRuntimeIdentifiers.Contains(runtimeIdentifier))
+        {
+            return EngineCliParseResult.Failure("Option '--runtime' must be one of: win-x64, linux-x64.");
         }
 
         string? publishProjectPath = options.TryGetValue("publish-project", out string? publishPathValue)

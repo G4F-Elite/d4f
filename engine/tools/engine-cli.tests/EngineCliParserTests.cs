@@ -242,6 +242,21 @@ public sealed class EngineCliParserTests
     }
 
     [Fact]
+    public void Parse_ShouldFail_WhenPackRuntimeIsUnsupported()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "pack",
+            "--project", "game",
+            "--manifest", "assets/manifest.json",
+            "--runtime", "osx-x64"
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--runtime' must be one of: win-x64, linux-x64.", result.Error);
+    }
+
+    [Fact]
     public void Parse_ShouldFail_WhenOptionDuplicated()
     {
         EngineCliParseResult result = EngineCliParser.Parse(["run", "--project", ".", "--project", "./other"]);
