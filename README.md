@@ -68,6 +68,18 @@ templates/        # game-template used by engine-cli init
 - CMake 3.20+
 - C++20 toolchain (MSVC/Clang/GCC)
 
+### First Native Configure (fresh clone)
+
+```bash
+cmake -S engine/native -B engine/native/build
+```
+
+or use helper script:
+
+```bat
+build-native.bat
+```
+
 ### 1. Initialize a Game Project
 
 ```bash

@@ -263,6 +263,7 @@ Standard verification commands:
 
 ```bash
 dotnet test dff.sln --nologo
+cmake -S engine/native -B engine/native/build
 cmake --build engine/native/build --config Debug
 ctest --test-dir engine/native/build -C Debug --output-on-failure
 ```
