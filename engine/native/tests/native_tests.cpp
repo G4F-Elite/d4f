@@ -10,6 +10,7 @@
 #include "core/resource_table.h"
 #include "engine_native.h"
 #include "platform/platform_state_tests.h"
+#include "render/frame_graph_builder_tests.h"
 #include "render/render_graph_tests.h"
 #include "rhi/rhi_device_tests.h"
 
@@ -370,6 +371,7 @@ int main() {
   TestRendererPassOrderForDrawAndUiScenarios();
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();
+  dff::native::tests::RunFrameGraphBuilderTests();
   dff::native::tests::RunRhiDeviceTests();
   dff::native::tests::RunRenderGraphTests();
 

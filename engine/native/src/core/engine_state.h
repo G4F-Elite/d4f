@@ -41,9 +41,6 @@ class RendererState {
   static bool IsPowerOfTwo(size_t value);
   engine_native_status_t BuildFrameGraph();
   engine_native_status_t ExecuteCompiledFrameGraph();
-  engine_native_status_t AddGraphPass(const char* pass_name,
-                                      rhi::RhiDevice::PassKind pass_kind,
-                                      render::RenderPassId* out_pass_id);
   void ResetFrameState();
 
   rhi::RhiDevice* rhi_device_ = nullptr;
