@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 #include "engine_native.h"
@@ -16,6 +17,8 @@ class RenderGraph {
   engine_native_status_t AddPass(const std::string& name, RenderPassId* out_pass_id);
 
   engine_native_status_t AddDependency(RenderPassId before, RenderPassId after);
+
+  engine_native_status_t ImportResource(const std::string& resource_name);
 
   engine_native_status_t AddRead(RenderPassId pass_id, const std::string& resource_name);
 
@@ -39,6 +42,8 @@ class RenderGraph {
   bool IsValidPassId(RenderPassId pass_id) const;
 
   std::vector<PassNode> passes_;
+  std::unordered_set<std::string> pass_names_;
+  std::unordered_set<std::string> imported_resources_;
 };
 
 }  // namespace dff::native::render

@@ -85,6 +85,36 @@ void TestCompileDetectsCycles() {
   assert(!error.empty());
 }
 
+void TestCompileFailsOnUnknownReadResource() {
+  RenderGraph graph;
+  RenderPassId lighting = 0;
+
+  assert(graph.AddPass("lighting", &lighting) == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddRead(lighting, "hdr_color") == ENGINE_NATIVE_STATUS_OK);
+
+  std::vector<RenderPassId> order;
+  std::string error;
+  assert(graph.Compile(&order, &error) == ENGINE_NATIVE_STATUS_INVALID_STATE);
+  assert(order.empty());
+  assert(error.find("unknown resource") != std::string::npos);
+}
+
+void TestCompileAllowsImportedResources() {
+  RenderGraph graph;
+  RenderPassId post = 0;
+
+  assert(graph.ImportResource("swapchain") == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddPass("post", &post) == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddRead(post, "swapchain") == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddWrite(post, "swapchain") == ENGINE_NATIVE_STATUS_OK);
+
+  std::vector<RenderPassId> order;
+  std::string error;
+  assert(graph.Compile(&order, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertOrder(order, {post});
+}
+
 void TestInputValidation() {
   RenderGraph graph;
   RenderPassId pass = 0;
@@ -92,9 +122,18 @@ void TestInputValidation() {
   assert(graph.AddPass("", &pass) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddPass("main", nullptr) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddPass("main", &pass) == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddPass("main", &pass) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+
+  assert(graph.ImportResource("") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(graph.ImportResource("swapchain") == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.ImportResource("swapchain") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   assert(graph.AddRead(pass, "") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddWrite(pass, "") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(graph.AddRead(pass, "swapchain") == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddRead(pass, "swapchain") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(graph.AddWrite(pass, "swapchain") == ENGINE_NATIVE_STATUS_OK);
+  assert(graph.AddWrite(pass, "swapchain") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddRead(99u, "depth") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddWrite(99u, "depth") == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(graph.AddDependency(pass, pass) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
@@ -111,6 +150,8 @@ void RunRenderGraphTests() {
   TestCompileBuildsOrderFromResourceHazards();
   TestCompileBuildsOrderFromExplicitDependencies();
   TestCompileDetectsCycles();
+  TestCompileFailsOnUnknownReadResource();
+  TestCompileAllowsImportedResources();
   TestInputValidation();
 }
 

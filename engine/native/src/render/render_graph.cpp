@@ -30,6 +30,9 @@ engine_native_status_t RenderGraph::AddPass(const std::string& name,
   if (name.empty()) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
+  if (pass_names_.contains(name)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
 
   if (passes_.size() >=
       static_cast<size_t>(std::numeric_limits<RenderPassId>::max())) {
@@ -39,6 +42,7 @@ engine_native_status_t RenderGraph::AddPass(const std::string& name,
   PassNode pass;
   pass.name = name;
   passes_.push_back(std::move(pass));
+  pass_names_.insert(name);
   *out_pass_id = static_cast<RenderPassId>(passes_.size() - 1u);
   return ENGINE_NATIVE_STATUS_OK;
 }
@@ -53,9 +57,25 @@ engine_native_status_t RenderGraph::AddDependency(RenderPassId before,
   return ENGINE_NATIVE_STATUS_OK;
 }
 
+engine_native_status_t RenderGraph::ImportResource(
+    const std::string& resource_name) {
+  if (!IsValidResourceName(resource_name)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (!imported_resources_.insert(resource_name).second) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
 engine_native_status_t RenderGraph::AddRead(RenderPassId pass_id,
                                             const std::string& resource_name) {
   if (!IsValidPassId(pass_id) || !IsValidResourceName(resource_name)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (std::find(passes_[pass_id].reads.begin(), passes_[pass_id].reads.end(),
+                resource_name) != passes_[pass_id].reads.end()) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -66,6 +86,10 @@ engine_native_status_t RenderGraph::AddRead(RenderPassId pass_id,
 engine_native_status_t RenderGraph::AddWrite(RenderPassId pass_id,
                                              const std::string& resource_name) {
   if (!IsValidPassId(pass_id) || !IsValidResourceName(resource_name)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (std::find(passes_[pass_id].writes.begin(), passes_[pass_id].writes.end(),
+                resource_name) != passes_[pass_id].writes.end()) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -131,6 +155,13 @@ engine_native_status_t RenderGraph::Compile(std::vector<RenderPassId>* out_order
       auto writer_it = last_writer.find(resource);
       if (writer_it != last_writer.end()) {
         add_edge(writer_it->second, pass_id);
+      } else if (!imported_resources_.contains(resource)) {
+        out_order->clear();
+        if (out_error != nullptr) {
+          *out_error = "RenderGraph reads unknown resource: " + resource +
+                       " in pass '" + pass.name + "'.";
+        }
+        return ENGINE_NATIVE_STATUS_INVALID_STATE;
       }
 
       last_readers[resource].push_back(pass_id);
@@ -189,6 +220,8 @@ engine_native_status_t RenderGraph::Compile(std::vector<RenderPassId>* out_order
 
 void RenderGraph::Clear() {
   passes_.clear();
+  pass_names_.clear();
+  imported_resources_.clear();
 }
 
 bool RenderGraph::IsValidPassId(RenderPassId pass_id) const {
