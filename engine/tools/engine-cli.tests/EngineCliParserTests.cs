@@ -72,6 +72,38 @@ public sealed class EngineCliParserTests
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
         Assert.Equal(Path.Combine("game", "artifacts", "tests"), command.ArtifactsDirectory);
         Assert.Equal("Debug", command.Configuration);
+        Assert.Null(command.GoldenDirectory);
+        Assert.False(command.PixelPerfectGolden);
+    }
+
+    [Fact]
+    public void Parse_ShouldReadGoldenAndComparison_ForTestCommand()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--golden", "goldens",
+            "--comparison", "pixel"
+        ]);
+
+        TestCommand command = Assert.IsType<TestCommand>(result.Command);
+        Assert.Equal("goldens", command.GoldenDirectory);
+        Assert.True(command.PixelPerfectGolden);
+    }
+
+    [Fact]
+    public void Parse_ShouldFail_WhenComparisonValueInvalid()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--comparison", "strict"
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--comparison' must be 'pixel' or 'tolerant'.", result.Error);
     }
 
     [Fact]

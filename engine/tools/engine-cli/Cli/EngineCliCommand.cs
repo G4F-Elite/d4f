@@ -23,7 +23,9 @@ public sealed record PreviewCommand(
 public sealed record TestCommand(
     string ProjectDirectory,
     string ArtifactsDirectory,
-    string Configuration) : EngineCliCommand;
+    string Configuration,
+    string? GoldenDirectory,
+    bool PixelPerfectGolden) : EngineCliCommand;
 
 public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
 

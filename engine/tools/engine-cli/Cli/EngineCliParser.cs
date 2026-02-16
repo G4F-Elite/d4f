@@ -1,6 +1,6 @@
 namespace Engine.Cli;
 
-public static class EngineCliParser
+public static partial class EngineCliParser
 {
     private const string AvailableCommandsText = "new, init, build, run, bake, preview, test, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
@@ -186,7 +186,32 @@ public static class EngineCliParser
             return EngineCliParseResult.Failure(outError);
         }
 
-        return EngineCliParseResult.Success(new TestCommand(project, artifacts, configuration));
+        string? goldenDirectory = options.TryGetValue("golden", out string? goldenValue)
+            ? goldenValue
+            : null;
+        if (goldenDirectory is not null && string.IsNullOrWhiteSpace(goldenDirectory))
+        {
+            return EngineCliParseResult.Failure("Option '--golden' cannot be empty.");
+        }
+
+        bool pixelPerfect = false;
+        if (options.TryGetValue("comparison", out string? comparisonMode))
+        {
+            if (string.Equals(comparisonMode, "pixel", StringComparison.OrdinalIgnoreCase))
+            {
+                pixelPerfect = true;
+            }
+            else if (string.Equals(comparisonMode, "tolerant", StringComparison.OrdinalIgnoreCase))
+            {
+                pixelPerfect = false;
+            }
+            else
+            {
+                return EngineCliParseResult.Failure("Option '--comparison' must be 'pixel' or 'tolerant'.");
+            }
+        }
+
+        return EngineCliParseResult.Success(new TestCommand(project, artifacts, configuration, goldenDirectory, pixelPerfect));
     }
 
     private static EngineCliParseResult ParsePack(IReadOnlyDictionary<string, string> options)
@@ -270,45 +295,6 @@ public static class EngineCliParser
         }
 
         return EngineCliParseResult.Success(new DoctorCommand(project));
-    }
-
-    private static EngineCliParseResult ParseApi(string[] args)
-    {
-        if (args.Length < 2)
-        {
-            return EngineCliParseResult.Failure("Subcommand is required for 'api'. Available subcommands: dump.");
-        }
-
-        string subcommand = args[1].ToLowerInvariant();
-        Dictionary<string, string> options = ParseOptions(args[2..], out string? parseError);
-        if (parseError is not null)
-        {
-            return EngineCliParseResult.Failure(parseError);
-        }
-
-        return subcommand switch
-        {
-            "dump" => ParseDump(options),
-            _ => EngineCliParseResult.Failure($"Unknown subcommand '{args[1]}' for 'api'. Available subcommands: dump.")
-        };
-    }
-
-    private static EngineCliParseResult ParseDump(IReadOnlyDictionary<string, string> options)
-    {
-        string header = options.TryGetValue("header", out string? headerValue)
-            ? headerValue
-            : Path.Combine("engine", "native", "include", "engine_native.h");
-
-        string output = GetOutOrOutputPath(
-            options,
-            defaultValue: Path.Combine("artifacts", "api", "native-api.json"),
-            out string? outError);
-        if (outError is not null)
-        {
-            return EngineCliParseResult.Failure(outError);
-        }
-
-        return EngineCliParseResult.Success(new ApiDumpCommand(header, output));
     }
 
     private static string GetOutOrOutputPath(

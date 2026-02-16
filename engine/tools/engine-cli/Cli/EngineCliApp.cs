@@ -199,9 +199,34 @@ public sealed partial class EngineCliApp
         }
 
         string artifactsDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ArtifactsDirectory);
-        string artifactsManifestPath = TestArtifactGenerator.Generate(artifactsDirectory);
+        TestArtifactsOutput artifactsOutput = TestArtifactGenerator.Generate(artifactsDirectory);
+
+        if (!string.IsNullOrWhiteSpace(command.GoldenDirectory))
+        {
+            string goldenDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.GoldenDirectory);
+            GoldenComparisonSummary summary = GoldenArtifactsComparer.Compare(
+                artifactsDirectory,
+                goldenDirectory,
+                artifactsOutput.Captures,
+                command.PixelPerfectGolden);
+            if (!summary.IsSuccess)
+            {
+                foreach (string failure in summary.Failures)
+                {
+                    _stderr.WriteLine(failure);
+                }
+
+                _stderr.WriteLine(
+                    $"Golden comparison failed for {summary.Failures.Count} capture(s) out of {artifactsOutput.Captures.Count}.");
+                return 1;
+            }
+
+            _stdout.WriteLine(
+                $"Golden comparison passed for {summary.ComparedCount} capture(s) ({(command.PixelPerfectGolden ? "pixel-perfect" : "tolerant")}).");
+        }
+
         _stdout.WriteLine($"Test artifacts created: {artifactsDirectory}");
-        _stdout.WriteLine($"Test manifest created: {artifactsManifestPath}");
+        _stdout.WriteLine($"Test manifest created: {artifactsOutput.ManifestPath}");
         return 0;
     }
 

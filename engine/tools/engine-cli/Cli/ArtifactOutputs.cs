@@ -1,15 +1,8 @@
 using System.Text.Json;
 using Engine.AssetPipeline;
+using Engine.Testing;
 
 namespace Engine.Cli;
-
-internal sealed record ArtifactManifest(DateTime GeneratedAtUtc, IReadOnlyList<ArtifactManifestEntry> Artifacts);
-
-internal sealed record ArtifactManifestEntry(
-    string Kind,
-    string Path,
-    string? SourceAssetPath,
-    string Description);
 
 internal static class ArtifactOutputWriter
 {
@@ -22,30 +15,29 @@ internal static class ArtifactOutputWriter
     private static readonly byte[] PlaceholderPngBytes = Convert.FromHexString(
         "89504E470D0A1A0A0000000D49484452000000010000000108060000001F15C4890000000A49444154789C6360000000020001E221BC330000000049454E44AE426082");
 
-    public static string WriteManifest(string outputDirectory, IReadOnlyList<ArtifactManifestEntry> entries)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
-        ArgumentNullException.ThrowIfNull(entries);
-
-        Directory.CreateDirectory(outputDirectory);
-        string manifestPath = Path.Combine(outputDirectory, "manifest.json");
-        var manifest = new ArtifactManifest(DateTime.UtcNow, entries);
-        string content = JsonSerializer.Serialize(manifest, SerializerOptions);
-        File.WriteAllText(manifestPath, content);
-        return manifestPath;
-    }
-
     public static void WritePlaceholderPng(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
 
-        string directory = Path.GetDirectoryName(path) ?? string.Empty;
+        string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
         File.WriteAllBytes(path, PlaceholderPngBytes);
+    }
+
+    public static string WriteManifest(string outputDirectory, IReadOnlyList<TestingArtifactEntry> entries)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        Directory.CreateDirectory(outputDirectory);
+        string manifestPath = Path.Combine(outputDirectory, "manifest.json");
+        var manifest = new TestingArtifactManifest(DateTime.UtcNow, entries);
+        TestingArtifactManifestCodec.Write(manifestPath, manifest);
+        return manifestPath;
     }
 }
 
@@ -57,7 +49,7 @@ internal static class PreviewArtifactGenerator
         ArgumentNullException.ThrowIfNull(compiledEntries);
 
         Directory.CreateDirectory(outputDirectory);
-        var manifestEntries = new List<ArtifactManifestEntry>(compiledEntries.Count);
+        var manifestEntries = new List<TestingArtifactEntry>(compiledEntries.Count);
 
         foreach (PakEntry entry in compiledEntries)
         {
@@ -66,18 +58,21 @@ internal static class PreviewArtifactGenerator
             string previewFullPath = Path.Combine(outputDirectory, previewRelativePath);
             ArtifactOutputWriter.WritePlaceholderPng(previewFullPath);
             manifestEntries.Add(
-                new ArtifactManifestEntry(
+                new TestingArtifactEntry(
                     Kind: $"{entry.Kind}-preview",
-                    Path: NormalizePath(previewRelativePath),
-                    SourceAssetPath: entry.Path,
+                    RelativePath: NormalizePath(previewRelativePath),
                     Description: $"Preview for '{entry.Path}' ({entry.Kind})."));
 
             if (IsAudioKind(entry.Kind))
             {
                 string waveformRelativePath = BuildWaveformRelativePath(entry.Path);
                 string waveformFullPath = Path.Combine(outputDirectory, waveformRelativePath);
-                string waveformDirectory = Path.GetDirectoryName(waveformFullPath) ?? outputDirectory;
-                Directory.CreateDirectory(waveformDirectory);
+                string? waveformDirectory = Path.GetDirectoryName(waveformFullPath);
+                if (!string.IsNullOrWhiteSpace(waveformDirectory))
+                {
+                    Directory.CreateDirectory(waveformDirectory);
+                }
+
                 File.WriteAllText(
                     waveformFullPath,
                     JsonSerializer.Serialize(
@@ -89,10 +84,9 @@ internal static class PreviewArtifactGenerator
                         },
                         ArtifactOutputWriter.SerializerOptions));
                 manifestEntries.Add(
-                    new ArtifactManifestEntry(
+                    new TestingArtifactEntry(
                         Kind: "audio-waveform",
-                        Path: NormalizePath(waveformRelativePath),
-                        SourceAssetPath: entry.Path,
+                        RelativePath: NormalizePath(waveformRelativePath),
                         Description: $"Waveform preview metadata for '{entry.Path}'."));
             }
         }
@@ -161,55 +155,89 @@ internal static class PreviewArtifactGenerator
     }
 }
 
+internal sealed record TestCaptureArtifact(string RelativeCapturePath, string RelativeBufferPath);
+
+internal sealed record TestArtifactsOutput(string ManifestPath, IReadOnlyList<TestCaptureArtifact> Captures);
+
 internal static class TestArtifactGenerator
 {
-    public static string Generate(string outputDirectory)
+    private sealed record CaptureDefinition(string Kind, string RelativeCapturePath, byte PatternSeed);
+
+    private static readonly CaptureDefinition[] CaptureDefinitions =
+    [
+        new("screenshot", Path.Combine("screenshots", "frame-0001.png"), 11),
+        new("albedo", Path.Combine("dumps", "albedo-0001.png"), 37),
+        new("normals", Path.Combine("dumps", "normals-0001.png"), 73),
+        new("depth", Path.Combine("dumps", "depth-0001.png"), 101),
+        new("shadow", Path.Combine("dumps", "shadow-0001.png"), 151)
+    ];
+
+    public static TestArtifactsOutput Generate(string outputDirectory)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
 
-        string[] capturePaths =
-        [
-            Path.Combine("screenshots", "frame-0001.png"),
-            Path.Combine("dumps", "albedo-0001.png"),
-            Path.Combine("dumps", "normals-0001.png"),
-            Path.Combine("dumps", "depth-0001.png"),
-            Path.Combine("dumps", "shadow-0001.png")
-        ];
+        var manifestEntries = new List<TestingArtifactEntry>(CaptureDefinitions.Length * 2 + 1);
+        var captures = new List<TestCaptureArtifact>(CaptureDefinitions.Length);
 
-        var manifestEntries = new List<ArtifactManifestEntry>(capturePaths.Length + 1);
-        foreach (string relativePath in capturePaths)
+        foreach (CaptureDefinition definition in CaptureDefinitions)
         {
-            string fullPath = Path.Combine(outputDirectory, relativePath);
-            ArtifactOutputWriter.WritePlaceholderPng(fullPath);
+            string captureFullPath = Path.Combine(outputDirectory, definition.RelativeCapturePath);
+            ArtifactOutputWriter.WritePlaceholderPng(captureFullPath);
             manifestEntries.Add(
-                new ArtifactManifestEntry(
-                    Kind: "capture",
-                    Path: relativePath.Replace('\\', '/'),
-                    SourceAssetPath: null,
+                new TestingArtifactEntry(
+                    Kind: definition.Kind,
+                    RelativePath: NormalizePath(definition.RelativeCapturePath),
                     Description: "Deterministic placeholder capture."));
+
+            string relativeBufferPath = Path.ChangeExtension(definition.RelativeCapturePath, ".rgba8.bin")
+                ?? throw new InvalidDataException($"Unable to compute buffer path for '{definition.RelativeCapturePath}'.");
+            string fullBufferPath = Path.Combine(outputDirectory, relativeBufferPath);
+            GoldenImageBufferFileCodec.Write(fullBufferPath, BuildDeterministicBuffer(definition.PatternSeed));
+            manifestEntries.Add(
+                new TestingArtifactEntry(
+                    Kind: $"{definition.Kind}-buffer",
+                    RelativePath: NormalizePath(relativeBufferPath),
+                    Description: "Deterministic raw capture buffer for golden comparison."));
+            captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
         }
 
-        string replayPath = Path.Combine(outputDirectory, "replay", "recording.json");
-        string replayDirectory = Path.GetDirectoryName(replayPath) ?? outputDirectory;
-        Directory.CreateDirectory(replayDirectory);
-        File.WriteAllText(
-            replayPath,
-            JsonSerializer.Serialize(
-                new
-                {
-                    deterministic = true,
-                    fixedDt = 0.016666667,
-                    seed = 1337,
-                    ticks = 60
-                },
-                ArtifactOutputWriter.SerializerOptions));
+        string replayRelativePath = Path.Combine("replay", "recording.json");
+        string replayFullPath = Path.Combine(outputDirectory, replayRelativePath);
+        ReplayRecordingCodec.Write(
+            replayFullPath,
+            new ReplayRecording(
+                Seed: 1337,
+                FixedDeltaSeconds: 1.0 / 60.0,
+                Frames:
+                [
+                    new ReplayFrameInput(0, 0, 0.0f, 0.0f),
+                    new ReplayFrameInput(1, 1, 0.2f, 0.1f),
+                    new ReplayFrameInput(2, 1, 0.3f, 0.2f)
+                ]));
         manifestEntries.Add(
-            new ArtifactManifestEntry(
+            new TestingArtifactEntry(
                 Kind: "replay",
-                Path: "replay/recording.json",
-                SourceAssetPath: null,
+                RelativePath: NormalizePath(replayRelativePath),
                 Description: "Record/replay metadata."));
 
-        return ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
+        string manifestPath = ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
+        return new TestArtifactsOutput(manifestPath, captures);
+    }
+
+    private static GoldenImageBuffer BuildDeterministicBuffer(byte seed)
+    {
+        byte[] rgba =
+        [
+            seed, (byte)(seed + 10), (byte)(seed + 20), 255,
+            (byte)(seed + 30), (byte)(seed + 40), (byte)(seed + 50), 255,
+            (byte)(seed + 60), (byte)(seed + 70), (byte)(seed + 80), 255,
+            (byte)(seed + 90), (byte)(seed + 100), (byte)(seed + 110), 255
+        ];
+        return new GoldenImageBuffer(2, 2, rgba);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/');
     }
 }
