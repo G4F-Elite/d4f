@@ -92,4 +92,7 @@ internal sealed class NativeRenderingApiStub : INativeRenderingApi
     }
 
     public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
+
+    public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+        => NoopRenderingFacade.Instance.CaptureFrameRgba8(width, height, includeAlpha);
 }

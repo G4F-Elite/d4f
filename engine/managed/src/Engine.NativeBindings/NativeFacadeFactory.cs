@@ -116,5 +116,8 @@ public static class NativeFacadeFactory
         public void Present() => _nativeApi.Present();
 
         public RenderingFrameStats GetLastFrameStats() => _nativeApi.GetLastFrameStats();
+
+        public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+            => _nativeApi.CaptureFrameRgba8(width, height, includeAlpha);
     }
 }

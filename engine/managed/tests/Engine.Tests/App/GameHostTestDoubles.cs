@@ -243,4 +243,14 @@ internal sealed class RecordingRenderingFacade : IRenderingFacade
         GetLastFrameStatsCallCount++;
         return LastFrameStats;
     }
+
+    public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+    {
+        if (width == 0u || height == 0u)
+        {
+            throw new ArgumentOutOfRangeException(width == 0u ? nameof(width) : nameof(height));
+        }
+
+        return new byte[checked((int)width * (int)height * 4)];
+    }
 }

@@ -92,4 +92,32 @@ public sealed class NativeRuntimeCaptureTests
         Assert.Throws<ArgumentOutOfRangeException>(() => runtime.CaptureFrameRgba8(0u, 1u));
         Assert.Throws<ArgumentOutOfRangeException>(() => runtime.CaptureFrameRgba8(1u, 0u));
     }
+
+    [Fact]
+    public void CaptureFrameRgba8_CompactsRows_WhenNativeStrideHasPadding()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            CaptureResultWidthToReturn = 2u,
+            CaptureResultHeightToReturn = 2u,
+            CaptureResultStrideToReturn = 12u,
+            CaptureResultFormatToReturn = (uint)EngineNativeCaptureFormat.Rgba8Unorm,
+            CapturePixelsToReturn =
+            [
+                1, 2, 3, 4, 5, 6, 7, 8, 99, 98, 97, 96,
+                9, 10, 11, 12, 13, 14, 15, 16, 95, 94, 93, 92
+            ]
+        };
+
+        using var runtime = new NativeRuntime(backend);
+
+        byte[] packed = runtime.CaptureFrameRgba8(2u, 2u);
+
+        Assert.Equal(
+        [
+            1, 2, 3, 4, 5, 6, 7, 8,
+            9, 10, 11, 12, 13, 14, 15, 16
+        ],
+            packed);
+    }
 }

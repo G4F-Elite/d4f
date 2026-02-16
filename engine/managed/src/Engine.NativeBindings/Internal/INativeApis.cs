@@ -45,4 +45,6 @@ internal interface INativeRenderingApi
     void Present();
 
     RenderingFrameStats GetLastFrameStats();
+
+    byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true);
 }

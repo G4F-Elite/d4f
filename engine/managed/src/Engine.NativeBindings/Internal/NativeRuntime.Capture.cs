@@ -6,7 +6,7 @@ namespace Engine.NativeBindings.Internal;
 
 internal sealed partial class NativeRuntime
 {
-    internal byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+    public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
     {
         if (width == 0u)
         {
@@ -62,14 +62,14 @@ internal sealed partial class NativeRuntime
                     $"Unsupported capture format '{result.Format}'.");
             }
 
-            int byteCount = checked((int)result.PixelBytes);
-            var bytes = new byte[byteCount];
-            if (byteCount > 0)
+            int rawByteCount = checked((int)result.PixelBytes);
+            var rawBytes = new byte[rawByteCount];
+            if (rawByteCount > 0)
             {
-                Marshal.Copy(result.Pixels, bytes, 0, byteCount);
+                Marshal.Copy(result.Pixels, rawBytes, 0, rawByteCount);
             }
 
-            return bytes;
+            return EnsureTightRgbaRows(rawBytes, result);
         }
         finally
         {
@@ -111,5 +111,24 @@ internal sealed partial class NativeRuntime
             throw new InvalidOperationException(
                 "Native capture returned inconsistent pixel pointer and byte count.");
         }
+    }
+
+    private static byte[] EnsureTightRgbaRows(byte[] rawBytes, EngineNativeCaptureResult result)
+    {
+        int tightStride = checked((int)result.Width * 4);
+        int sourceStride = checked((int)result.Stride);
+        if (sourceStride == tightStride)
+        {
+            return rawBytes;
+        }
+
+        int rowCount = checked((int)result.Height);
+        var compact = new byte[checked(tightStride * rowCount)];
+        for (int row = 0; row < rowCount; row++)
+        {
+            Buffer.BlockCopy(rawBytes, row * sourceStride, compact, row * tightStride, tightStride);
+        }
+
+        return compact;
     }
 }

@@ -177,8 +177,14 @@ public sealed class EngineCliAppValidationTests
             Assert.Contains("Debug", invocation.Arguments);
 
             Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "manifest.json")));
-            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.png")));
+            string screenshotPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.png");
+            Assert.True(File.Exists(screenshotPath));
             Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "dumps", "albedo-0001.png")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba8.bin")));
+
+            (uint width, uint height) = ReadPngDimensions(screenshotPath);
+            Assert.Equal((uint)64, width);
+            Assert.Equal((uint)64, height);
         }
         finally
         {
@@ -333,6 +339,24 @@ public sealed class EngineCliAppValidationTests
         string path = Path.Combine(Path.GetTempPath(), $"engine-cli-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static (uint Width, uint Height) ReadPngDimensions(string filePath)
+    {
+        byte[] bytes = File.ReadAllBytes(filePath);
+        Assert.True(bytes.Length >= 24);
+        Assert.Equal((byte)0x89, bytes[0]);
+        Assert.Equal((byte)'P', bytes[1]);
+        Assert.Equal((byte)'N', bytes[2]);
+        Assert.Equal((byte)'G', bytes[3]);
+        Assert.Equal((byte)'I', bytes[12]);
+        Assert.Equal((byte)'H', bytes[13]);
+        Assert.Equal((byte)'D', bytes[14]);
+        Assert.Equal((byte)'R', bytes[15]);
+
+        uint width = ((uint)bytes[16] << 24) | ((uint)bytes[17] << 16) | ((uint)bytes[18] << 8) | bytes[19];
+        uint height = ((uint)bytes[20] << 24) | ((uint)bytes[21] << 16) | ((uint)bytes[22] << 8) | bytes[23];
+        return (width, height);
     }
 
     private sealed class RecordingCommandRunner : IExternalCommandRunner

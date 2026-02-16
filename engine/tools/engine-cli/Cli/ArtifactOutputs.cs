@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Engine.AssetPipeline;
+using Engine.Rendering;
 using Engine.Testing;
 
 namespace Engine.Cli;
@@ -26,6 +27,12 @@ internal static class ArtifactOutputWriter
         }
 
         File.WriteAllBytes(path, PlaceholderPngBytes);
+    }
+
+    public static void WriteRgbaPng(string path, GoldenImageBuffer image)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        RgbaPngCodec.Write(path, image);
     }
 
     public static string WriteManifest(string outputDirectory, IReadOnlyList<TestingArtifactEntry> entries)
@@ -163,6 +170,9 @@ internal static class TestArtifactGenerator
 {
     private sealed record CaptureDefinition(string Kind, string RelativeCapturePath, byte PatternSeed);
 
+    private const uint CaptureWidth = 64u;
+    private const uint CaptureHeight = 64u;
+
     private static readonly CaptureDefinition[] CaptureDefinitions =
     [
         new("screenshot", Path.Combine("screenshots", "frame-0001.png"), 11),
@@ -178,26 +188,28 @@ internal static class TestArtifactGenerator
 
         var manifestEntries = new List<TestingArtifactEntry>(CaptureDefinitions.Length * 2 + 1);
         var captures = new List<TestCaptureArtifact>(CaptureDefinitions.Length);
+        IRenderingFacade captureFacade = NoopRenderingFacade.Instance;
 
         foreach (CaptureDefinition definition in CaptureDefinitions)
         {
+            GoldenImageBuffer image = CaptureBuffer(captureFacade, definition);
             string captureFullPath = Path.Combine(outputDirectory, definition.RelativeCapturePath);
-            ArtifactOutputWriter.WritePlaceholderPng(captureFullPath);
+            ArtifactOutputWriter.WriteRgbaPng(captureFullPath, image);
             manifestEntries.Add(
                 new TestingArtifactEntry(
                     Kind: definition.Kind,
                     RelativePath: NormalizePath(definition.RelativeCapturePath),
-                    Description: "Deterministic placeholder capture."));
+                    Description: "Deterministic runtime capture."));
 
             string relativeBufferPath = Path.ChangeExtension(definition.RelativeCapturePath, ".rgba8.bin")
                 ?? throw new InvalidDataException($"Unable to compute buffer path for '{definition.RelativeCapturePath}'.");
             string fullBufferPath = Path.Combine(outputDirectory, relativeBufferPath);
-            GoldenImageBufferFileCodec.Write(fullBufferPath, BuildDeterministicBuffer(definition.PatternSeed));
+            GoldenImageBufferFileCodec.Write(fullBufferPath, image);
             manifestEntries.Add(
                 new TestingArtifactEntry(
                     Kind: $"{definition.Kind}-buffer",
                     RelativePath: NormalizePath(relativeBufferPath),
-                    Description: "Deterministic raw capture buffer for golden comparison."));
+                    Description: "Deterministic runtime raw capture buffer for golden comparison."));
             captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
         }
 
@@ -224,16 +236,20 @@ internal static class TestArtifactGenerator
         return new TestArtifactsOutput(manifestPath, captures);
     }
 
-    private static GoldenImageBuffer BuildDeterministicBuffer(byte seed)
+    private static GoldenImageBuffer CaptureBuffer(IRenderingFacade captureFacade, CaptureDefinition definition)
     {
-        byte[] rgba =
-        [
-            seed, (byte)(seed + 10), (byte)(seed + 20), 255,
-            (byte)(seed + 30), (byte)(seed + 40), (byte)(seed + 50), 255,
-            (byte)(seed + 60), (byte)(seed + 70), (byte)(seed + 80), 255,
-            (byte)(seed + 90), (byte)(seed + 100), (byte)(seed + 110), 255
-        ];
-        return new GoldenImageBuffer(2, 2, rgba);
+        byte[] rgba = captureFacade.CaptureFrameRgba8(CaptureWidth, CaptureHeight);
+        byte[] transformed = new byte[rgba.Length];
+        Buffer.BlockCopy(rgba, 0, transformed, 0, rgba.Length);
+
+        // Keep captures deterministic but distinct per artifact kind.
+        for (int i = 0; i < transformed.Length; i += 4)
+        {
+            transformed[i] ^= definition.PatternSeed;
+            transformed[i + 1] = unchecked((byte)(transformed[i + 1] + definition.PatternSeed / 2));
+        }
+
+        return new GoldenImageBuffer(checked((int)CaptureWidth), checked((int)CaptureHeight), transformed);
     }
 
     private static string NormalizePath(string path)

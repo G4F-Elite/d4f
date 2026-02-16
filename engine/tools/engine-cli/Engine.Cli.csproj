@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\asset-pipeline\Engine.AssetPipeline.csproj" />
     <ProjectReference Include="..\..\managed\src\Engine.Testing\Engine.Testing.csproj" />
+    <ProjectReference Include="..\..\managed\src\Engine.Rendering\Engine.Rendering.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
