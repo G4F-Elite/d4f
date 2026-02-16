@@ -6,11 +6,13 @@ namespace {
 
 constexpr const char* kShadowPassName = "shadow";
 constexpr const char* kPbrPassName = "pbr_opaque";
+constexpr const char* kBloomPassName = "bloom";
 constexpr const char* kTonemapPassName = "tonemap";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
 constexpr const char* kShadowMapResourceName = "shadow_map";
 constexpr const char* kHdrColorResourceName = "hdr_color";
+constexpr const char* kBloomColorResourceName = "bloom_color";
 constexpr const char* kLdrColorResourceName = "ldr_color";
 
 engine_native_status_t AddPass(RenderGraph* graph,
@@ -57,6 +59,7 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
 
   RenderPassId shadow_pass = 0u;
   RenderPassId pbr_pass = 0u;
+  RenderPassId bloom_pass = 0u;
   RenderPassId tonemap_pass = 0u;
   RenderPassId ui_pass = 0u;
   RenderPassId present_pass = 0u;
@@ -90,13 +93,29 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
       return status;
     }
 
+    status = AddPass(graph, output, kBloomPassName, rhi::RhiDevice::PassKind::kBloom,
+                     &bloom_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddRead(bloom_pass, kHdrColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddWrite(bloom_pass, kBloomColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
     status = AddPass(graph, output, kTonemapPassName, rhi::RhiDevice::PassKind::kTonemap,
                      &tonemap_pass);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = graph->AddRead(tonemap_pass, kHdrColorResourceName);
+    status = graph->AddRead(tonemap_pass, kBloomColorResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }

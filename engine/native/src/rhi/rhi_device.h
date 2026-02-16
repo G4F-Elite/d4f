@@ -18,6 +18,7 @@ class RhiDevice {
     kShadowMap = 3u,
     kPbrOpaque = 4u,
     kTonemap = 5u,
+    kBloom = 6u,
   };
 
   engine_native_status_t BeginFrame();

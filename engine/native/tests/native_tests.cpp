@@ -95,7 +95,7 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "tonemap", "present"});
+                  {"shadow", "pbr_opaque", "bloom", "tonemap", "present"});
   assert(internal_engine->state.renderer.pipeline_cache_misses() == 2u);
   assert(internal_engine->state.renderer.pipeline_cache_hits() == 0u);
   assert(internal_engine->state.renderer.cached_pipeline_count() == 2u);
@@ -287,7 +287,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_packet_b) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "tonemap", "present"});
+                  {"shadow", "pbr_opaque", "bloom", "tonemap", "present"});
 
   frame_memory = nullptr;
   assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
@@ -331,7 +331,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_and_ui_packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "tonemap", "ui", "present"});
+                  {"shadow", "pbr_opaque", "bloom", "tonemap", "ui", "present"});
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }

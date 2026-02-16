@@ -22,14 +22,16 @@ void TestFrameLifecycleWithPbrPipelinePasses() {
 
   assert(device.ExecutePass(PassKind::kShadowMap) == ENGINE_NATIVE_STATUS_OK);
   assert(device.ExecutePass(PassKind::kPbrOpaque) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kBloom) == ENGINE_NATIVE_STATUS_OK);
   assert(device.ExecutePass(PassKind::kTonemap) == ENGINE_NATIVE_STATUS_OK);
   assert(device.ExecutePass(PassKind::kPresent) == ENGINE_NATIVE_STATUS_OK);
 
-  assert(device.executed_passes().size() == 4u);
+  assert(device.executed_passes().size() == 5u);
   assert(device.executed_passes()[0] == PassKind::kShadowMap);
   assert(device.executed_passes()[1] == PassKind::kPbrOpaque);
-  assert(device.executed_passes()[2] == PassKind::kTonemap);
-  assert(device.executed_passes()[3] == PassKind::kPresent);
+  assert(device.executed_passes()[2] == PassKind::kBloom);
+  assert(device.executed_passes()[3] == PassKind::kTonemap);
+  assert(device.executed_passes()[4] == PassKind::kPresent);
 
   assert(device.EndFrame() == ENGINE_NATIVE_STATUS_OK);
   assert(!device.is_frame_open());

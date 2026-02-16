@@ -27,6 +27,8 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
       return "shadow";
     case rhi::RhiDevice::PassKind::kPbrOpaque:
       return "pbr_opaque";
+    case rhi::RhiDevice::PassKind::kBloom:
+      return "bloom";
     case rhi::RhiDevice::PassKind::kTonemap:
       return "tonemap";
     case rhi::RhiDevice::PassKind::kSceneOpaque:
