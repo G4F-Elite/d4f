@@ -29,6 +29,7 @@
     <ProjectReference Include="..\..\src\Engine.App\Engine.App.csproj" />
     <ProjectReference Include="..\..\src\Engine.Scenes\Engine.Scenes.csproj" />
     <ProjectReference Include="..\..\src\Engine.NativeBindings\Engine.NativeBindings.csproj" />
+    <ProjectReference Include="..\..\src\Engine.Net\Engine.Net.csproj" />
   </ItemGroup>
 
 </Project>
