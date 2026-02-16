@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Engine.Core\Engine.Core.csproj" />
+    <ProjectReference Include="..\..\src\Engine.Content\Engine.Content.csproj" />
     <ProjectReference Include="..\..\src\Engine.ECS\Engine.ECS.csproj" />
     <ProjectReference Include="..\..\src\Engine.Physics\Engine.Physics.csproj" />
     <ProjectReference Include="..\..\src\Engine.Rendering\Engine.Rendering.csproj" />

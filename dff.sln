@@ -49,6 +49,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.Tests", "engine\mana
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.Scenes", "engine\managed\src\Engine.Scenes\Engine.Scenes.csproj", "{C1117E47-D727-4999-A277-E3D7FD8F1081}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Engine.Content", "engine\managed\src\Engine.Content\Engine.Content.csproj", "{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -227,6 +229,18 @@ Global
 		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x64.Build.0 = Release|Any CPU
 		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x86.ActiveCfg = Release|Any CPU
 		{C1117E47-D727-4999-A277-E3D7FD8F1081}.Release|x86.Build.0 = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|x64.Build.0 = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Debug|x86.Build.0 = Debug|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|x64.ActiveCfg = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|x64.Build.0 = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|x86.ActiveCfg = Release|Any CPU
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -254,5 +268,6 @@ Global
 		{D0672B24-9CEC-4ED0-B4D5-9401877EFEAD} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 		{475A28B0-3431-4572-B164-542DE44EFD30} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 		{C1117E47-D727-4999-A277-E3D7FD8F1081} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
+		{2254D44A-E6D9-4217-BBDA-F3899C25F1DE} = {52C7792C-60D1-ADB8-BBB9-313F1ABEA16F}
 	EndGlobalSection
 EndGlobal
