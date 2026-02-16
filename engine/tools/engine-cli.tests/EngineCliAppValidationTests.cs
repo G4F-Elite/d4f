@@ -77,6 +77,7 @@ public sealed class EngineCliAppValidationTests
             string projectRoot = Path.Combine(tempRoot, "DemoGame");
             Assert.True(Directory.Exists(Path.Combine(projectRoot, "src")));
             Assert.True(Directory.Exists(Path.Combine(projectRoot, "assets")));
+            Assert.True(Directory.Exists(Path.Combine(projectRoot, "GameAssets")));
             Assert.True(Directory.Exists(Path.Combine(projectRoot, "tests")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "project.json")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "src", "DemoGame.Runtime", "DemoGame.Runtime.csproj")));

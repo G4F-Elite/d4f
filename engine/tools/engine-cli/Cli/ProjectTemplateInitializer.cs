@@ -20,8 +20,21 @@ internal static class ProjectTemplateInitializer
         }
 
         CopyDirectory(templateDirectory, projectDirectory);
+        EnsureGameAssetsDirectory(projectDirectory);
         RenameRuntimeProject(projectDirectory, gameName);
         ReplaceTokensInTextFiles(projectDirectory, GameNameToken, gameName);
+    }
+
+    private static void EnsureGameAssetsDirectory(string projectDirectory)
+    {
+        string gameAssetsDirectory = Path.Combine(projectDirectory, "GameAssets");
+        Directory.CreateDirectory(gameAssetsDirectory);
+
+        string keepFilePath = Path.Combine(gameAssetsDirectory, ".gitkeep");
+        if (!File.Exists(keepFilePath))
+        {
+            File.WriteAllText(keepFilePath, string.Empty, Encoding.UTF8);
+        }
     }
 
     private static void RenameRuntimeProject(string projectDirectory, string gameName)
