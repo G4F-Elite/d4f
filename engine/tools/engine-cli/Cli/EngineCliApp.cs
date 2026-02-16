@@ -76,9 +76,10 @@ public sealed class EngineCliApp
             Path.Combine(projectDirectory, "assets", "manifest.json"),
             """
             {
+              "version": 1,
               "assets": [
                 {
-                  "path": "assets/example.txt",
+                  "path": "example.txt",
                   "kind": "text"
                 }
               ]
@@ -148,13 +149,23 @@ public sealed class EngineCliApp
         }
 
         string manifestPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ManifestPath);
+        string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? projectDirectory;
         AssetManifest manifest = AssetPipelineService.LoadManifest(manifestPath);
-        AssetPipelineService.ValidateAssetsExist(manifest, projectDirectory);
+        AssetPipelineService.ValidateAssetsExist(manifest, manifestDirectory);
 
         string outputPakPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.OutputPakPath);
-        AssetPipelineService.WritePak(outputPakPath, manifest);
+        string outputDirectory = Path.GetDirectoryName(outputPakPath) ?? projectDirectory;
+        string compiledRootDirectory = Path.Combine(outputDirectory, "compiled");
+        IReadOnlyList<PakEntry> compiledEntries = AssetPipelineService.CompileAssets(
+            manifest,
+            manifestDirectory,
+            compiledRootDirectory);
+        AssetPipelineService.WritePak(outputPakPath, compiledEntries);
+        string compiledManifestPath = Path.Combine(outputDirectory, AssetPipelineService.CompiledManifestFileName);
+        AssetPipelineService.WriteCompiledManifest(compiledManifestPath, compiledEntries);
 
         _stdout.WriteLine($"Pak created: {outputPakPath}");
+        _stdout.WriteLine($"Compiled manifest created: {compiledManifestPath}");
         return 0;
     }
 }

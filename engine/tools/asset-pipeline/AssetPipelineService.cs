@@ -5,6 +5,8 @@ namespace Engine.AssetPipeline;
 public static class AssetPipelineService
 {
     private const int PakVersion = 2;
+    public const int SourceManifestVersion = 1;
+    public const string CompiledManifestFileName = "compiled.manifest.bin";
     private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         WriteIndented = true
@@ -21,6 +23,12 @@ public static class AssetPipelineService
 
         using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
         JsonElement root = document.RootElement;
+        int manifestVersion = ReadRequiredInt(root, "version", "root");
+        if (manifestVersion != SourceManifestVersion)
+        {
+            throw new InvalidDataException(
+                $"Unsupported manifest version {manifestVersion}. Expected {SourceManifestVersion}.");
+        }
 
         if (!root.TryGetProperty("assets", out JsonElement assetsElement) || assetsElement.ValueKind != JsonValueKind.Array)
         {
@@ -48,7 +56,7 @@ public static class AssetPipelineService
             throw new InvalidDataException("Manifest must define at least one asset entry.");
         }
 
-        return new AssetManifest(entries);
+        return new AssetManifest(manifestVersion, entries);
     }
 
     public static void ValidateAssetsExist(AssetManifest manifest, string baseDirectory)
@@ -107,6 +115,14 @@ public static class AssetPipelineService
             .ToArray();
 
         WritePak(outputPakPath, compatibilityEntries);
+    }
+
+    public static void WriteCompiledManifest(string outputPath, IReadOnlyList<PakEntry> entries)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(entries);
+
+        CompiledManifestCodec.Write(outputPath, entries);
     }
 
     public static PakArchive ReadPak(string pakPath)
@@ -181,6 +197,21 @@ public static class AssetPipelineService
         if (string.IsNullOrWhiteSpace(value))
         {
             throw new InvalidDataException($"'{location}.{propertyName}' cannot be empty.");
+        }
+
+        return value;
+    }
+
+    private static int ReadRequiredInt(JsonElement element, string propertyName, string location)
+    {
+        if (!element.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind != JsonValueKind.Number)
+        {
+            throw new InvalidDataException($"'{location}.{propertyName}' must be a number.");
+        }
+
+        if (!property.TryGetInt32(out int value))
+        {
+            throw new InvalidDataException($"'{location}.{propertyName}' must be a valid integer.");
         }
 
         return value;

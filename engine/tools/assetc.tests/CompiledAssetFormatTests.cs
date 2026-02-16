@@ -32,6 +32,7 @@ public sealed class CompiledAssetFormatTests
                 manifestPath,
                 """
                 {
+                  "version": 1,
                   "assets": [
                     {
                       "path": "textures/pixel.png",
@@ -55,6 +56,9 @@ public sealed class CompiledAssetFormatTests
 
             PakArchive pak = AssetPipelineService.ReadPak(pakPath);
             Assert.Equal(2, pak.Entries.Count);
+            IReadOnlyList<PakEntry> compiledManifest = CompiledManifestCodec.Read(
+                Path.Combine(tempRoot, AssetPipelineService.CompiledManifestFileName));
+            Assert.Equal(2, compiledManifest.Count);
 
             PakEntry textureEntry = pak.Entries.Single(x => x.Kind == "texture");
             string textureCompiledPath = ResolveCompiledPath(pakPath, textureEntry.CompiledPath);

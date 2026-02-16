@@ -30,6 +30,7 @@ public sealed class AssetcAppValidationTests
                 manifestPath,
                 """
                 {
+                  "version": 1,
                   "assets": [
                     {
                       "path": "textures/missing.png",
@@ -69,6 +70,7 @@ public sealed class AssetcAppValidationTests
                 manifestPath,
                 """
                 {
+                  "version": 1,
                   "assets": [
                     {
                       "path": "textures/hero.png",
@@ -86,6 +88,7 @@ public sealed class AssetcAppValidationTests
 
             Assert.Equal(0, buildCode);
             Assert.True(File.Exists(pakPath));
+            Assert.True(File.Exists(Path.Combine(tempRoot, AssetPipelineService.CompiledManifestFileName)));
 
             using var listOutput = new StringWriter();
             using var listError = new StringWriter();
@@ -133,6 +136,7 @@ public sealed class AssetcAppValidationTests
                 manifestPath,
                 """
                 {
+                  "version": 1,
                   "assets": [
                     {
                       "path": "scenes/level.scene.json",
@@ -149,6 +153,7 @@ public sealed class AssetcAppValidationTests
             int buildCode = app.Run(["build", "--manifest", manifestPath, "--output", pakPath]);
 
             Assert.Equal(0, buildCode);
+            Assert.True(File.Exists(Path.Combine(tempRoot, AssetPipelineService.CompiledManifestFileName)));
             PakArchive pak = AssetPipelineService.ReadPak(pakPath);
             PakEntry entry = Assert.Single(pak.Entries);
             Assert.Equal("scene", entry.Kind);
@@ -177,6 +182,42 @@ public sealed class AssetcAppValidationTests
             Assert.Single(scene.Components);
             Assert.Equal(1u, scene.Entities[0].StableId);
             Assert.Equal("Tag", scene.Components[0].TypeId);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailBuild_WhenManifestVersionUnsupported()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            File.WriteAllText(
+                Path.Combine(tempRoot, "manifest.json"),
+                """
+                {
+                  "version": 99,
+                  "assets": [
+                    {
+                      "path": "example.txt",
+                      "kind": "text"
+                    }
+                  ]
+                }
+                """);
+            File.WriteAllText(Path.Combine(tempRoot, "example.txt"), "data");
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            AssetcApp app = new(output, error);
+
+            int code = app.Run(["build", "--manifest", Path.Combine(tempRoot, "manifest.json"), "--output", Path.Combine(tempRoot, "content.pak")]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Unsupported manifest version", error.ToString(), StringComparison.Ordinal);
         }
         finally
         {

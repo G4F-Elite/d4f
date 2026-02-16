@@ -53,8 +53,11 @@ public sealed class AssetcApp
             manifestDirectory,
             compiledRootDirectory);
         AssetPipelineService.WritePak(outputPakPath, compiledEntries);
+        string compiledManifestPath = Path.Combine(outputDirectory, AssetPipelineService.CompiledManifestFileName);
+        AssetPipelineService.WriteCompiledManifest(compiledManifestPath, compiledEntries);
 
         _stdout.WriteLine($"Pak created: {outputPakPath}");
+        _stdout.WriteLine($"Compiled manifest created: {compiledManifestPath}");
         return 0;
     }
 
