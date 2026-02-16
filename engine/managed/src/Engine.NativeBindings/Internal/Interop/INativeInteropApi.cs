@@ -4,6 +4,8 @@ namespace Engine.NativeBindings.Internal.Interop;
 
 internal interface INativeInteropApi
 {
+    uint EngineGetNativeApiVersion();
+
     EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine);
 
     EngineNativeStatus EngineDestroy(IntPtr engine);

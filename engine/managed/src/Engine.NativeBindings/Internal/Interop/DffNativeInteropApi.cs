@@ -12,6 +12,9 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     {
     }
 
+    public uint EngineGetNativeApiVersion()
+        => NativeMethods.EngineGetNativeApiVersion();
+
     public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
         => NativeMethods.EngineCreate(in createDesc, out engine);
 
@@ -98,6 +101,10 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
 
     private static partial class NativeMethods
     {
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_native_api_version")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial uint EngineGetNativeApiVersion();
+
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_create")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus EngineCreate(

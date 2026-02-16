@@ -41,6 +41,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus EngineCreateStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public uint NativeApiVersionToReturn { get; set; } = EngineNativeConstants.ApiVersion;
+
     public EngineNativeStatus EngineDestroyStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EnginePumpEventsStatus { get; set; } = EngineNativeStatus.Ok;
@@ -96,6 +98,12 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus PhysicsSweepStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsOverlapStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public uint EngineGetNativeApiVersion()
+    {
+        Calls.Add("engine_get_native_api_version");
+        return NativeApiVersionToReturn;
+    }
 
     public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
     {

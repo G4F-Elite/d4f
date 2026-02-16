@@ -198,6 +198,8 @@ typedef struct engine_native_overlap_hit {
 extern "C" {
 #endif
 
+ENGINE_NATIVE_API uint32_t engine_get_native_api_version(void);
+
 ENGINE_NATIVE_API engine_native_status_t engine_create(
     const engine_native_create_desc_t* create_desc,
     engine_native_engine_t** out_engine);

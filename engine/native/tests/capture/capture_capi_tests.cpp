@@ -7,6 +7,8 @@
 namespace {
 
 void TestCaptureFlowAndValidation() {
+  assert(engine_get_native_api_version() == ENGINE_NATIVE_API_VERSION);
+
   engine_native_create_desc_t create_desc{
       .api_version = ENGINE_NATIVE_API_VERSION,
       .user_data = nullptr};
