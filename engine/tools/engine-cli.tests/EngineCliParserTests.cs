@@ -36,12 +36,40 @@ public sealed class EngineCliParserTests
     }
 
     [Fact]
+    public void Parse_ShouldCreateNewCommand_WhenNameProvidedAsPositionalArgument()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["new", "Demo", "--output", "templates"]);
+
+        NewCommand command = Assert.IsType<NewCommand>(result.Command);
+        Assert.Equal("Demo", command.Name);
+        Assert.Equal("templates", command.OutputDirectory);
+    }
+
+    [Fact]
+    public void Parse_ShouldFail_WhenNewNameProvidedAsPositionalAndOption()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["new", "Demo", "--name", "Other"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Project name cannot be provided both as positional argument and '--name'.", result.Error);
+    }
+
+    [Fact]
     public void Parse_ShouldFail_WhenConfigurationIsInvalid()
     {
         EngineCliParseResult result = EngineCliParser.Parse(["build", "--project", ".", "--configuration", "Prod"]);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--configuration' must be 'Debug' or 'Release'.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldAcceptShortConfigurationAlias_ForBuild()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["build", "--project", ".", "-c", "Release"]);
+
+        BuildCommand command = Assert.IsType<BuildCommand>(result.Command);
+        Assert.Equal("Release", command.Configuration);
     }
 
     [Fact]
@@ -194,6 +222,23 @@ public sealed class EngineCliParserTests
         Assert.Equal("src/MyGame.Runtime/MyGame.Runtime.csproj", command.PublishProjectPath);
         Assert.Equal("native/dff_native.dll", command.NativeLibraryPath);
         Assert.Equal("dist/package.zip", command.ZipOutputPath);
+    }
+
+    [Fact]
+    public void Parse_ShouldAcceptShortRuntimeAlias_ForPack()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "pack",
+            "-p", "game",
+            "-m", "assets/manifest.json",
+            "-r", "linux-x64",
+            "-o", "dist/game.pak"
+        ]);
+
+        PackCommand command = Assert.IsType<PackCommand>(result.Command);
+        Assert.Equal("linux-x64", command.RuntimeIdentifier);
+        Assert.Equal("dist/game.pak", command.OutputPakPath);
     }
 
     [Fact]

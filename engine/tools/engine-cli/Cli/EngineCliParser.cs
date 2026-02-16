@@ -33,10 +33,30 @@ public static partial class EngineCliParser
             return ParseDump(dumpOptions);
         }
 
-        Dictionary<string, string> optionsResult = ParseOptions(args[1..], out string? parseError);
+        int optionsStartIndex = 1;
+        string? positionalProjectName = null;
+        if ((string.Equals(commandName, "new", StringComparison.Ordinal) ||
+             string.Equals(commandName, "init", StringComparison.Ordinal)) &&
+            args.Length > 1 &&
+            !args[1].StartsWith("-", StringComparison.Ordinal))
+        {
+            positionalProjectName = args[1];
+            optionsStartIndex = 2;
+        }
+
+        Dictionary<string, string> optionsResult = ParseOptions(args[optionsStartIndex..], out string? parseError);
         if (parseError is not null)
         {
             return EngineCliParseResult.Failure(parseError);
+        }
+        if (positionalProjectName is not null)
+        {
+            if (optionsResult.ContainsKey("name"))
+            {
+                return EngineCliParseResult.Failure("Project name cannot be provided both as positional argument and '--name'.");
+            }
+
+            optionsResult["name"] = positionalProjectName;
         }
 
         return commandName switch
@@ -322,44 +342,4 @@ public static partial class EngineCliParser
         return result;
     }
 
-    private static Dictionary<string, string> ParseOptions(IReadOnlyList<string> args, out string? error)
-    {
-        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-        for (int i = 0; i < args.Count; i += 2)
-        {
-            string current = args[i];
-            if (!current.StartsWith("--", StringComparison.Ordinal))
-            {
-                error = $"Expected option name, but got '{current}'.";
-                return result;
-            }
-
-            if (i + 1 >= args.Count)
-            {
-                error = $"Option '{current}' requires a value.";
-                return result;
-            }
-
-            string key = current[2..];
-            string value = args[i + 1];
-
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                error = "Option name cannot be empty.";
-                return result;
-            }
-
-            if (result.ContainsKey(key))
-            {
-                error = $"Option '--{key}' is duplicated.";
-                return result;
-            }
-
-            result[key] = value;
-        }
-
-        error = null;
-        return result;
-    }
 }
