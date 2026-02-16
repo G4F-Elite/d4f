@@ -96,7 +96,56 @@ public static class EngineCliParser
             ? outputValue
             : Path.Combine(project, "dist", "content.pak");
 
-        return EngineCliParseResult.Success(new PackCommand(project, manifest, output));
+        string configuration = options.TryGetValue("configuration", out string? cfg)
+            ? cfg
+            : "Release";
+        if (!ValidConfigurations.Contains(configuration))
+        {
+            return EngineCliParseResult.Failure("Option '--configuration' must be 'Debug' or 'Release'.");
+        }
+
+        string runtimeIdentifier = options.TryGetValue("runtime", out string? runtimeValue)
+            ? runtimeValue
+            : "win-x64";
+        if (string.IsNullOrWhiteSpace(runtimeIdentifier))
+        {
+            return EngineCliParseResult.Failure("Option '--runtime' cannot be empty.");
+        }
+
+        string? publishProjectPath = options.TryGetValue("publish-project", out string? publishPathValue)
+            ? publishPathValue
+            : null;
+        if (publishProjectPath is not null && string.IsNullOrWhiteSpace(publishProjectPath))
+        {
+            return EngineCliParseResult.Failure("Option '--publish-project' cannot be empty.");
+        }
+
+        string? nativeLibraryPath = options.TryGetValue("native-lib", out string? nativeLibValue)
+            ? nativeLibValue
+            : null;
+        if (nativeLibraryPath is not null && string.IsNullOrWhiteSpace(nativeLibraryPath))
+        {
+            return EngineCliParseResult.Failure("Option '--native-lib' cannot be empty.");
+        }
+
+        string? zipOutputPath = options.TryGetValue("zip", out string? zipValue)
+            ? zipValue
+            : null;
+        if (zipOutputPath is not null && string.IsNullOrWhiteSpace(zipOutputPath))
+        {
+            return EngineCliParseResult.Failure("Option '--zip' cannot be empty.");
+        }
+
+        return EngineCliParseResult.Success(
+            new PackCommand(
+                project,
+                manifest,
+                output,
+                configuration,
+                runtimeIdentifier,
+                publishProjectPath,
+                nativeLibraryPath,
+                zipOutputPath));
     }
 
     private static Dictionary<string, string> ParseOptions(IReadOnlyList<string> args, out string? error)

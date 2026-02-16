@@ -9,9 +9,17 @@
 3. Build the project:
    `dotnet run --project engine/tools/engine-cli -- build --project MyGame --configuration Debug`
 4. Pack assets:
-   `dotnet run --project engine/tools/engine-cli -- pack --project MyGame --manifest assets/manifest.json --output dist/content.pak`
+   `dotnet run --project engine/tools/engine-cli -- pack --project MyGame --manifest assets/manifest.json --output dist/content.pak --runtime win-x64 --configuration Release --zip dist/MyGame.zip`
 5. Run:
    `dotnet run --project engine/tools/engine-cli -- run --project MyGame --configuration Debug`
+
+`pack` produces:
+- `dist/content.pak`, `dist/compiled.manifest.bin`, `dist/compiled/*`
+- portable layout in `dist/package`:
+  - `App/` (output of `dotnet publish` when runtime `.csproj` is found or passed via `--publish-project`)
+  - `Content/Game.pak`, `Content/compiled.manifest.bin`, `Content/compiled/*`
+  - `config/runtime.json`
+- optional archive via `--zip`
 
 ## Standalone asset compiler
 

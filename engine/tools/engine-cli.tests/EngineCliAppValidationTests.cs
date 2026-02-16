@@ -117,6 +117,10 @@ public sealed class EngineCliAppValidationTests
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "content.pak")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "compiled", "text", "example.txt.bin")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "compiled.manifest.bin")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "Game.pak")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled", "text", "example.txt.bin")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
         }
         finally
         {

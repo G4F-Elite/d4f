@@ -8,4 +8,12 @@ public sealed record BuildCommand(string ProjectDirectory, string Configuration)
 
 public sealed record RunCommand(string ProjectDirectory, string Configuration) : EngineCliCommand;
 
-public sealed record PackCommand(string ProjectDirectory, string ManifestPath, string OutputPakPath) : EngineCliCommand;
+public sealed record PackCommand(
+    string ProjectDirectory,
+    string ManifestPath,
+    string OutputPakPath,
+    string Configuration,
+    string RuntimeIdentifier,
+    string? PublishProjectPath,
+    string? NativeLibraryPath,
+    string? ZipOutputPath) : EngineCliCommand;
