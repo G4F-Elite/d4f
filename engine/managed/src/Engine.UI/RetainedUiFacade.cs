@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
@@ -9,7 +10,7 @@ namespace Engine.UI;
 
 public sealed class RetainedUiFacade : IUiFacade
 {
-    private readonly Queue<string> _queuedClickIds = [];
+    private readonly Queue<UiQueuedInteraction> _queuedInteractions = [];
     private readonly UiDocument _document;
     private EntityId _renderBatchEntity = EntityId.Invalid;
 
@@ -32,13 +33,29 @@ public sealed class RetainedUiFacade : IUiFacade
             throw new ArgumentException("Element id cannot be empty.", nameof(elementId));
         }
 
-        _queuedClickIds.Enqueue(elementId);
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreateElementClick(elementId));
+    }
+
+    public void QueuePointerClick(float x, float y)
+    {
+        if (!float.IsFinite(x))
+        {
+            throw new ArgumentOutOfRangeException(nameof(x), "Pointer X coordinate must be finite.");
+        }
+
+        if (!float.IsFinite(y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(y), "Pointer Y coordinate must be finite.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerClick(x, y));
     }
 
     public void Update(World world, in FrameTiming timing)
     {
         ArgumentNullException.ThrowIfNull(world);
 
+        UiLayoutEngine.Apply(_document);
         DispatchQueuedClicks();
         IReadOnlyList<UiDrawCommand> commands = BuildCommands();
         WriteRenderBatch(world, commands);
@@ -74,16 +91,16 @@ public sealed class RetainedUiFacade : IUiFacade
         switch (element)
         {
             case UiPanel panel:
-                AppendCommand(panel.BackgroundTexture, 1u, commands, ref vertexOffset, ref indexOffset);
+                AppendCommand(panel.BackgroundTexture, 1u, element.LayoutBounds, commands, ref vertexOffset, ref indexOffset);
                 break;
             case UiButton button:
-                AppendCommand(button.BackgroundTexture, 1u, commands, ref vertexOffset, ref indexOffset);
+                AppendCommand(button.BackgroundTexture, 1u, element.LayoutBounds, commands, ref vertexOffset, ref indexOffset);
                 break;
             case UiText text:
                 uint glyphCount = checked((uint)text.Content.Length);
                 if (glyphCount > 0u)
                 {
-                    AppendCommand(text.FontTexture, glyphCount, commands, ref vertexOffset, ref indexOffset);
+                    AppendCommand(text.FontTexture, glyphCount, element.LayoutBounds, commands, ref vertexOffset, ref indexOffset);
                 }
                 break;
         }
@@ -97,13 +114,14 @@ public sealed class RetainedUiFacade : IUiFacade
     private static void AppendCommand(
         TextureHandle texture,
         uint quadCount,
+        RectF bounds,
         List<UiDrawCommand> commands,
         ref uint vertexOffset,
         ref uint indexOffset)
     {
         uint vertexCount = checked(quadCount * 4u);
         uint indexCount = checked(quadCount * 6u);
-        commands.Add(new UiDrawCommand(texture, vertexOffset, vertexCount, indexOffset, indexCount));
+        commands.Add(new UiDrawCommand(texture, vertexOffset, vertexCount, indexOffset, indexCount, bounds));
         vertexOffset = checked(vertexOffset + vertexCount);
         indexOffset = checked(indexOffset + indexCount);
     }
@@ -127,32 +145,50 @@ public sealed class RetainedUiFacade : IUiFacade
 
     private void DispatchQueuedClicks()
     {
-        while (_queuedClickIds.Count > 0)
+        while (_queuedInteractions.Count > 0)
         {
-            string clickedId = _queuedClickIds.Dequeue();
-            DispatchClick(clickedId);
+            UiQueuedInteraction interaction = _queuedInteractions.Dequeue();
+            if (interaction.IsPointerClick)
+            {
+                DispatchPointerClick(interaction.PointerX, interaction.PointerY);
+                continue;
+            }
+
+            DispatchClick(interaction.ElementId);
         }
     }
 
-    private void DispatchClick(string clickedId)
+    private void DispatchClick(string elementId)
     {
         foreach (UiElement root in _document.Roots)
         {
-            if (TryDispatchClick(root, clickedId))
+            if (TryDispatchElementClick(root, elementId))
             {
                 return;
             }
         }
     }
 
-    private static bool TryDispatchClick(UiElement element, string clickedId)
+    private void DispatchPointerClick(float pointerX, float pointerY)
+    {
+        for (int i = _document.Roots.Count - 1; i >= 0; i--)
+        {
+            UiElement root = _document.Roots[i];
+            if (TryDispatchPointerClick(root, pointerX, pointerY))
+            {
+                return;
+            }
+        }
+    }
+
+    private static bool TryDispatchElementClick(UiElement element, string elementId)
     {
         if (!element.Visible)
         {
             return false;
         }
 
-        if (element.Id == clickedId && element is UiButton button)
+        if (element.Id == elementId && element is UiButton button)
         {
             button.InvokeClick();
             return true;
@@ -160,12 +196,50 @@ public sealed class RetainedUiFacade : IUiFacade
 
         foreach (UiElement child in element.Children)
         {
-            if (TryDispatchClick(child, clickedId))
+            if (TryDispatchElementClick(child, elementId))
             {
                 return true;
             }
         }
 
         return false;
+    }
+
+    private static bool TryDispatchPointerClick(UiElement element, float pointerX, float pointerY)
+    {
+        if (!element.Visible)
+        {
+            return false;
+        }
+
+        for (int i = element.Children.Count - 1; i >= 0; i--)
+        {
+            if (TryDispatchPointerClick(element.Children[i], pointerX, pointerY))
+            {
+                return true;
+            }
+        }
+
+        if (!element.ContainsPoint(pointerX, pointerY))
+        {
+            return false;
+        }
+
+        if (element is UiButton button)
+        {
+            button.InvokeClick();
+            return true;
+        }
+
+        return false;
+    }
+
+    private readonly record struct UiQueuedInteraction(string ElementId, float PointerX, float PointerY, bool IsPointerClick)
+    {
+        public static UiQueuedInteraction CreateElementClick(string elementId) =>
+            new(elementId, 0.0f, 0.0f, false);
+
+        public static UiQueuedInteraction CreatePointerClick(float x, float y) =>
+            new(string.Empty, x, y, true);
     }
 }

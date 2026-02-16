@@ -1,4 +1,5 @@
 using System;
+using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.Rendering;
 using Xunit;
@@ -17,6 +18,16 @@ public sealed class UiDrawCommandTests
         Assert.Equal((uint)2, command.VertexCount);
         Assert.Equal((uint)3, command.IndexOffset);
         Assert.Equal((uint)4, command.IndexCount);
+        Assert.Equal(RectF.Empty, command.Bounds);
+    }
+
+    [Fact]
+    public void Constructor_StoresBounds_WhenProvided()
+    {
+        RectF bounds = new(10, 20, 30, 40);
+        var command = new UiDrawCommand(new TextureHandle(55), 1, 2, 3, 4, bounds);
+
+        Assert.Equal(bounds, command.Bounds);
     }
 
     [Fact]

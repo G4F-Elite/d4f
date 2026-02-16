@@ -1,13 +1,21 @@
 using System;
 using System.Collections.Generic;
+using Engine.Core.Geometry;
 
 namespace Engine.UI;
 
 public abstract class UiElement
 {
     private readonly List<UiElement> _children = [];
+    private UiThickness _margin = UiThickness.Zero;
+    private UiThickness _padding = UiThickness.Zero;
     private float _width;
     private float _height;
+    private float _minWidth;
+    private float _minHeight;
+    private float? _maxWidth;
+    private float? _maxHeight;
+    private float _layoutGap;
 
     protected UiElement(string id)
     {
@@ -22,6 +30,22 @@ public abstract class UiElement
     public string Id { get; }
 
     public bool Visible { get; set; } = true;
+
+    public UiLayoutMode LayoutMode { get; set; } = UiLayoutMode.Absolute;
+
+    public float LayoutGap
+    {
+        get => _layoutGap;
+        set
+        {
+            if (value < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Layout gap cannot be negative.");
+            }
+
+            _layoutGap = value;
+        }
+    }
 
     public float X { get; set; }
 
@@ -55,9 +79,104 @@ public abstract class UiElement
         }
     }
 
+    public float MinWidth
+    {
+        get => _minWidth;
+        set
+        {
+            if (value < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Minimum width cannot be negative.");
+            }
+
+            if (_maxWidth.HasValue && value > _maxWidth.Value)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Minimum width cannot exceed maximum width.");
+            }
+
+            _minWidth = value;
+        }
+    }
+
+    public float MinHeight
+    {
+        get => _minHeight;
+        set
+        {
+            if (value < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Minimum height cannot be negative.");
+            }
+
+            if (_maxHeight.HasValue && value > _maxHeight.Value)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Minimum height cannot exceed maximum height.");
+            }
+
+            _minHeight = value;
+        }
+    }
+
+    public float? MaxWidth
+    {
+        get => _maxWidth;
+        set
+        {
+            if (value is not null && value < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Maximum width cannot be negative.");
+            }
+
+            if (value is not null && value < _minWidth)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Maximum width cannot be smaller than minimum width.");
+            }
+
+            _maxWidth = value;
+        }
+    }
+
+    public float? MaxHeight
+    {
+        get => _maxHeight;
+        set
+        {
+            if (value is not null && value < 0.0f)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Maximum height cannot be negative.");
+            }
+
+            if (value is not null && value < _minHeight)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Maximum height cannot be smaller than minimum height.");
+            }
+
+            _maxHeight = value;
+        }
+    }
+
+    public UiThickness Margin
+    {
+        get => _margin;
+        set => _margin = value;
+    }
+
+    public UiThickness Padding
+    {
+        get => _padding;
+        set => _padding = value;
+    }
+
+    public RectF LayoutBounds { get; private set; } = RectF.Empty;
+
     public UiElement? Parent { get; private set; }
 
     public IReadOnlyList<UiElement> Children => _children;
+
+    public bool ContainsPoint(float x, float y)
+    {
+        return Visible && LayoutBounds.Contains(x, y);
+    }
 
     public void AddChild(UiElement child)
     {
@@ -88,5 +207,10 @@ public abstract class UiElement
 
         child.Parent = null;
         return true;
+    }
+
+    internal void SetLayoutBounds(RectF bounds)
+    {
+        LayoutBounds = bounds;
     }
 }

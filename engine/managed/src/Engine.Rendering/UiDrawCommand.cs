@@ -1,11 +1,18 @@
 using System;
 using Engine.Core.Handles;
+using Engine.Core.Geometry;
 
 namespace Engine.Rendering;
 
 public readonly record struct UiDrawCommand
 {
-    public UiDrawCommand(TextureHandle texture, uint vertexOffset, uint vertexCount, uint indexOffset, uint indexCount)
+    public UiDrawCommand(
+        TextureHandle texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount,
+        RectF bounds)
     {
         if (!texture.IsValid)
         {
@@ -27,10 +34,37 @@ public readonly record struct UiDrawCommand
         VertexCount = vertexCount;
         IndexOffset = indexOffset;
         IndexCount = indexCount;
+        Bounds = bounds;
     }
 
-    public UiDrawCommand(uint texture, uint vertexOffset, uint vertexCount, uint indexOffset, uint indexCount)
-        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount)
+    public UiDrawCommand(
+        TextureHandle texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount)
+        : this(texture, vertexOffset, vertexCount, indexOffset, indexCount, RectF.Empty)
+    {
+    }
+
+    public UiDrawCommand(
+        uint texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount,
+        RectF bounds)
+        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount, bounds)
+    {
+    }
+
+    public UiDrawCommand(
+        uint texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount)
+        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount, RectF.Empty)
     {
     }
 
@@ -43,4 +77,6 @@ public readonly record struct UiDrawCommand
     public uint IndexOffset { get; }
 
     public uint IndexCount { get; }
+
+    public RectF Bounds { get; }
 }
