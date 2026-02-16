@@ -55,6 +55,10 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus RendererPresentStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus RendererGetLastFrameStatsStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeRendererFrameStats RendererFrameStatsToReturn { get; set; }
+
     public EngineNativeStatus PhysicsStepStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsSyncFromWorldStatus { get; set; } = EngineNativeStatus.Ok;
@@ -147,6 +151,15 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     {
         Calls.Add("renderer_present");
         return RendererPresentStatus;
+    }
+
+    public EngineNativeStatus RendererGetLastFrameStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats)
+    {
+        Calls.Add("renderer_get_last_frame_stats");
+        stats = RendererFrameStatsToReturn;
+        return RendererGetLastFrameStatsStatus;
     }
 
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)

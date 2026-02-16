@@ -22,6 +22,7 @@ internal sealed partial class NativeRuntime
     private IntPtr _renderer;
     private IntPtr _physics;
     private bool _disposed;
+    private RenderingFrameStats _lastFrameStats = RenderingFrameStats.Empty;
 
     public NativeRuntime(INativeInteropApi interop)
     {
@@ -300,6 +301,23 @@ internal sealed partial class NativeRuntime
         ThrowIfDisposed();
 
         NativeStatusGuard.ThrowIfFailed(_interop.RendererPresent(_renderer), "renderer_present");
+        NativeStatusGuard.ThrowIfFailed(
+            _interop.RendererGetLastFrameStats(_renderer, out var nativeStats),
+            "renderer_get_last_frame_stats");
+        _lastFrameStats = new RenderingFrameStats(
+            nativeStats.DrawItemCount,
+            nativeStats.UiItemCount,
+            nativeStats.ExecutedPassCount,
+            nativeStats.PresentCount,
+            nativeStats.PipelineCacheHits,
+            nativeStats.PipelineCacheMisses,
+            nativeStats.PassMask);
+    }
+
+    public RenderingFrameStats GetLastFrameStats()
+    {
+        ThrowIfDisposed();
+        return _lastFrameStats;
     }
 
     public void Dispose()

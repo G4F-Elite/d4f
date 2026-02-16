@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using Engine.Core.Abstractions;
 using Engine.ECS;
@@ -39,6 +40,9 @@ public sealed class GameHost
         _renderingFacade = renderingFacade ?? throw new ArgumentNullException(nameof(renderingFacade));
         _options = options ?? GameHostOptions.Default;
     }
+
+    public FrameObservabilitySnapshot LastFrameObservability { get; private set; } =
+        FrameObservabilitySnapshot.Empty;
 
     public void Run(CancellationToken cancellationToken = default)
     {
@@ -84,7 +88,11 @@ public sealed class GameHost
             throw new InvalidOperationException($"Timing facade returned a negative frame delta: {timing.DeltaTime}.");
         }
 
+        long frameStart = Stopwatch.GetTimestamp();
+
+        long stageStart = Stopwatch.GetTimestamp();
         _world.RunStage(SystemStage.PrePhysics, timing);
+        TimeSpan prePhysicsCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
         _physicsAccumulator += timing.DeltaTime;
         if (_physicsAccumulator > _options.MaxAccumulatedTime)
@@ -94,6 +102,7 @@ public sealed class GameHost
 
         var substeps = 0;
 
+        stageStart = Stopwatch.GetTimestamp();
         while (_physicsAccumulator >= _options.FixedDt && substeps < _options.MaxSubsteps)
         {
             if (substeps == 0)
@@ -110,16 +119,40 @@ public sealed class GameHost
         {
             _physicsFacade.SyncFromPhysics(_world);
         }
+        TimeSpan physicsCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
+        stageStart = Stopwatch.GetTimestamp();
         _world.RunStage(SystemStage.PostPhysics, timing);
+        TimeSpan postPhysicsCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
+        stageStart = Stopwatch.GetTimestamp();
         _world.RunStage(SystemStage.UI, timing);
         _uiFacade.Update(_world, timing);
+        TimeSpan uiCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
+        stageStart = Stopwatch.GetTimestamp();
         using var frameArena = _renderingFacade.BeginFrame(_options.FrameArenaBytes, _options.FrameArenaAlignment);
         _world.RunStage(SystemStage.PreRender, timing);
         var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena);
+        TimeSpan preRenderCpuTime = Stopwatch.GetElapsedTime(stageStart);
+
+        stageStart = Stopwatch.GetTimestamp();
         _renderingFacade.Submit(renderPacket);
         _renderingFacade.Present();
+        RenderingFrameStats renderingStats = _renderingFacade.GetLastFrameStats();
+        TimeSpan renderCpuTime = Stopwatch.GetElapsedTime(stageStart);
+
+        TimeSpan totalCpuTime = Stopwatch.GetElapsedTime(frameStart);
+        LastFrameObservability = new FrameObservabilitySnapshot(
+            timing.FrameNumber,
+            prePhysicsCpuTime,
+            physicsCpuTime,
+            postPhysicsCpuTime,
+            uiCpuTime,
+            preRenderCpuTime,
+            renderCpuTime,
+            totalCpuTime,
+            substeps,
+            renderingStats);
     }
 }

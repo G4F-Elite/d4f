@@ -90,4 +90,6 @@ internal sealed class NativeRenderingApiStub : INativeRenderingApi
     public void Present()
     {
     }
+
+    public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
 }

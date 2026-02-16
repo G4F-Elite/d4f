@@ -114,5 +114,7 @@ public static class NativeFacadeFactory
         public void Submit(RenderPacket packet) => _nativeApi.Submit(packet);
 
         public void Present() => _nativeApi.Present();
+
+        public RenderingFrameStats GetLastFrameStats() => _nativeApi.GetLastFrameStats();
     }
 }

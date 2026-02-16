@@ -27,6 +27,10 @@ internal interface INativeInteropApi
 
     EngineNativeStatus RendererPresent(IntPtr renderer);
 
+    EngineNativeStatus RendererGetLastFrameStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats);
+
     EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds);
 
     EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount);

@@ -43,4 +43,6 @@ internal interface INativeRenderingApi
     void Submit(RenderPacket packet);
 
     void Present();
+
+    RenderingFrameStats GetLastFrameStats();
 }

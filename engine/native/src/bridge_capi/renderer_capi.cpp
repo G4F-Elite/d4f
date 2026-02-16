@@ -51,4 +51,15 @@ engine_native_status_t renderer_present(engine_native_renderer_t* renderer) {
   return renderer->state->Present();
 }
 
+engine_native_status_t renderer_get_last_frame_stats(
+    engine_native_renderer_t* renderer,
+    engine_native_renderer_frame_stats_t* out_stats) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return renderer->state->GetLastFrameStats(out_stats);
+}
+
 }  // extern "C"

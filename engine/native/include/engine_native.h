@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 5u
+#define ENGINE_NATIVE_API_VERSION 6u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -76,6 +76,17 @@ typedef struct engine_native_render_packet {
   const engine_native_ui_draw_item_t* ui_items;
   uint32_t ui_item_count;
 } engine_native_render_packet_t;
+
+typedef struct engine_native_renderer_frame_stats {
+  uint32_t draw_item_count;
+  uint32_t ui_item_count;
+  uint32_t executed_pass_count;
+  uint32_t reserved0;
+  uint64_t present_count;
+  uint64_t pipeline_cache_hits;
+  uint64_t pipeline_cache_misses;
+  uint64_t pass_mask;
+} engine_native_renderer_frame_stats_t;
 
 typedef struct engine_native_body_write {
   engine_native_resource_handle_t body;
@@ -212,6 +223,10 @@ ENGINE_NATIVE_API engine_native_status_t renderer_submit(
 
 ENGINE_NATIVE_API engine_native_status_t renderer_present(
     engine_native_renderer_t* renderer);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats(
+    engine_native_renderer_t* renderer,
+    engine_native_renderer_frame_stats_t* out_stats);
 
 ENGINE_NATIVE_API engine_native_status_t physics_step(
     engine_native_physics_t* physics,

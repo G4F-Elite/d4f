@@ -96,6 +96,21 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "bloom", "tonemap", "present"});
+  engine_native_renderer_frame_stats_t renderer_stats{};
+  assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_stats.draw_item_count == 2u);
+  assert(renderer_stats.ui_item_count == 0u);
+  assert(renderer_stats.executed_pass_count == 5u);
+  assert(renderer_stats.present_count == 1u);
+  assert(renderer_stats.pipeline_cache_hits == 0u);
+  assert(renderer_stats.pipeline_cache_misses == 2u);
+  assert((renderer_stats.pass_mask &
+          (static_cast<uint64_t>(1u) << 3u)) != 0u);  // shadow
+  assert((renderer_stats.pass_mask &
+          (static_cast<uint64_t>(1u) << 6u)) != 0u);  // bloom
+  assert((renderer_stats.pass_mask &
+          (static_cast<uint64_t>(1u) << 2u)) != 0u);  // present
   assert(internal_engine->state.renderer.pipeline_cache_misses() == 2u);
   assert(internal_engine->state.renderer.pipeline_cache_hits() == 0u);
   assert(internal_engine->state.renderer.cached_pipeline_count() == 2u);
@@ -239,6 +254,10 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_overlap(physics, &overlap_query, overlap_hits, 1u, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_get_last_frame_stats(renderer, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_get_last_frame_stats(nullptr, &renderer_stats) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);

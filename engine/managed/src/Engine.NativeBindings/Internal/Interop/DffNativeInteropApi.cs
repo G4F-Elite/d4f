@@ -43,6 +43,11 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus RendererPresent(IntPtr renderer)
         => NativeMethods.RendererPresent(renderer);
 
+    public EngineNativeStatus RendererGetLastFrameStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats)
+        => NativeMethods.RendererGetLastFrameStats(renderer, out stats);
+
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
         => NativeMethods.PhysicsStep(physics, deltaSeconds);
 
@@ -124,6 +129,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus RendererPresent(IntPtr renderer);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_get_last_frame_stats")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererGetLastFrameStats(
+            IntPtr renderer,
+            out EngineNativeRendererFrameStats outStats);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

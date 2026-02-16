@@ -72,6 +72,19 @@ internal struct EngineNativeRenderPacket
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeRendererFrameStats
+{
+    public uint DrawItemCount;
+    public uint UiItemCount;
+    public uint ExecutedPassCount;
+    public uint Reserved0;
+    public ulong PresentCount;
+    public ulong PipelineCacheHits;
+    public ulong PipelineCacheMisses;
+    public ulong PassMask;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeBodyWrite
 {
     public ulong Body;

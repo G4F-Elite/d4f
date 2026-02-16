@@ -23,4 +23,6 @@ public sealed class NoopRenderingFacade : IRenderingFacade
     public void Present()
     {
     }
+
+    public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
 }

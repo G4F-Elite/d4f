@@ -16,7 +16,19 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     [Fact]
     public void NativeRuntimeUsesExpectedLifecycleAndCallOrder()
     {
-        var backend = new FakeNativeInteropApi();
+        var backend = new FakeNativeInteropApi
+        {
+            RendererFrameStatsToReturn = new EngineNativeRendererFrameStats
+            {
+                DrawItemCount = 1,
+                UiItemCount = 0,
+                ExecutedPassCount = 5,
+                PresentCount = 1,
+                PipelineCacheHits = 3,
+                PipelineCacheMisses = 2,
+                PassMask = 0x24
+            }
+        };
         var world = new World();
         var entity = world.CreateEntity();
         using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
@@ -32,6 +44,14 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal(backend.RendererBeginFrameMemory, frameArena.BasePointer);
         nativeSet.Rendering.Submit(CreatePacket(entity));
         nativeSet.Rendering.Present();
+        RenderingFrameStats stats = nativeSet.Rendering.GetLastFrameStats();
+        Assert.Equal((uint)1, stats.DrawItemCount);
+        Assert.Equal((uint)0, stats.UiItemCount);
+        Assert.Equal((uint)5, stats.ExecutedPassCount);
+        Assert.Equal((ulong)1, stats.PresentCount);
+        Assert.Equal((ulong)3, stats.PipelineCacheHits);
+        Assert.Equal((ulong)2, stats.PipelineCacheMisses);
+        Assert.Equal((ulong)0x24, stats.PassMask);
 
         nativeSet.Physics.SyncToPhysics(world);
         nativeSet.Physics.Step(TimeSpan.FromSeconds(1.0 / 60.0));
@@ -48,6 +68,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 "renderer_begin_frame",
                 "renderer_submit",
                 "renderer_present",
+                "renderer_get_last_frame_stats",
                 "physics_sync_from_world",
                 "physics_step",
                 "physics_sync_to_world",
@@ -73,6 +94,26 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         Assert.Contains("renderer_submit", exception.Message, StringComparison.Ordinal);
         Assert.Contains("InvalidState", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeRuntimeThrowsWhenRendererStatsReadFails()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            RendererGetLastFrameStatsStatus = EngineNativeStatus.InternalError
+        };
+
+        var world = new World();
+        var entity = world.CreateEntity();
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
+        nativeSet.Rendering.Submit(CreatePacket(entity));
+
+        var exception = Assert.Throws<NativeCallException>(() => nativeSet.Rendering.Present());
+
+        Assert.Contains("renderer_get_last_frame_stats", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("InternalError", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

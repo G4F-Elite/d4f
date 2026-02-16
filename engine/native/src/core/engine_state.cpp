@@ -126,6 +126,7 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   submitted_ui_count_ = 0u;
   submitted_draw_items_.clear();
   last_executed_rhi_passes_.clear();
+  last_pass_mask_ = 0u;
 
   engine_native_status_t status = rhi_device_->BeginFrame();
   if (status != ENGINE_NATIVE_STATUS_OK) {
@@ -242,6 +243,16 @@ engine_native_status_t RendererState::Present() {
     return status;
   }
 
+  last_frame_stats_.draw_item_count = submitted_draw_count_;
+  last_frame_stats_.ui_item_count = submitted_ui_count_;
+  last_frame_stats_.executed_pass_count =
+      static_cast<uint32_t>(last_executed_rhi_passes_.size());
+  last_frame_stats_.reserved0 = 0u;
+  last_frame_stats_.present_count = present_count();
+  last_frame_stats_.pipeline_cache_hits = pipeline_cache_hits();
+  last_frame_stats_.pipeline_cache_misses = pipeline_cache_misses();
+  last_frame_stats_.pass_mask = last_pass_mask_;
+
   ResetFrameState();
   return ENGINE_NATIVE_STATUS_OK;
 }
@@ -270,6 +281,7 @@ engine_native_status_t RendererState::ExecuteCompiledFrameGraph() {
 
   last_executed_rhi_passes_.clear();
   last_executed_rhi_passes_.reserve(compiled_pass_order_.size());
+  uint64_t pass_mask = 0u;
 
   for (render::RenderPassId pass_id : compiled_pass_order_) {
     const size_t pass_index = static_cast<size_t>(pass_id);
@@ -283,9 +295,22 @@ engine_native_status_t RendererState::ExecuteCompiledFrameGraph() {
       return status;
     }
 
+    pass_mask |= static_cast<uint64_t>(1u)
+                 << static_cast<uint32_t>(pass_kind);
     last_executed_rhi_passes_.push_back(PassNameForKind(pass_kind));
   }
 
+  last_pass_mask_ = pass_mask;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::GetLastFrameStats(
+    engine_native_renderer_frame_stats_t* out_stats) const {
+  if (out_stats == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_stats = last_frame_stats_;
   return ENGINE_NATIVE_STATUS_OK;
 }
 

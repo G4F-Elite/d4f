@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Engine.App;
 using Engine.Core.Timing;
 using Engine.ECS;
+using Engine.Rendering;
 using Xunit;
 
 namespace Engine.Tests.App;
@@ -299,6 +300,60 @@ public sealed class GameHostPipelineTests
         Assert.Equal(3, physics.StepCallCount);
         Assert.Equal(1, physics.SyncFromCallCount);
         Assert.Equal([options.FixedDt, options.FixedDt, options.FixedDt], physics.StepDeltaTimes);
+    }
+
+    [Fact]
+    public void RunFrames_UpdatesFrameObservabilitySnapshot()
+    {
+        var execution = new List<string>();
+        var world = new World();
+        world.RegisterSystem(SystemStage.PrePhysics, new RecordingWorldSystem("stage.prephysics", execution));
+        world.RegisterSystem(SystemStage.PostPhysics, new RecordingWorldSystem("stage.postphysics", execution));
+        world.RegisterSystem(SystemStage.UI, new RecordingWorldSystem("stage.ui", execution));
+        world.RegisterSystem(SystemStage.PreRender, new RecordingWorldSystem("stage.prerender", execution));
+
+        var options = new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 2048,
+            frameArenaAlignment: 128);
+        var timing = new FrameTiming(7, TimeSpan.FromMilliseconds(20), TimeSpan.FromMilliseconds(20));
+        var rendering = new RecordingRenderingFacade(execution)
+        {
+            LastFrameStats = new RenderingFrameStats(
+                DrawItemCount: 12,
+                UiItemCount: 2,
+                ExecutedPassCount: 6,
+                PresentCount: 4,
+                PipelineCacheHits: 100,
+                PipelineCacheMisses: 5,
+                PassMask: 0x2CUL)
+        };
+        var host = GameHostFactory.CreateHost(
+            world,
+            new RecordingPlatformFacade(execution, true),
+            new RecordingTimingFacade(execution, timing),
+            new RecordingPhysicsFacade(execution),
+            new RecordingUiFacade(execution),
+            new RecordingPacketBuilder(execution),
+            rendering,
+            options);
+
+        var frames = host.RunFrames(1);
+        FrameObservabilitySnapshot snapshot = host.LastFrameObservability;
+
+        Assert.Equal(1, frames);
+        Assert.Equal(7, snapshot.FrameNumber);
+        Assert.Equal(1, snapshot.PhysicsSubsteps);
+        Assert.Equal(rendering.LastFrameStats, snapshot.RenderingStats);
+        Assert.Equal(1, rendering.GetLastFrameStatsCallCount);
+        Assert.True(snapshot.PrePhysicsCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.PhysicsCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.PostPhysicsCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.UiCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.PreRenderCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.RenderCpuTime >= TimeSpan.Zero);
+        Assert.True(snapshot.TotalCpuTime >= snapshot.RenderCpuTime);
     }
 
     [Fact]

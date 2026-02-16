@@ -216,6 +216,10 @@ internal sealed class RecordingRenderingFacade : IRenderingFacade
 
     public int LastAlignment { get; private set; }
 
+    public RenderingFrameStats LastFrameStats { get; set; } = RenderingFrameStats.Empty;
+
+    public int GetLastFrameStatsCallCount { get; private set; }
+
     public FrameArena BeginFrame(int requestedBytes, int alignment)
     {
         LastRequestedBytes = requestedBytes;
@@ -232,5 +236,11 @@ internal sealed class RecordingRenderingFacade : IRenderingFacade
     public void Present()
     {
         _execution.Add("render.present");
+    }
+
+    public RenderingFrameStats GetLastFrameStats()
+    {
+        GetLastFrameStatsCallCount++;
+        return LastFrameStats;
     }
 }

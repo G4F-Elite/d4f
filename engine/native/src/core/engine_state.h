@@ -28,6 +28,8 @@ class RendererState {
                                     void** out_frame_memory);
   engine_native_status_t Submit(const engine_native_render_packet_t& packet);
   engine_native_status_t Present();
+  engine_native_status_t GetLastFrameStats(
+      engine_native_renderer_frame_stats_t* out_stats) const;
 
   bool is_frame_open() const { return frame_open_; }
   uint32_t submitted_draw_count() const { return submitted_draw_count_; }
@@ -64,6 +66,8 @@ class RendererState {
   std::vector<engine_native_draw_item_t> submitted_draw_items_;
   render::MaterialSystem material_system_;
   rhi::PipelineStateCache pipeline_cache_;
+  uint64_t last_pass_mask_ = 0u;
+  engine_native_renderer_frame_stats_t last_frame_stats_{};
 };
 
 struct PhysicsBodyState {
