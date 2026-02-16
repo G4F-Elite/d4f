@@ -59,16 +59,20 @@ public sealed class CompiledAssetFormatTests
             IReadOnlyList<PakEntry> compiledManifest = CompiledManifestCodec.Read(
                 Path.Combine(tempRoot, AssetPipelineService.CompiledManifestFileName));
             Assert.Equal(2, compiledManifest.Count);
+            Assert.All(pak.Entries, static entry => Assert.True(entry.OffsetBytes >= 0));
+            Assert.All(pak.Entries, static entry => Assert.False(string.IsNullOrWhiteSpace(entry.AssetKey)));
 
             PakEntry textureEntry = pak.Entries.Single(x => x.Kind == "texture");
             string textureCompiledPath = ResolveCompiledPath(pakPath, textureEntry.CompiledPath);
             Assert.True(File.Exists(textureCompiledPath));
             VerifyTextureBinary(textureCompiledPath, expectedWidth: 1u, expectedHeight: 1u);
+            Assert.Equal(File.ReadAllBytes(textureCompiledPath), ReadPakPayload(pakPath, textureEntry));
 
             PakEntry meshEntry = pak.Entries.Single(x => x.Kind == "mesh");
             string meshCompiledPath = ResolveCompiledPath(pakPath, meshEntry.CompiledPath);
             Assert.True(File.Exists(meshCompiledPath));
             VerifyMeshBinary(meshCompiledPath, expectedSourceKind: 1u);
+            Assert.Equal(File.ReadAllBytes(meshCompiledPath), ReadPakPayload(pakPath, meshEntry));
         }
         finally
         {
@@ -117,6 +121,16 @@ public sealed class CompiledAssetFormatTests
                 Path.GetDirectoryName(pakPath)!,
                 "compiled",
                 compiledRelativePath.Replace('/', Path.DirectorySeparatorChar)));
+    }
+
+    private static byte[] ReadPakPayload(string pakPath, PakEntry entry)
+    {
+        using FileStream stream = File.OpenRead(pakPath);
+        stream.Seek(entry.OffsetBytes, SeekOrigin.Begin);
+        byte[] bytes = new byte[checked((int)entry.SizeBytes)];
+        int read = stream.Read(bytes, 0, bytes.Length);
+        Assert.Equal(bytes.Length, read);
+        return bytes;
     }
 
     private static string CreateTempDirectory()

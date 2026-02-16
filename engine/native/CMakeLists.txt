@@ -9,6 +9,7 @@ add_library(dff_native SHARED
   src/bridge_capi/physics_capi.cpp
   src/bridge_capi/capture_capi.cpp
   src/content/content_runtime.cpp
+  src/content/pak_index.cpp
   src/core/capture_store.cpp
   src/core/engine_state.cpp
   src/core/physics_raycast.cpp

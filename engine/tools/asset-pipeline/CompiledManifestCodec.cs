@@ -5,7 +5,7 @@ namespace Engine.AssetPipeline;
 public static class CompiledManifestCodec
 {
     public const uint Magic = 0x4D464644; // DFFM
-    public const uint Version = 1;
+    public const uint Version = 2;
 
     public static void Write(string outputPath, IReadOnlyList<PakEntry> entries)
     {
@@ -29,6 +29,8 @@ public static class CompiledManifestCodec
             writer.Write(entry.Kind);
             writer.Write(entry.CompiledPath);
             writer.Write(entry.SizeBytes);
+            writer.Write(entry.OffsetBytes);
+            writer.Write(entry.AssetKey);
         }
     }
 
@@ -51,9 +53,9 @@ public static class CompiledManifestCodec
         }
 
         uint version = reader.ReadUInt32();
-        if (version != Version)
+        if (version != 1u && version != Version)
         {
-            throw new InvalidDataException($"Unsupported compiled manifest version {version}. Expected {Version}.");
+            throw new InvalidDataException($"Unsupported compiled manifest version {version}. Expected 1 or {Version}.");
         }
 
         int entryCount = reader.ReadInt32();
@@ -69,7 +71,20 @@ public static class CompiledManifestCodec
             string kind = reader.ReadString();
             string compiledPath = reader.ReadString();
             long sizeBytes = reader.ReadInt64();
-            entries.Add(new PakEntry(path, kind, compiledPath, sizeBytes));
+            long offsetBytes = 0;
+            string assetKey = string.Empty;
+            if (version >= 2u)
+            {
+                offsetBytes = reader.ReadInt64();
+                assetKey = reader.ReadString();
+            }
+
+            if (string.IsNullOrWhiteSpace(assetKey))
+            {
+                assetKey = PakEntryKeyBuilder.Compute(path, kind, compiledPath, sizeBytes);
+            }
+
+            entries.Add(new PakEntry(path, kind, compiledPath, sizeBytes, offsetBytes, assetKey));
         }
 
         return entries;

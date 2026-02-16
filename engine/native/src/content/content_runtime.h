@@ -9,6 +9,7 @@
 #include <unordered_map>
 #include <vector>
 
+#include "content/pak_index.h"
 #include "engine_native.h"
 
 namespace dff::native::content {
@@ -29,8 +30,8 @@ class ContentRuntime {
 
  private:
   struct PakMount {
-    std::filesystem::path compiled_root;
-    std::unordered_map<std::string, std::string> compiled_path_by_asset;
+    std::filesystem::path pak_path;
+    std::unordered_map<std::string, PakAssetEntry> entry_by_asset;
   };
 
   std::vector<PakMount> pak_mounts_;

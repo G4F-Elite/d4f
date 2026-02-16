@@ -4,13 +4,9 @@ namespace Engine.AssetPipeline;
 
 public static class AssetPipelineService
 {
-    private const int PakVersion = 2;
+    private const int PakVersion = 3;
     public const int SourceManifestVersion = 1;
     public const string CompiledManifestFileName = "compiled.manifest.bin";
-    private static readonly JsonSerializerOptions SerializerOptions = new()
-    {
-        WriteIndented = true
-    };
 
     public static AssetManifest LoadManifest(string manifestPath)
     {
@@ -82,7 +78,7 @@ public static class AssetPipelineService
         return AssetCompiler.CompileAssets(manifest, baseDirectory, outputRootDirectory);
     }
 
-    public static void WritePak(string outputPakPath, IReadOnlyList<PakEntry> entries)
+    public static PakArchive WritePak(string outputPakPath, IReadOnlyList<PakEntry> entries)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPakPath);
         ArgumentNullException.ThrowIfNull(entries);
@@ -92,29 +88,25 @@ public static class AssetPipelineService
             throw new InvalidDataException("Pak must contain at least one entry.");
         }
 
-        string directory = Path.GetDirectoryName(outputPakPath) ?? string.Empty;
-        if (!string.IsNullOrWhiteSpace(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
-
-        PakArchive archive = new(
-            Version: PakVersion,
-            CreatedAtUtc: DateTime.UtcNow,
-            Entries: entries.ToArray());
-
-        File.WriteAllText(outputPakPath, JsonSerializer.Serialize(archive, SerializerOptions));
+        return PakBinaryCodec.WriteFromCompiledEntries(outputPakPath, entries);
     }
 
-    public static void WritePak(string outputPakPath, AssetManifest manifest)
+    public static PakArchive WritePak(string outputPakPath, AssetManifest manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
 
         var compatibilityEntries = manifest.Assets
-            .Select(static x => new PakEntry(x.Path, x.Kind, x.Path, 0))
+            .Select(static x =>
+                new PakEntry(
+                    x.Path,
+                    x.Kind,
+                    x.Path,
+                    0,
+                    0,
+                    PakEntryKeyBuilder.Compute(x.Path, x.Kind, x.Path, 0)))
             .ToArray();
 
-        WritePak(outputPakPath, compatibilityEntries);
+        return PakBinaryCodec.WriteMetadataOnly(outputPakPath, compatibilityEntries);
     }
 
     public static void WriteCompiledManifest(string outputPath, IReadOnlyList<PakEntry> entries)
@@ -129,17 +121,7 @@ public static class AssetPipelineService
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(pakPath);
 
-        if (!File.Exists(pakPath))
-        {
-            throw new FileNotFoundException($"Pak file was not found: {pakPath}", pakPath);
-        }
-
-        PakArchive? archive = JsonSerializer.Deserialize<PakArchive>(File.ReadAllText(pakPath), SerializerOptions);
-        if (archive is null)
-        {
-            throw new InvalidDataException($"Pak file '{pakPath}' is empty or invalid.");
-        }
-
+        PakArchive archive = PakBinaryCodec.Read(pakPath);
         if (archive.Version != PakVersion)
         {
             throw new InvalidDataException($"Unsupported pak version {archive.Version}. Expected {PakVersion}.");
@@ -170,6 +152,16 @@ public static class AssetPipelineService
             if (entry.SizeBytes < 0)
             {
                 throw new InvalidDataException($"Pak entry size cannot be negative for asset '{entry.Path}'.");
+            }
+
+            if (entry.OffsetBytes < 0)
+            {
+                throw new InvalidDataException($"Pak entry offset cannot be negative for asset '{entry.Path}'.");
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.AssetKey))
+            {
+                throw new InvalidDataException($"Pak entry asset key cannot be empty for asset '{entry.Path}'.");
             }
         }
 

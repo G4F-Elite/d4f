@@ -32,9 +32,10 @@ internal static class BakePipeline
             manifest,
             manifestDirectory,
             compiledRootDirectory);
-        AssetPipelineService.WritePak(resolvedOutputPakPath, compiledEntries);
+        PakArchive pakArchive = AssetPipelineService.WritePak(resolvedOutputPakPath, compiledEntries);
+        IReadOnlyList<PakEntry> resolvedPakEntries = pakArchive.Entries;
         string compiledManifestPath = Path.Combine(outputDirectory, AssetPipelineService.CompiledManifestFileName);
-        AssetPipelineService.WriteCompiledManifest(compiledManifestPath, compiledEntries);
+        AssetPipelineService.WriteCompiledManifest(compiledManifestPath, resolvedPakEntries);
 
         return new BakedContentOutput(
             resolvedManifestPath,
@@ -43,6 +44,6 @@ internal static class BakePipeline
             outputDirectory,
             compiledRootDirectory,
             compiledManifestPath,
-            compiledEntries);
+            resolvedPakEntries);
     }
 }

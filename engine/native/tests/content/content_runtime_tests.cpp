@@ -16,8 +16,8 @@
 namespace dff::native::tests {
 namespace {
 
-constexpr uint32_t kCompiledManifestMagic = 0x4D464644u;  // DFFM
-constexpr uint32_t kCompiledManifestVersion = 1u;
+constexpr uint32_t kPakMagic = 0x50464644u;  // DFFP
+constexpr uint32_t kPakVersion = 3u;
 
 struct ScopedTempDirectory {
   explicit ScopedTempDirectory(const std::string& test_name) {
@@ -33,11 +33,12 @@ struct ScopedTempDirectory {
   std::filesystem::path path;
 };
 
-struct ManifestEntry {
+struct PakAsset {
   std::string path;
   std::string kind;
   std::string compiled_path;
-  int64_t size_bytes = 0;
+  std::string asset_key;
+  std::string payload;
 };
 
 void Write7BitEncodedInt(std::ostream* stream, uint32_t value) {
@@ -59,55 +60,86 @@ void WriteDotNetString(std::ostream* stream, const std::string& value) {
   }
 }
 
-void WriteCompiledManifest(
-    const std::filesystem::path& manifest_path,
-    const std::vector<ManifestEntry>& entries) {
-  std::ofstream stream(manifest_path, std::ios::binary | std::ios::trunc);
+size_t EncodedStringSize(const std::string& value) {
+  size_t length = value.size();
+  size_t size = 1u;
+  while (length >= 0x80u) {
+    length >>= 7u;
+    ++size;
+  }
+
+  return size + value.size();
+}
+
+size_t ComputeIndexSize(const std::vector<PakAsset>& assets) {
+  size_t index_size = 0u;
+  for (const PakAsset& asset : assets) {
+    index_size += EncodedStringSize(asset.path);
+    index_size += EncodedStringSize(asset.kind);
+    index_size += EncodedStringSize(asset.compiled_path);
+    index_size += EncodedStringSize(asset.asset_key);
+    index_size += sizeof(int64_t) * 2u;
+  }
+
+  return index_size;
+}
+
+void WritePak(const std::filesystem::path& pak_path,
+              const std::vector<PakAsset>& assets) {
+  std::ofstream stream(pak_path, std::ios::binary | std::ios::trunc);
   assert(stream.is_open());
 
-  const int32_t entry_count = static_cast<int32_t>(entries.size());
-  stream.write(reinterpret_cast<const char*>(&kCompiledManifestMagic),
-               sizeof(kCompiledManifestMagic));
-  stream.write(reinterpret_cast<const char*>(&kCompiledManifestVersion),
-               sizeof(kCompiledManifestVersion));
-  stream.write(reinterpret_cast<const char*>(&entry_count), sizeof(entry_count));
+  const int32_t entry_count = static_cast<int32_t>(assets.size());
+  const uint32_t reserved = 0u;
+  const int64_t created_at_ticks = static_cast<int64_t>(
+      std::chrono::system_clock::now().time_since_epoch().count());
+  const size_t header_size =
+      sizeof(uint32_t) + sizeof(uint32_t) + sizeof(int32_t) + sizeof(uint32_t) +
+      sizeof(int64_t);
+  const size_t index_size = ComputeIndexSize(assets);
+  int64_t next_offset = static_cast<int64_t>(header_size + index_size);
 
-  for (const ManifestEntry& entry : entries) {
-    WriteDotNetString(&stream, entry.path);
-    WriteDotNetString(&stream, entry.kind);
-    WriteDotNetString(&stream, entry.compiled_path);
-    stream.write(reinterpret_cast<const char*>(&entry.size_bytes),
-                 sizeof(entry.size_bytes));
+  stream.write(reinterpret_cast<const char*>(&kPakMagic), sizeof(kPakMagic));
+  stream.write(reinterpret_cast<const char*>(&kPakVersion), sizeof(kPakVersion));
+  stream.write(reinterpret_cast<const char*>(&entry_count), sizeof(entry_count));
+  stream.write(reinterpret_cast<const char*>(&reserved), sizeof(reserved));
+  stream.write(reinterpret_cast<const char*>(&created_at_ticks),
+               sizeof(created_at_ticks));
+
+  for (const PakAsset& asset : assets) {
+    WriteDotNetString(&stream, asset.path);
+    WriteDotNetString(&stream, asset.kind);
+    WriteDotNetString(&stream, asset.compiled_path);
+    WriteDotNetString(&stream, asset.asset_key);
+
+    const int64_t size_bytes = static_cast<int64_t>(asset.payload.size());
+    const int64_t offset_bytes = size_bytes == 0 ? 0 : next_offset;
+    stream.write(reinterpret_cast<const char*>(&offset_bytes), sizeof(offset_bytes));
+    stream.write(reinterpret_cast<const char*>(&size_bytes), sizeof(size_bytes));
+    next_offset += size_bytes;
+  }
+
+  for (const PakAsset& asset : assets) {
+    if (!asset.payload.empty()) {
+      stream.write(asset.payload.data(),
+                   static_cast<std::streamsize>(asset.payload.size()));
+    }
   }
 }
 
 void TestMountPakAndReadFile() {
   ScopedTempDirectory temp("content_pak");
-  const std::filesystem::path compiled_root = temp.path / "compiled" / "text";
-  std::filesystem::create_directories(compiled_root);
-
-  const std::string payload = "hello";
-  const std::filesystem::path compiled_file = compiled_root / "example.txt.bin";
-  {
-    std::ofstream file(compiled_file, std::ios::binary | std::ios::trunc);
-    assert(file.is_open());
-    file.write(payload.data(), static_cast<std::streamsize>(payload.size()));
-  }
-
   const std::filesystem::path pak_path = temp.path / "content.pak";
-  {
-    std::ofstream file(pak_path, std::ios::trunc);
-    assert(file.is_open());
-    file << "{}";
-  }
+  const std::string payload = "hello";
 
-  WriteCompiledManifest(
-      temp.path / "compiled.manifest.bin",
-      {ManifestEntry{
+  WritePak(
+      pak_path,
+      {PakAsset{
           .path = "assets/example.txt",
           .kind = "text",
           .compiled_path = "text/example.txt.bin",
-          .size_bytes = static_cast<int64_t>(payload.size()),
+          .asset_key = "example_key",
+          .payload = payload,
       }});
 
   engine_native_engine_t* engine = nullptr;
@@ -137,8 +169,7 @@ void TestMountPakAndReadFile() {
 
   std::array<char, 16> buffer{};
   assert(content_read_file(engine, "assets/example.txt", buffer.data(),
-                           buffer.size(), &out_size) ==
-         ENGINE_NATIVE_STATUS_OK);
+                           buffer.size(), &out_size) == ENGINE_NATIVE_STATUS_OK);
   assert(out_size == payload.size());
   assert(std::memcmp(buffer.data(), payload.data(), payload.size()) == 0);
 
