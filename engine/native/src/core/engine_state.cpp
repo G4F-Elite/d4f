@@ -56,6 +56,16 @@ bool IsUnitRange(float value) {
   return value >= 0.0f && value <= 1.0f;
 }
 
+uint32_t ExtractMaterialFeatureFlags(
+    const engine_native_draw_item_t& draw_item) {
+  return draw_item.sort_key_high & 0x7u;
+}
+
+uint64_t ComposePipelineKey(engine_native_resource_handle_t material,
+                            const render::ShaderVariantKey& variant) {
+  return (material << 32u) ^ static_cast<uint64_t>(variant.value);
+}
+
 }  // namespace
 
 EngineState::EngineState() {
@@ -112,6 +122,7 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   frame_capacity_ = requested_bytes;
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
+  submitted_draw_items_.clear();
   last_executed_rhi_passes_.clear();
 
   engine_native_status_t status = rhi_device_->BeginFrame();
@@ -170,6 +181,39 @@ engine_native_status_t RendererState::Submit(
 
   submitted_draw_count_ = total_draw_count;
   submitted_ui_count_ = total_ui_count;
+
+  if (packet.draw_item_count > 0u) {
+    const size_t old_size = submitted_draw_items_.size();
+    const size_t added = static_cast<size_t>(packet.draw_item_count);
+    submitted_draw_items_.resize(old_size + added);
+    std::copy_n(packet.draw_items, packet.draw_item_count,
+                submitted_draw_items_.data() + old_size);
+
+    for (uint32_t i = 0u; i < packet.draw_item_count; ++i) {
+      const engine_native_draw_item_t& draw_item = packet.draw_items[i];
+      if (draw_item.material == 0u) {
+        continue;
+      }
+
+      const uint32_t feature_flags = ExtractMaterialFeatureFlags(draw_item);
+      const engine_native_status_t register_status =
+          material_system_.RegisterMaterial(draw_item.material, feature_flags);
+      if (register_status != ENGINE_NATIVE_STATUS_OK) {
+        return register_status;
+      }
+
+      render::ShaderVariantKey variant;
+      const engine_native_status_t resolve_status =
+          material_system_.ResolveVariant(draw_item.material,
+                                         /*shadows_enabled=*/true, &variant);
+      if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+        return resolve_status;
+      }
+
+      pipeline_cache_.GetOrCreate(ComposePipelineKey(draw_item.material, variant));
+    }
+  }
+
   return ENGINE_NATIVE_STATUS_OK;
 }
 
@@ -251,6 +295,7 @@ void RendererState::ResetFrameState() {
   frame_graph_.Clear();
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();
+  submitted_draw_items_.clear();
   frame_open_ = false;
   frame_storage_.clear();
 }

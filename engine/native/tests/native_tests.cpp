@@ -11,7 +11,9 @@
 #include "engine_native.h"
 #include "platform/platform_state_tests.h"
 #include "render/frame_graph_builder_tests.h"
+#include "render/material_system_tests.h"
 #include "render/render_graph_tests.h"
+#include "rhi/pipeline_state_cache_tests.h"
 #include "rhi/rhi_device_tests.h"
 
 namespace {
@@ -93,6 +95,9 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "tonemap", "present"});
+  assert(internal_engine->state.renderer.pipeline_cache_misses() == 2u);
+  assert(internal_engine->state.renderer.pipeline_cache_hits() == 0u);
+  assert(internal_engine->state.renderer.cached_pipeline_count() == 2u);
   assert(internal_engine->state.rhi_device.present_count() == 1u);
   const auto clear_color = internal_engine->state.renderer.last_clear_color();
   assert(clear_color[0] == 0.05f);
@@ -372,6 +377,8 @@ int main() {
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();
   dff::native::tests::RunFrameGraphBuilderTests();
+  dff::native::tests::RunMaterialSystemTests();
+  dff::native::tests::RunPipelineStateCacheTests();
   dff::native::tests::RunRhiDeviceTests();
   dff::native::tests::RunRenderGraphTests();
 

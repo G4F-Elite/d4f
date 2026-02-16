@@ -11,7 +11,9 @@ add_library(dff_native SHARED
   src/core/physics_queries.cpp
   src/platform/platform_state.cpp
   src/render/frame_graph_builder.cpp
+  src/render/material_system.cpp
   src/render/render_graph.cpp
+  src/rhi/pipeline_state_cache.cpp
   src/rhi/rhi_device.cpp
 )
 
@@ -36,11 +38,15 @@ if(BUILD_TESTING)
     tests/native_tests.cpp
     tests/platform/platform_state_tests.cpp
     tests/render/frame_graph_builder_tests.cpp
+    tests/render/material_system_tests.cpp
     tests/render/render_graph_tests.cpp
+    tests/rhi/pipeline_state_cache_tests.cpp
     tests/rhi/rhi_device_tests.cpp
     src/platform/platform_state.cpp
     src/render/frame_graph_builder.cpp
+    src/render/material_system.cpp
     src/render/render_graph.cpp
+    src/rhi/pipeline_state_cache.cpp
     src/rhi/rhi_device.cpp
   )
 

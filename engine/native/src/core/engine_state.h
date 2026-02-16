@@ -10,8 +10,10 @@
 #include <vector>
 
 #include "engine_native.h"
+#include "render/material_system.h"
 #include "platform/platform_state.h"
 #include "render/render_graph.h"
+#include "rhi/pipeline_state_cache.h"
 #include "rhi/rhi_device.h"
 
 namespace dff::native {
@@ -36,6 +38,9 @@ class RendererState {
   const std::vector<std::string>& last_executed_rhi_passes() const {
     return last_executed_rhi_passes_;
   }
+  uint64_t pipeline_cache_hits() const { return pipeline_cache_.hit_count(); }
+  uint64_t pipeline_cache_misses() const { return pipeline_cache_.miss_count(); }
+  size_t cached_pipeline_count() const { return pipeline_cache_.size(); }
 
  private:
   static bool IsPowerOfTwo(size_t value);
@@ -55,6 +60,9 @@ class RendererState {
   std::vector<rhi::RhiDevice::PassKind> pass_kinds_by_id_;
   std::vector<std::string> last_executed_rhi_passes_;
   std::array<float, 4> last_clear_color_{0.05f, 0.07f, 0.10f, 1.0f};
+  std::vector<engine_native_draw_item_t> submitted_draw_items_;
+  render::MaterialSystem material_system_;
+  rhi::PipelineStateCache pipeline_cache_;
 };
 
 struct PhysicsBodyState {
