@@ -8,14 +8,21 @@ public sealed class GameHostOptions
     private const int DefaultFrameArenaAlignment = 64;
     private const int DefaultMaxSubsteps = 8;
     private static readonly TimeSpan DefaultFixedDt = TimeSpan.FromTicks(TimeSpan.TicksPerSecond / 60);
+    private static readonly TimeSpan DefaultMaxAccumulatedTime = TimeSpan.FromTicks(DefaultFixedDt.Ticks * DefaultMaxSubsteps);
 
     public static GameHostOptions Default { get; } = new(
         DefaultFixedDt,
         DefaultMaxSubsteps,
         DefaultFrameArenaBytes,
-        DefaultFrameArenaAlignment);
+        DefaultFrameArenaAlignment,
+        DefaultMaxAccumulatedTime);
 
-    public GameHostOptions(TimeSpan fixedDt, int maxSubsteps, int frameArenaBytes, int frameArenaAlignment)
+    public GameHostOptions(
+        TimeSpan fixedDt,
+        int maxSubsteps,
+        int frameArenaBytes,
+        int frameArenaAlignment,
+        TimeSpan? maxAccumulatedTime = null)
     {
         if (fixedDt <= TimeSpan.Zero)
         {
@@ -39,10 +46,19 @@ public sealed class GameHostOptions
                 "Frame arena alignment must be a positive power of two.");
         }
 
+        TimeSpan resolvedMaxAccumulatedTime = maxAccumulatedTime ?? TimeSpan.FromTicks(fixedDt.Ticks * maxSubsteps);
+        if (resolvedMaxAccumulatedTime < fixedDt)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxAccumulatedTime),
+                "Max accumulated time must be greater than or equal to fixed delta time.");
+        }
+
         FixedDt = fixedDt;
         MaxSubsteps = maxSubsteps;
         FrameArenaBytes = frameArenaBytes;
         FrameArenaAlignment = frameArenaAlignment;
+        MaxAccumulatedTime = resolvedMaxAccumulatedTime;
     }
 
     public TimeSpan FixedDt { get; }
@@ -52,6 +68,8 @@ public sealed class GameHostOptions
     public int FrameArenaBytes { get; }
 
     public int FrameArenaAlignment { get; }
+
+    public TimeSpan MaxAccumulatedTime { get; }
 
     private static bool IsPowerOfTwo(int value)
     {

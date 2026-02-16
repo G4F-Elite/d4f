@@ -13,12 +13,14 @@ public sealed class GameHostOptionsTests
             fixedDt: TimeSpan.FromMilliseconds(8),
             maxSubsteps: 6,
             frameArenaBytes: 4096,
-            frameArenaAlignment: 128);
+            frameArenaAlignment: 128,
+            maxAccumulatedTime: TimeSpan.FromMilliseconds(60));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
         Assert.Equal(4096, options.FrameArenaBytes);
         Assert.Equal(128, options.FrameArenaAlignment);
+        Assert.Equal(TimeSpan.FromMilliseconds(60), options.MaxAccumulatedTime);
     }
 
     [Fact]
@@ -31,6 +33,7 @@ public sealed class GameHostOptionsTests
         Assert.True(options.FrameArenaBytes > 0);
         Assert.True(options.FrameArenaAlignment > 0);
         Assert.Equal(0, options.FrameArenaAlignment & (options.FrameArenaAlignment - 1));
+        Assert.True(options.MaxAccumulatedTime >= options.FixedDt);
     }
 
     [Fact]
@@ -71,5 +74,16 @@ public sealed class GameHostOptionsTests
             maxSubsteps: 4,
             frameArenaBytes: 2048,
             frameArenaAlignment: 96));
+    }
+
+    [Fact]
+    public void Constructor_RejectsMaxAccumulatedTimeSmallerThanFixedDt()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 2048,
+            frameArenaAlignment: 64,
+            maxAccumulatedTime: TimeSpan.FromMilliseconds(8)));
     }
 }

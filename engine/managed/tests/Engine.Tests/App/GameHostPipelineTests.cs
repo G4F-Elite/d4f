@@ -264,6 +264,44 @@ public sealed class GameHostPipelineTests
     }
 
     [Fact]
+    public void RunFrames_ClampsAccumulatorToConfiguredMaximum()
+    {
+        var execution = new List<string>();
+        var world = new World();
+        world.RegisterSystem(SystemStage.PrePhysics, new RecordingWorldSystem("stage.prephysics", execution));
+        world.RegisterSystem(SystemStage.PostPhysics, new RecordingWorldSystem("stage.postphysics", execution));
+        world.RegisterSystem(SystemStage.UI, new RecordingWorldSystem("stage.ui", execution));
+        world.RegisterSystem(SystemStage.PreRender, new RecordingWorldSystem("stage.prerender", execution));
+
+        var options = new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(10),
+            maxSubsteps: 3,
+            frameArenaBytes: 2048,
+            frameArenaAlignment: 128,
+            maxAccumulatedTime: TimeSpan.FromMilliseconds(30));
+        var firstFrame = new FrameTiming(0, TimeSpan.FromMilliseconds(100), TimeSpan.FromMilliseconds(100));
+        var secondFrame = new FrameTiming(1, TimeSpan.Zero, TimeSpan.FromMilliseconds(100));
+        var physics = new RecordingPhysicsFacade(execution);
+        var host = GameHostFactory.CreateHost(
+            world,
+            new RecordingPlatformFacade(execution, true, true),
+            new RecordingTimingFacade(execution, firstFrame, secondFrame),
+            physics,
+            new RecordingUiFacade(execution),
+            new RecordingPacketBuilder(execution),
+            new RecordingRenderingFacade(execution),
+            options);
+
+        var frames = host.RunFrames(2);
+
+        Assert.Equal(2, frames);
+        Assert.Equal(1, physics.SyncToCallCount);
+        Assert.Equal(3, physics.StepCallCount);
+        Assert.Equal(1, physics.SyncFromCallCount);
+        Assert.Equal([options.FixedDt, options.FixedDt, options.FixedDt], physics.StepDeltaTimes);
+    }
+
+    [Fact]
     public void RunFrames_StopsWhenPlatformRequestsShutdown()
     {
         var execution = new List<string>();

@@ -79,10 +79,19 @@ public sealed class GameHost
     private void ExecuteFrame()
     {
         var timing = _timingFacade.NextFrameTiming();
+        if (timing.DeltaTime < TimeSpan.Zero)
+        {
+            throw new InvalidOperationException($"Timing facade returned a negative frame delta: {timing.DeltaTime}.");
+        }
 
         _world.RunStage(SystemStage.PrePhysics, timing);
 
         _physicsAccumulator += timing.DeltaTime;
+        if (_physicsAccumulator > _options.MaxAccumulatedTime)
+        {
+            _physicsAccumulator = _options.MaxAccumulatedTime;
+        }
+
         var substeps = 0;
 
         while (_physicsAccumulator >= _options.FixedDt && substeps < _options.MaxSubsteps)
