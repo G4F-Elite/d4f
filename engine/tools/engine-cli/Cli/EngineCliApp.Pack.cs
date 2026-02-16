@@ -23,14 +23,11 @@ public sealed partial class EngineCliApp
         string packageRoot = Path.Combine(baked.OutputDirectory, "package");
         string appDirectory = Path.Combine(packageRoot, "App");
         string contentDirectory = Path.Combine(packageRoot, "Content");
-        string contentCompiledDirectory = Path.Combine(contentDirectory, "compiled");
 
         Directory.CreateDirectory(appDirectory);
         Directory.CreateDirectory(contentDirectory);
 
         File.Copy(baked.OutputPakPath, Path.Combine(contentDirectory, "Game.pak"), overwrite: true);
-        File.Copy(baked.CompiledManifestPath, Path.Combine(contentDirectory, AssetPipelineService.CompiledManifestFileName), overwrite: true);
-        CopyDirectory(baked.CompiledRootDirectory, contentCompiledDirectory);
 
         string? publishProjectPath = ResolvePublishProjectPath(projectDirectory, command.PublishProjectPath);
         if (publishProjectPath is not null)
@@ -53,7 +50,6 @@ public sealed partial class EngineCliApp
         }
 
         _stdout.WriteLine($"Pak created: {baked.OutputPakPath}");
-        _stdout.WriteLine($"Compiled manifest created: {baked.CompiledManifestPath}");
         _stdout.WriteLine($"Portable package prepared: {packageRoot}");
         return 0;
     }
@@ -171,7 +167,7 @@ public sealed partial class EngineCliApp
             runtime = command.RuntimeIdentifier,
             configuration = command.Configuration,
             contentPak = "Content/Game.pak",
-            compiledManifest = $"Content/{AssetPipelineService.CompiledManifestFileName}",
+            contentMode = "pak-only",
             appDirectory = "App",
             generatedAtUtc = DateTime.UtcNow
         };
@@ -198,25 +194,5 @@ public sealed partial class EngineCliApp
         }
 
         ZipFile.CreateFromDirectory(packageRoot, zipOutputPath, CompressionLevel.Optimal, includeBaseDirectory: false);
-    }
-
-    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
-    {
-        if (!Directory.Exists(sourceDirectory))
-        {
-            throw new DirectoryNotFoundException($"Directory was not found: {sourceDirectory}");
-        }
-
-        Directory.CreateDirectory(destinationDirectory);
-
-        foreach (string filePath in Directory.GetFiles(sourceDirectory, "*", SearchOption.AllDirectories))
-        {
-            string relativePath = Path.GetRelativePath(sourceDirectory, filePath);
-            string destinationPath = Path.Combine(destinationDirectory, relativePath);
-            string destinationParent = Path.GetDirectoryName(destinationPath)
-                ?? throw new InvalidDataException($"Destination path is invalid: {destinationPath}");
-            Directory.CreateDirectory(destinationParent);
-            File.Copy(filePath, destinationPath, overwrite: true);
-        }
     }
 }

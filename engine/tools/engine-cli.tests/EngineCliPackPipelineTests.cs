@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Engine.Cli;
 
 namespace Engine.Cli.Tests;
@@ -35,6 +36,13 @@ public sealed class EngineCliPackPipelineTests
 
             Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "Game.pak")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "config", "runtime.json")));
+            Assert.False(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "compiled.manifest.bin")));
+            Assert.False(Directory.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "compiled")));
+
+            string runtimeConfigPath = Path.Combine(projectRoot, "dist", "package", "config", "runtime.json");
+            using JsonDocument runtimeConfig = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
+            Assert.Equal("pak-only", runtimeConfig.RootElement.GetProperty("contentMode").GetString());
+            Assert.False(runtimeConfig.RootElement.TryGetProperty("compiledManifest", out _));
         }
         finally
         {
@@ -86,6 +94,8 @@ public sealed class EngineCliPackPipelineTests
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "build.zip")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "App", "dff_native.dll")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
+            Assert.False(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
+            Assert.False(Directory.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled")));
             Assert.Contains("Package archive created", output.ToString(), StringComparison.Ordinal);
         }
         finally
