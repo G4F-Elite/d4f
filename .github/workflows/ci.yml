@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore and test managed/tooling
+        run: dotnet test dff.sln --nologo
+
+      - name: Configure native build
+        run: cmake -S engine/native -B engine/native/build
+
+      - name: Build native
+        run: cmake --build engine/native/build --config Debug
+
+      - name: Run native tests
+        run: ctest --test-dir engine/native/build -C Debug --output-on-failure
