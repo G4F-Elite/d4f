@@ -18,12 +18,13 @@ public static unsafe class RenderPacketMarshaller
         ArgumentNullException.ThrowIfNull(drawCommands);
         ArgumentNullException.ThrowIfNull(uiDrawCommands);
 
-        var nativeDrawBatch = MarshalDrawBatch(drawCommands, frameArena);
+        IReadOnlyList<DrawCommand> orderedDrawCommands = RenderCommandOrdering.OrderDrawCommands(drawCommands);
+        var nativeDrawBatch = MarshalDrawBatch(orderedDrawCommands, frameArena);
         var nativeUiBatch = MarshalUiDrawBatch(uiDrawCommands, frameArena);
 
         return RenderPacket.CreateNative(
             frameNumber,
-            drawCommands,
+            orderedDrawCommands,
             uiDrawCommands,
             nativeDrawBatch.Pointer,
             nativeDrawBatch.Count,

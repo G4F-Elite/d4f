@@ -159,6 +159,32 @@ public sealed class RenderPacketMarshallerTests
         Assert.Equal(RenderDebugViewMode.None, packet.DebugViewMode);
     }
 
+    [Fact]
+    public void Marshal_OrdersDrawCommandsDeterministicallyBySortKeys()
+    {
+        using var arena = new FrameArena(2048, 64);
+        IReadOnlyList<DrawCommand> drawCommands =
+        [
+            CreateDrawCommand(8, 1, mesh: 40, material: 10, texture: 7, Matrix4x4.Identity, sortKeyHigh: 2, sortKeyLow: 1),
+            CreateDrawCommand(7, 1, mesh: 30, material: 11, texture: 7, Matrix4x4.Identity, sortKeyHigh: 1, sortKeyLow: 5),
+            CreateDrawCommand(6, 1, mesh: 20, material: 11, texture: 7, Matrix4x4.Identity, sortKeyHigh: 1, sortKeyLow: 5),
+            CreateDrawCommand(5, 1, mesh: 10, material: 12, texture: 7, Matrix4x4.Identity, sortKeyHigh: 0, sortKeyLow: 9)
+        ];
+
+        RenderPacket packet = RenderPacketMarshaller.Marshal(1, arena, drawCommands, Array.Empty<UiDrawCommand>());
+
+        Assert.Equal(4, packet.NativeDrawItemCount);
+        Assert.Equal((ulong)10, packet.NativeDrawItems[0].Mesh);
+        Assert.Equal((ulong)20, packet.NativeDrawItems[1].Mesh);
+        Assert.Equal((ulong)30, packet.NativeDrawItems[2].Mesh);
+        Assert.Equal((ulong)40, packet.NativeDrawItems[3].Mesh);
+
+        Assert.Equal((uint)0, packet.DrawCommands[0].SortKeyHigh);
+        Assert.Equal((uint)1, packet.DrawCommands[1].SortKeyHigh);
+        Assert.Equal((uint)1, packet.DrawCommands[2].SortKeyHigh);
+        Assert.Equal((uint)2, packet.DrawCommands[3].SortKeyHigh);
+    }
+
     private static DrawCommand CreateDrawCommand(
         int entityIndex,
         uint generation,

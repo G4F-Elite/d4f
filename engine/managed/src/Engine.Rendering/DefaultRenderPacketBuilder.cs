@@ -1,5 +1,6 @@
 using System;
 using Engine.Core.Timing;
+using Engine.Core.Handles;
 using Engine.ECS;
 
 namespace Engine.Rendering;
@@ -27,15 +28,37 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 
     private static IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)
     {
-        List<UiDrawCommand>? aggregate = null;
-
-        foreach (var (_, batch) in world.Query<UiRenderBatch>())
+        List<(EntityId Entity, UiRenderBatch Batch)>? batches = null;
+        foreach (var (entity, batch) in world.Query<UiRenderBatch>())
         {
             if (batch.Commands.Count == 0)
             {
                 continue;
             }
 
+            batches ??= new List<(EntityId Entity, UiRenderBatch Batch)>();
+            batches.Add((entity, batch));
+        }
+
+        if (batches is null || batches.Count == 0)
+        {
+            return Array.Empty<UiDrawCommand>();
+        }
+
+        batches.Sort(static (left, right) =>
+        {
+            int byIndex = left.Entity.Index.CompareTo(right.Entity.Index);
+            if (byIndex != 0)
+            {
+                return byIndex;
+            }
+
+            return left.Entity.Generation.CompareTo(right.Entity.Generation);
+        });
+
+        List<UiDrawCommand>? aggregate = null;
+        foreach (var (_, batch) in batches)
+        {
             aggregate ??= new List<UiDrawCommand>(batch.Commands.Count);
             aggregate.AddRange(batch.Commands);
         }
