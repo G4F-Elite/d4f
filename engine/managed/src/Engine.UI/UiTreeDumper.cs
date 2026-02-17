@@ -6,7 +6,7 @@ namespace Engine.UI;
 
 public static class UiTreeDumper
 {
-    public static string Dump(UiDocument document)
+    public static string Dump(UiDocument document, bool includeResolvedStyles = false)
     {
         ArgumentNullException.ThrowIfNull(document);
 
@@ -19,13 +19,19 @@ public static class UiTreeDumper
         bool wroteAnyLine = false;
         foreach (UiElement root in document.Roots)
         {
-            AppendElement(root, builder, depth: 0, ref wroteAnyLine);
+            AppendElement(document, root, builder, depth: 0, includeResolvedStyles, ref wroteAnyLine);
         }
 
         return builder.ToString();
     }
 
-    private static void AppendElement(UiElement element, StringBuilder builder, int depth, ref bool wroteAnyLine)
+    private static void AppendElement(
+        UiDocument document,
+        UiElement element,
+        StringBuilder builder,
+        int depth,
+        bool includeResolvedStyles,
+        ref bool wroteAnyLine)
     {
         if (wroteAnyLine)
         {
@@ -99,9 +105,14 @@ public static class UiTreeDumper
                 break;
         }
 
+        if (includeResolvedStyles)
+        {
+            AppendResolvedStyle(document, element, builder);
+        }
+
         foreach (UiElement child in element.Children)
         {
-            AppendElement(child, builder, depth + 1, ref wroteAnyLine);
+            AppendElement(document, child, builder, depth + 1, includeResolvedStyles, ref wroteAnyLine);
         }
     }
 
@@ -146,5 +157,54 @@ public static class UiTreeDumper
     {
         float normalized = value == 0f ? 0f : value;
         builder.Append(normalized.ToString("G9", CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendResolvedStyle(UiDocument document, UiElement element, StringBuilder builder)
+    {
+        UiResolvedStyle style = UiStyleResolver.Resolve(document, element);
+        builder.Append(" style={font=\"");
+        AppendEscaped(builder, style.FontFamily);
+        builder.Append("\",size=");
+        AppendFloat(builder, style.FontSize);
+        builder.Append(",fg=");
+        AppendColor(builder, style.ForegroundColor);
+        builder.Append(",bg=");
+        AppendColor(builder, style.BackgroundColor);
+        builder.Append(",radius=");
+        AppendFloat(builder, style.BorderRadius);
+        builder.Append(",shadow=");
+        AppendShadow(builder, style.Shadow);
+        builder.Append(",spacing=");
+        AppendFloat(builder, style.Spacing);
+        builder.Append('}');
+    }
+
+    private static void AppendColor(StringBuilder builder, System.Numerics.Vector4 color)
+    {
+        builder.Append('(');
+        AppendFloat(builder, color.X);
+        builder.Append(',');
+        AppendFloat(builder, color.Y);
+        builder.Append(',');
+        AppendFloat(builder, color.Z);
+        builder.Append(',');
+        AppendFloat(builder, color.W);
+        builder.Append(')');
+    }
+
+    private static void AppendShadow(StringBuilder builder, UiShadowStyle shadow)
+    {
+        builder.Append('(');
+        builder.Append("offset=");
+        builder.Append('(');
+        AppendFloat(builder, shadow.Offset.X);
+        builder.Append(',');
+        AppendFloat(builder, shadow.Offset.Y);
+        builder.Append(')');
+        builder.Append(",blur=");
+        AppendFloat(builder, shadow.BlurRadius);
+        builder.Append(",color=");
+        AppendColor(builder, shadow.Color);
+        builder.Append(')');
     }
 }

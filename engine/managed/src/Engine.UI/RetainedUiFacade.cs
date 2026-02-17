@@ -28,9 +28,14 @@ public sealed partial class RetainedUiFacade : IUiFacade
 
     public string DumpTree()
     {
+        return DumpTree(includeResolvedStyles: false);
+    }
+
+    public string DumpTree(bool includeResolvedStyles)
+    {
         UiLayoutEngine.Apply(_document);
         UpdateScrollViewMeasurements();
-        return UiTreeDumper.Dump(_document);
+        return UiTreeDumper.Dump(_document, includeResolvedStyles);
     }
 
     public void QueueClick(string elementId)
