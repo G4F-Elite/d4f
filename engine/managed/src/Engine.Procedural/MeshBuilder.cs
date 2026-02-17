@@ -18,9 +18,36 @@ public sealed class MeshBuilder
 
     public int AddVertex(Vector3 position, Vector3 normal, Vector2 uv)
     {
+        return AddVertex(position, normal, uv, Vector4.One);
+    }
+
+    public int AddVertex(Vector3 position, Vector3 normal, Vector2 uv, Vector4 color)
+    {
+        return AddVertex(position, normal, uv, color, new Vector4(1f, 0f, 0f, 1f));
+    }
+
+    public int AddVertex(Vector3 position, Vector3 normal, Vector2 uv, Vector4 color, Vector4 tangent)
+    {
+        ValidateFinite(position, nameof(position));
+        ValidateFinite(normal, nameof(normal));
+        ValidateFinite(uv, nameof(uv));
+        ValidateFinite(color, nameof(color));
+        ValidateFinite(tangent, nameof(tangent));
+
         Vector3 safeNormal = normal.LengthSquared() <= 0f ? Vector3.UnitY : Vector3.Normalize(normal);
+        Vector3 tangentDirection = new(tangent.X, tangent.Y, tangent.Z);
+        if (tangentDirection.LengthSquared() <= 1e-8f)
+        {
+            tangentDirection = ComputeFallbackTangent(safeNormal);
+        }
+        else
+        {
+            tangentDirection = Vector3.Normalize(tangentDirection);
+        }
+
+        float tangentSign = tangent.W < 0f ? -1f : 1f;
         int index = _vertices.Count;
-        _vertices.Add(new ProcVertex(position, safeNormal, uv, Vector4.One));
+        _vertices.Add(new ProcVertex(position, safeNormal, uv, color, new Vector4(tangentDirection, tangentSign)));
         return index;
     }
 
@@ -147,6 +174,7 @@ public sealed class MeshBuilder
     public ProcMeshData Build()
     {
         EndSubmesh();
+        RecalculateTangents();
 
         ProcBounds bounds = ProcBounds.FromPoints(_vertices);
         var submeshes = _submeshes.Count == 0
@@ -183,6 +211,129 @@ public sealed class MeshBuilder
         float angle = MathF.Atan2(position.Z, position.X);
         float u = (angle / (MathF.PI * 2f)) + 0.5f;
         return new Vector2(u, position.Y);
+    }
+
+    private void RecalculateTangents()
+    {
+        if (_vertices.Count == 0 || _indices.Count == 0)
+        {
+            return;
+        }
+
+        var tangentSums = new Vector3[_vertices.Count];
+        var bitangentSums = new Vector3[_vertices.Count];
+
+        for (int i = 0; i < _indices.Count; i += 3)
+        {
+            int ia = _indices[i];
+            int ib = _indices[i + 1];
+            int ic = _indices[i + 2];
+
+            ProcVertex a = _vertices[ia];
+            ProcVertex b = _vertices[ib];
+            ProcVertex c = _vertices[ic];
+
+            Vector3 edge1 = b.Position - a.Position;
+            Vector3 edge2 = c.Position - a.Position;
+            Vector2 deltaUv1 = b.Uv - a.Uv;
+            Vector2 deltaUv2 = c.Uv - a.Uv;
+
+            float determinant = deltaUv1.X * deltaUv2.Y - deltaUv1.Y * deltaUv2.X;
+            if (MathF.Abs(determinant) <= 1e-8f)
+            {
+                continue;
+            }
+
+            float inverse = 1f / determinant;
+            Vector3 tangent = (edge1 * deltaUv2.Y - edge2 * deltaUv1.Y) * inverse;
+            Vector3 bitangent = (edge2 * deltaUv1.X - edge1 * deltaUv2.X) * inverse;
+
+            if (!IsFinite(tangent) || !IsFinite(bitangent))
+            {
+                continue;
+            }
+
+            tangentSums[ia] += tangent;
+            tangentSums[ib] += tangent;
+            tangentSums[ic] += tangent;
+            bitangentSums[ia] += bitangent;
+            bitangentSums[ib] += bitangent;
+            bitangentSums[ic] += bitangent;
+        }
+
+        for (int i = 0; i < _vertices.Count; i++)
+        {
+            ProcVertex vertex = _vertices[i];
+            Vector3 normal = vertex.Normal.LengthSquared() <= 1e-8f ? Vector3.UnitY : Vector3.Normalize(vertex.Normal);
+            Vector3 tangent = tangentSums[i];
+
+            if (tangent.LengthSquared() <= 1e-8f || !IsFinite(tangent))
+            {
+                tangent = ComputeFallbackTangent(normal);
+            }
+            else
+            {
+                tangent = Vector3.Normalize(tangent - normal * Vector3.Dot(normal, tangent));
+                if (tangent.LengthSquared() <= 1e-8f || !IsFinite(tangent))
+                {
+                    tangent = ComputeFallbackTangent(normal);
+                }
+            }
+
+            Vector3 bitangent = bitangentSums[i];
+            float handedness = 1f;
+            if (bitangent.LengthSquared() > 1e-8f && IsFinite(bitangent))
+            {
+                handedness = Vector3.Dot(Vector3.Cross(normal, tangent), bitangent) < 0f ? -1f : 1f;
+            }
+
+            _vertices[i] = vertex with
+            {
+                Normal = normal,
+                Tangent = new Vector4(tangent, handedness)
+            };
+        }
+    }
+
+    private static Vector3 ComputeFallbackTangent(Vector3 normal)
+    {
+        Vector3 axis = MathF.Abs(normal.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
+        Vector3 tangent = Vector3.Cross(axis, normal);
+        if (tangent.LengthSquared() <= 1e-8f)
+        {
+            tangent = Vector3.UnitX;
+        }
+
+        return Vector3.Normalize(tangent);
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+    }
+
+    private static void ValidateFinite(Vector2 value, string paramName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Vector2 components must be finite.");
+        }
+    }
+
+    private static void ValidateFinite(Vector3 value, string paramName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Vector3 components must be finite.");
+        }
+    }
+
+    private static void ValidateFinite(Vector4 value, string paramName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z) || !float.IsFinite(value.W))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Vector4 components must be finite.");
+        }
     }
 
     private void ValidateVertexIndex(int index)

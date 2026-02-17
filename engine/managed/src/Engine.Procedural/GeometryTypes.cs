@@ -9,7 +9,18 @@ public enum UvProjection
     Cylindrical = 2
 }
 
-public readonly record struct ProcVertex(Vector3 Position, Vector3 Normal, Vector2 Uv, Vector4 Color);
+public readonly record struct ProcVertex(
+    Vector3 Position,
+    Vector3 Normal,
+    Vector2 Uv,
+    Vector4 Color,
+    Vector4 Tangent)
+{
+    public ProcVertex(Vector3 position, Vector3 normal, Vector2 uv, Vector4 color)
+        : this(position, normal, uv, color, new Vector4(1f, 0f, 0f, 1f))
+    {
+    }
+}
 
 public readonly record struct ProcBounds(Vector3 Min, Vector3 Max)
 {
@@ -106,6 +117,11 @@ public sealed record ProcMeshData(
             throw new InvalidDataException("Mesh indices must be non-empty and divisible by 3.");
         }
 
+        foreach (ProcVertex vertex in Vertices)
+        {
+            ValidateVertex(vertex);
+        }
+
         foreach (int index in Indices)
         {
             if (index < 0 || index >= Vertices.Count)
@@ -131,4 +147,34 @@ public sealed record ProcMeshData(
 
         return this;
     }
+
+    private static void ValidateVertex(ProcVertex vertex)
+    {
+        if (!IsFinite(vertex.Position.X) || !IsFinite(vertex.Position.Y) || !IsFinite(vertex.Position.Z))
+        {
+            throw new InvalidDataException("Mesh vertex position contains a non-finite component.");
+        }
+
+        if (!IsFinite(vertex.Normal.X) || !IsFinite(vertex.Normal.Y) || !IsFinite(vertex.Normal.Z))
+        {
+            throw new InvalidDataException("Mesh vertex normal contains a non-finite component.");
+        }
+
+        if (!IsFinite(vertex.Uv.X) || !IsFinite(vertex.Uv.Y))
+        {
+            throw new InvalidDataException("Mesh vertex UV contains a non-finite component.");
+        }
+
+        if (!IsFinite(vertex.Color.X) || !IsFinite(vertex.Color.Y) || !IsFinite(vertex.Color.Z) || !IsFinite(vertex.Color.W))
+        {
+            throw new InvalidDataException("Mesh vertex color contains a non-finite component.");
+        }
+
+        if (!IsFinite(vertex.Tangent.X) || !IsFinite(vertex.Tangent.Y) || !IsFinite(vertex.Tangent.Z) || !IsFinite(vertex.Tangent.W))
+        {
+            throw new InvalidDataException("Mesh vertex tangent contains a non-finite component.");
+        }
+    }
+
+    private static bool IsFinite(float value) => !float.IsNaN(value) && !float.IsInfinity(value);
 }
