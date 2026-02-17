@@ -214,6 +214,8 @@ public abstract class UiElement
         set => _padding = value;
     }
 
+    public UiStyle? StyleOverride { get; set; }
+
     public RectF LayoutBounds { get; private set; } = RectF.Empty;
 
     public UiElement? Parent { get; private set; }

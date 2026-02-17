@@ -6,8 +6,15 @@ namespace Engine.UI;
 public sealed class UiDocument
 {
     private readonly List<UiElement> _roots = [];
+    private UiTheme _theme = UiTheme.Default;
 
     public IReadOnlyList<UiElement> Roots => _roots;
+
+    public UiTheme Theme
+    {
+        get => _theme;
+        set => _theme = value ?? throw new ArgumentNullException(nameof(value));
+    }
 
     public void AddRoot(UiElement root)
     {
