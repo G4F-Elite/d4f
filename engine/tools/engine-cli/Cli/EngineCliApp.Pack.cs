@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Formats.Tar;
 using System.Text.Json;
 using Engine.AssetPipeline;
 
@@ -44,9 +45,9 @@ public sealed partial class EngineCliApp
 
         if (!string.IsNullOrWhiteSpace(command.ZipOutputPath))
         {
-            string zipOutputPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ZipOutputPath);
-            CreateZipArchive(packageRoot, zipOutputPath);
-            _stdout.WriteLine($"Package archive created: {zipOutputPath}");
+            string archiveOutputPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ZipOutputPath);
+            CreatePackageArchive(packageRoot, archiveOutputPath);
+            _stdout.WriteLine($"Package archive created: {archiveOutputPath}");
         }
 
         _stdout.WriteLine($"Pak created: {baked.OutputPakPath}");
@@ -146,15 +147,28 @@ public sealed partial class EngineCliApp
             return configuredPath;
         }
 
-        string autoPath = Path.GetFullPath(
+        string nativeBuildDirectory = Path.GetFullPath(
             Path.Combine(
                 Environment.CurrentDirectory,
                 "engine",
                 "native",
                 "build",
-                command.Configuration,
-                "dff_native.dll"));
-        return File.Exists(autoPath) ? autoPath : null;
+                command.Configuration));
+        if (!Directory.Exists(nativeBuildDirectory))
+        {
+            return null;
+        }
+
+        foreach (string candidateFileName in GetNativeLibraryCandidates(command.RuntimeIdentifier))
+        {
+            string candidatePath = Path.Combine(nativeBuildDirectory, candidateFileName);
+            if (File.Exists(candidatePath))
+            {
+                return candidatePath;
+            }
+        }
+
+        return null;
     }
 
     private static void WritePackConfig(string packageRoot, PackCommand command)
@@ -180,6 +194,35 @@ public sealed partial class EngineCliApp
         File.WriteAllText(configPath, json);
     }
 
+    private static IReadOnlyList<string> GetNativeLibraryCandidates(string runtimeIdentifier)
+    {
+        return runtimeIdentifier.ToLowerInvariant() switch
+        {
+            "win-x64" => ["dff_native.dll"],
+            "linux-x64" => ["libdff_native.so", "dff_native.so"],
+            _ => ["dff_native.dll", "libdff_native.so", "dff_native.so"]
+        };
+    }
+
+    private static void CreatePackageArchive(string packageRoot, string archiveOutputPath)
+    {
+        if (archiveOutputPath.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            CreateZipArchive(packageRoot, archiveOutputPath);
+            return;
+        }
+
+        if (archiveOutputPath.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase) ||
+            archiveOutputPath.EndsWith(".tgz", StringComparison.OrdinalIgnoreCase))
+        {
+            CreateTarGzArchive(packageRoot, archiveOutputPath);
+            return;
+        }
+
+        throw new InvalidDataException(
+            $"Unsupported archive extension for '{archiveOutputPath}'. Use '.zip', '.tar.gz' or '.tgz'.");
+    }
+
     private static void CreateZipArchive(string packageRoot, string zipOutputPath)
     {
         string zipDirectory = Path.GetDirectoryName(zipOutputPath) ?? string.Empty;
@@ -194,5 +237,42 @@ public sealed partial class EngineCliApp
         }
 
         ZipFile.CreateFromDirectory(packageRoot, zipOutputPath, CompressionLevel.Optimal, includeBaseDirectory: false);
+    }
+
+    private static void CreateTarGzArchive(string packageRoot, string outputPath)
+    {
+        string outputDirectory = Path.GetDirectoryName(outputPath) ?? string.Empty;
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+        {
+            Directory.CreateDirectory(outputDirectory);
+        }
+
+        if (File.Exists(outputPath))
+        {
+            File.Delete(outputPath);
+        }
+
+        string tempTarPath = Path.Combine(outputDirectory, $"{Path.GetFileNameWithoutExtension(outputPath)}.tmp.tar");
+        if (File.Exists(tempTarPath))
+        {
+            File.Delete(tempTarPath);
+        }
+
+        TarFile.CreateFromDirectory(packageRoot, tempTarPath, includeBaseDirectory: false);
+
+        try
+        {
+            using FileStream tarStream = File.OpenRead(tempTarPath);
+            using FileStream outputStream = File.Create(outputPath);
+            using var gzipStream = new GZipStream(outputStream, CompressionLevel.Optimal, leaveOpen: false);
+            tarStream.CopyTo(gzipStream);
+        }
+        finally
+        {
+            if (File.Exists(tempTarPath))
+            {
+                File.Delete(tempTarPath);
+            }
+        }
     }
 }

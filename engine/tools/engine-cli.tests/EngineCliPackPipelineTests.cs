@@ -1,3 +1,5 @@
+using System.Formats.Tar;
+using System.IO.Compression;
 using System.Text.Json;
 using Engine.Cli;
 
@@ -105,6 +107,55 @@ public sealed class EngineCliPackPipelineTests
     }
 
     [Fact]
+    public void Run_ShouldPackLinuxAndCreateTarGzArchive_WhenRequested()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareAssetManifest(tempRoot);
+            string runtimeProjectPath = Path.Combine(tempRoot, "src", "Game.Runtime", "Game.Runtime.csproj");
+            Directory.CreateDirectory(Path.GetDirectoryName(runtimeProjectPath)!);
+            File.WriteAllText(runtimeProjectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            string nativeLibraryPath = Path.Combine(tempRoot, "native", "libdff_native.so");
+            Directory.CreateDirectory(Path.GetDirectoryName(nativeLibraryPath)!);
+            File.WriteAllText(nativeLibraryPath, "native-linux");
+
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(
+            [
+                "pack",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--publish-project", "src/Game.Runtime/Game.Runtime.csproj",
+                "--runtime", "linux-x64",
+                "--configuration", "Release",
+                "--native-lib", "native/libdff_native.so",
+                "--zip", "dist/build.tar.gz"
+            ]);
+
+            Assert.Equal(0, code);
+            string archivePath = Path.Combine(tempRoot, "dist", "build.tar.gz");
+            Assert.True(File.Exists(archivePath));
+            Assert.Equal([0x1F, 0x8B], File.ReadAllBytes(archivePath).Take(2).ToArray());
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "App", "libdff_native.so")));
+
+            string[] archiveEntries = ListTarGzEntries(archivePath);
+            Assert.Contains("App/libdff_native.so", archiveEntries);
+            Assert.Contains("Content/Game.pak", archiveEntries);
+            Assert.Contains("config/runtime.json", archiveEntries);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailPack_WhenPublishCommandFails()
     {
         string tempRoot = CreateTempDirectory();
@@ -163,6 +214,26 @@ public sealed class EngineCliPackPipelineTests
         string path = Path.Combine(Path.GetTempPath(), $"engine-cli-pack-tests-{Guid.NewGuid():N}");
         Directory.CreateDirectory(path);
         return path;
+    }
+
+    private static string[] ListTarGzEntries(string archivePath)
+    {
+        var entries = new List<string>();
+        using FileStream compressed = File.OpenRead(archivePath);
+        using var gzip = new GZipStream(compressed, CompressionMode.Decompress);
+        using var reader = new TarReader(gzip);
+        TarEntry? entry;
+        while ((entry = reader.GetNextEntry()) is not null)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Name))
+            {
+                continue;
+            }
+
+            entries.Add(entry.Name.Replace('\\', '/'));
+        }
+
+        return entries.ToArray();
     }
 
     private sealed class RecordingCommandRunner : IExternalCommandRunner
