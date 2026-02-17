@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using Engine.AssetPipeline;
+using Engine.Testing;
 
 namespace Engine.Cli;
 
@@ -41,6 +42,7 @@ public sealed partial class EngineCliApp
                 RunCommand cmd => HandleRun(cmd),
                 BakeCommand cmd => HandleBake(cmd),
                 PreviewCommand cmd => HandlePreview(cmd),
+                PreviewDumpCommand cmd => HandlePreviewDump(cmd),
                 TestCommand cmd => HandleTest(cmd),
                 PackCommand cmd => HandlePack(cmd),
                 DoctorCommand cmd => HandleDoctor(cmd),
@@ -170,6 +172,28 @@ public sealed partial class EngineCliApp
 
         _stdout.WriteLine($"Preview artifacts created: {outputDirectory}");
         _stdout.WriteLine($"Preview manifest created: {artifactsManifestPath}");
+        return 0;
+    }
+
+    private int HandlePreviewDump(PreviewDumpCommand command)
+    {
+        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
+        if (!Directory.Exists(projectDirectory))
+        {
+            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
+            return 1;
+        }
+
+        string manifestPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ManifestPath);
+        TestingArtifactManifest manifest = TestingArtifactManifestCodec.Read(manifestPath);
+
+        _stdout.WriteLine($"Preview artifact manifest: {manifestPath}");
+        _stdout.WriteLine($"Generated at: {manifest.GeneratedAtUtc:O}");
+        foreach (TestingArtifactEntry artifact in manifest.Artifacts)
+        {
+            _stdout.WriteLine($"{artifact.Kind}\t{artifact.RelativePath}\t{artifact.Description}");
+        }
+
         return 0;
     }
 

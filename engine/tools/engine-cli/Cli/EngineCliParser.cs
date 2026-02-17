@@ -4,7 +4,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, test, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview dump, test, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -38,6 +38,19 @@ public static partial class EngineCliParser
             }
 
             return ParseDump(dumpOptions);
+        }
+
+        if (string.Equals(commandName, "preview", StringComparison.Ordinal) &&
+            args.Length > 1 &&
+            string.Equals(args[1], "dump", StringComparison.OrdinalIgnoreCase))
+        {
+            Dictionary<string, string> dumpOptions = ParseOptions(args[2..], out string? dumpError);
+            if (dumpError is not null)
+            {
+                return EngineCliParseResult.Failure(dumpError);
+            }
+
+            return ParsePreviewDump(dumpOptions);
         }
 
         int optionsStartIndex = 1;
@@ -187,6 +200,24 @@ public static partial class EngineCliParser
         }
 
         return EngineCliParseResult.Success(new PreviewCommand(project, manifest, output));
+    }
+
+    private static EngineCliParseResult ParsePreviewDump(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'preview dump'.");
+        }
+
+        string manifest = options.TryGetValue("manifest", out string? manifestValue)
+            ? manifestValue
+            : Path.Combine(project, "artifacts", "preview", "manifest.json");
+        if (string.IsNullOrWhiteSpace(manifest))
+        {
+            return EngineCliParseResult.Failure("Option '--manifest' cannot be empty.");
+        }
+
+        return EngineCliParseResult.Success(new PreviewDumpCommand(project, manifest));
     }
 
     private static EngineCliParseResult ParseTest(IReadOnlyDictionary<string, string> options)

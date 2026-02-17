@@ -11,7 +11,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, test, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, run, bake, preview, preview dump, test, pack, doctor, api dump.",
             result.Error);
     }
 

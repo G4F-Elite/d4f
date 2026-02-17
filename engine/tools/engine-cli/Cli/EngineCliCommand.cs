@@ -20,6 +20,10 @@ public sealed record PreviewCommand(
     string ManifestPath,
     string OutputDirectory) : EngineCliCommand;
 
+public sealed record PreviewDumpCommand(
+    string ProjectDirectory,
+    string ManifestPath) : EngineCliCommand;
+
 public sealed record TestCommand(
     string ProjectDirectory,
     string ArtifactsDirectory,
