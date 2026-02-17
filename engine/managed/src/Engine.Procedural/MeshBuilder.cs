@@ -108,19 +108,37 @@ public sealed class MeshBuilder
         }
 
         int triangleCount = _indices.Count / 3;
-        int step = Math.Max(2, triangleCount / 2);
-        var lodIndices = new List<int>(_indices.Count / 2);
-        for (int triangle = 0; triangle < triangleCount; triangle += step)
+        int keepTriangleCount = Math.Clamp(
+            checked((int)MathF.Ceiling(triangleCount * screenCoverage)),
+            1,
+            triangleCount - 1);
+        var candidates = new List<TriangleCandidate>(triangleCount);
+        for (int triangle = 0; triangle < triangleCount; triangle++)
         {
             int start = triangle * 3;
+            int ia = _indices[start];
+            int ib = _indices[start + 1];
+            int ic = _indices[start + 2];
+            Vector3 a = _vertices[ia].Position;
+            Vector3 b = _vertices[ib].Position;
+            Vector3 c = _vertices[ic].Position;
+            float area = Vector3.Cross(b - a, c - a).LengthSquared();
+            candidates.Add(new TriangleCandidate(start, area));
+        }
+
+        int[] selectedStarts = candidates
+            .OrderByDescending(static x => x.Area)
+            .ThenBy(static x => x.IndexStart)
+            .Take(keepTriangleCount)
+            .Select(static x => x.IndexStart)
+            .OrderBy(static x => x)
+            .ToArray();
+        var lodIndices = new List<int>(selectedStarts.Length * 3);
+        foreach (int start in selectedStarts)
+        {
             lodIndices.Add(_indices[start]);
             lodIndices.Add(_indices[start + 1]);
             lodIndices.Add(_indices[start + 2]);
-        }
-
-        if (lodIndices.Count == 0)
-        {
-            lodIndices.AddRange(_indices.Take(3));
         }
 
         _lods.Add(new ProcMeshLod(screenCoverage, lodIndices.ToArray()));
@@ -174,4 +192,6 @@ public sealed class MeshBuilder
             throw new ArgumentOutOfRangeException(nameof(index), $"Vertex index {index} is outside range [0, {_vertices.Count - 1}].");
         }
     }
+
+    private readonly record struct TriangleCandidate(int IndexStart, float Area);
 }
