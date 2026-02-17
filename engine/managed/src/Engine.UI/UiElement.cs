@@ -16,6 +16,9 @@ public abstract class UiElement
     private float? _maxWidth;
     private float? _maxHeight;
     private float _layoutGap;
+    private UiFlexDirection _flexDirection;
+    private UiJustifyContent _justifyContent;
+    private UiAlignItems _alignItems;
 
     protected UiElement(string id)
     {
@@ -32,6 +35,50 @@ public abstract class UiElement
     public bool Visible { get; set; } = true;
 
     public UiLayoutMode LayoutMode { get; set; } = UiLayoutMode.Absolute;
+
+    public UiFlexDirection FlexDirection
+    {
+        get => _flexDirection;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported flex direction.");
+            }
+
+            _flexDirection = value;
+        }
+    }
+
+    public UiJustifyContent JustifyContent
+    {
+        get => _justifyContent;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported justify mode.");
+            }
+
+            _justifyContent = value;
+        }
+    }
+
+    public UiAlignItems AlignItems
+    {
+        get => _alignItems;
+        set
+        {
+            if (!Enum.IsDefined(value))
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported align mode.");
+            }
+
+            _alignItems = value;
+        }
+    }
+
+    public bool Wrap { get; set; }
 
     public float LayoutGap
     {

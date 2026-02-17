@@ -54,6 +54,9 @@ internal static class UiLayoutEngine
             case UiLayoutMode.HorizontalStack:
                 ApplyHorizontalLayout(element.Children, contentX, contentY, contentWidth, contentHeight, element.LayoutGap);
                 return;
+            case UiLayoutMode.Flex:
+                ApplyFlexLayout(element, contentX, contentY, contentWidth, contentHeight);
+                return;
             default:
                 foreach (UiElement child in element.Children)
                 {
@@ -116,6 +119,204 @@ internal static class UiLayoutEngine
         }
     }
 
+    private static void ApplyFlexLayout(
+        UiElement container,
+        float contentX,
+        float contentY,
+        float contentWidth,
+        float contentHeight)
+    {
+        bool isRow = container.FlexDirection == UiFlexDirection.Row;
+        float contentMain = Math.Max(0.0f, isRow ? contentWidth : contentHeight);
+        float contentCross = Math.Max(0.0f, isRow ? contentHeight : contentWidth);
+        float gap = container.LayoutGap;
+        var lines = new List<FlexLine>();
+        var currentLine = new FlexLine();
+        lines.Add(currentLine);
+
+        foreach (UiElement child in container.Children)
+        {
+            if (!child.Visible)
+            {
+                ApplyElementLayout(child, contentX, contentY, null, null, null, null);
+                continue;
+            }
+
+            FlexItem item = CreateFlexItem(child, isRow);
+            float itemMainWithGap = currentLine.Items.Count == 0
+                ? item.TotalMain
+                : currentLine.MainUsed + gap + item.TotalMain;
+
+            if (container.Wrap && currentLine.Items.Count > 0 && itemMainWithGap > contentMain)
+            {
+                currentLine = new FlexLine();
+                lines.Add(currentLine);
+            }
+
+            if (currentLine.Items.Count > 0)
+            {
+                currentLine.MainUsed += gap;
+            }
+
+            currentLine.Items.Add(item);
+            currentLine.MainUsed += item.TotalMain;
+            currentLine.CrossExtent = Math.Max(currentLine.CrossExtent, item.TotalCross);
+        }
+
+        if (container.AlignItems == UiAlignItems.Stretch)
+        {
+            int lineCount = lines.Count(static line => line.Items.Count > 0);
+            if (lineCount > 0)
+            {
+                float availableCross = Math.Max(0.0f, contentCross - gap * (lineCount - 1));
+                float defaultCrossExtent = container.Wrap
+                    ? availableCross / lineCount
+                    : contentCross;
+
+                foreach (FlexLine line in lines)
+                {
+                    if (line.Items.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    line.CrossExtent = Math.Max(line.CrossExtent, defaultCrossExtent);
+                }
+            }
+        }
+
+        float crossCursor = 0.0f;
+        for (int lineIndex = 0; lineIndex < lines.Count; lineIndex++)
+        {
+            FlexLine line = lines[lineIndex];
+            if (line.Items.Count == 0)
+            {
+                continue;
+            }
+
+            ResolveMainAxisSpacing(container.JustifyContent, line, contentMain, gap, out float mainCursor, out float spacing);
+            float lineCrossExtent = line.CrossExtent;
+            if (container.AlignItems == UiAlignItems.Stretch && lineCrossExtent <= 0.0f)
+            {
+                lineCrossExtent = contentCross;
+            }
+
+            for (int itemIndex = 0; itemIndex < line.Items.Count; itemIndex++)
+            {
+                FlexItem item = line.Items[itemIndex];
+                float crossSize = item.CrossSize;
+
+                if (container.AlignItems == UiAlignItems.Stretch && item.IsCrossAuto)
+                {
+                    crossSize = Math.Max(0.0f, lineCrossExtent - item.CrossMarginStart - item.CrossMarginEnd);
+                }
+
+                float crossOffset = ResolveCrossOffset(container.AlignItems, lineCrossExtent, item, crossSize);
+                float localMain = mainCursor + item.MainMarginStart;
+                float localCross = crossCursor + crossOffset;
+
+                float localX = isRow ? localMain + item.Child.X : localCross + item.Child.X;
+                float localY = isRow ? localCross + item.Child.Y : localMain + item.Child.Y;
+                float width = isRow ? item.MainSize : crossSize;
+                float height = isRow ? crossSize : item.MainSize;
+                ApplyElementLayout(item.Child, contentX, contentY, localX, localY, width, height);
+
+                mainCursor += item.TotalMain + spacing;
+            }
+
+            crossCursor += lineCrossExtent;
+            if (lineIndex < lines.Count - 1)
+            {
+                crossCursor += gap;
+            }
+        }
+    }
+
+    private static FlexItem CreateFlexItem(UiElement child, bool isRow)
+    {
+        float mainSize = ResolveFlexSize(
+            configured: isRow ? child.Width : child.Height,
+            min: isRow ? child.MinWidth : child.MinHeight,
+            max: isRow ? child.MaxWidth : child.MaxHeight);
+        float crossSize = ResolveFlexSize(
+            configured: isRow ? child.Height : child.Width,
+            min: isRow ? child.MinHeight : child.MinWidth,
+            max: isRow ? child.MaxHeight : child.MaxWidth);
+
+        float mainMarginStart = isRow ? child.Margin.Left : child.Margin.Top;
+        float mainMarginEnd = isRow ? child.Margin.Right : child.Margin.Bottom;
+        float crossMarginStart = isRow ? child.Margin.Top : child.Margin.Left;
+        float crossMarginEnd = isRow ? child.Margin.Bottom : child.Margin.Right;
+        bool isCrossAuto = isRow ? child.Height <= 0f : child.Width <= 0f;
+
+        return new FlexItem(
+            child,
+            mainSize,
+            crossSize,
+            mainMarginStart,
+            mainMarginEnd,
+            crossMarginStart,
+            crossMarginEnd,
+            isCrossAuto);
+    }
+
+    private static float ResolveFlexSize(float configured, float min, float? max)
+    {
+        float candidate = configured <= 0f ? 0f : configured;
+        return ClampDimension(candidate, min, max);
+    }
+
+    private static void ResolveMainAxisSpacing(
+        UiJustifyContent justify,
+        FlexLine line,
+        float contentMain,
+        float baseGap,
+        out float mainCursor,
+        out float spacing)
+    {
+        float free = Math.Max(0.0f, contentMain - line.MainUsed);
+        spacing = baseGap;
+        mainCursor = 0.0f;
+
+        switch (justify)
+        {
+            case UiJustifyContent.Center:
+                mainCursor = free * 0.5f;
+                break;
+            case UiJustifyContent.End:
+                mainCursor = free;
+                break;
+            case UiJustifyContent.SpaceBetween:
+                if (line.Items.Count > 1)
+                {
+                    spacing = baseGap + free / (line.Items.Count - 1);
+                }
+                break;
+            case UiJustifyContent.SpaceAround:
+                if (line.Items.Count > 0)
+                {
+                    float around = free / line.Items.Count;
+                    mainCursor = around * 0.5f;
+                    spacing = baseGap + around;
+                }
+
+                break;
+        }
+    }
+
+    private static float ResolveCrossOffset(UiAlignItems align, float lineCrossExtent, FlexItem item, float crossSize)
+    {
+        float usedCross = item.CrossMarginStart + crossSize + item.CrossMarginEnd;
+        float free = Math.Max(0.0f, lineCrossExtent - usedCross);
+
+        return align switch
+        {
+            UiAlignItems.Center => item.CrossMarginStart + free * 0.5f,
+            UiAlignItems.End => item.CrossMarginStart + free,
+            _ => item.CrossMarginStart
+        };
+    }
+
     private static float ResolveAutoDimension(float configured, float min, float? max, float available)
     {
         if (configured > 0.0f)
@@ -135,5 +336,29 @@ internal static class UiLayoutEngine
         }
 
         return clamped;
+    }
+
+    private sealed class FlexLine
+    {
+        public List<FlexItem> Items { get; } = [];
+
+        public float MainUsed { get; set; }
+
+        public float CrossExtent { get; set; }
+    }
+
+    private readonly record struct FlexItem(
+        UiElement Child,
+        float MainSize,
+        float CrossSize,
+        float MainMarginStart,
+        float MainMarginEnd,
+        float CrossMarginStart,
+        float CrossMarginEnd,
+        bool IsCrossAuto)
+    {
+        public float TotalMain => MainMarginStart + MainSize + MainMarginEnd;
+
+        public float TotalCross => CrossMarginStart + CrossSize + CrossMarginEnd;
     }
 }
