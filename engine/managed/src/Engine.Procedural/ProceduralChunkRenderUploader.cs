@@ -77,25 +77,33 @@ public sealed record ProceduralChunkUploadResult(
     }
 }
 
+public readonly record struct ProceduralChunkUploadOptions(
+    bool UseCpuMeshPath = false,
+    bool UseCpuTexturePath = false);
+
 public static class ProceduralChunkRenderUploader
 {
     public static ProceduralChunkUploadResult Upload(
         IRenderingFacade rendering,
-        ProceduralChunkContent content)
+        ProceduralChunkContent content,
+        in ProceduralChunkUploadOptions options = default)
     {
         ArgumentNullException.ThrowIfNull(rendering);
         ArgumentNullException.ThrowIfNull(content);
         content = content.Validate();
 
-        MeshHandle meshHandle = rendering.CreateMeshFromBlob(EncodeMeshBlob(content.Mesh));
+        MeshHandle meshHandle = options.UseCpuMeshPath
+            ? CreateMeshFromCpu(rendering, content.Mesh)
+            : rendering.CreateMeshFromBlob(EncodeMeshBlob(content.Mesh));
 
         var textureHandles = new Dictionary<string, TextureHandle>(
             content.MaterialBundle.Textures.Count,
             StringComparer.Ordinal);
         foreach (ProceduralTextureExport textureExport in content.MaterialBundle.Textures)
         {
-            byte[] textureBlob = EncodeTextureBlob(textureExport);
-            TextureHandle textureHandle = rendering.CreateTextureFromBlob(textureBlob);
+            TextureHandle textureHandle = options.UseCpuTexturePath
+                ? CreateTextureFromCpu(rendering, textureExport)
+                : rendering.CreateTextureFromBlob(EncodeTextureBlob(textureExport));
             textureHandles.Add(textureExport.Key, textureHandle);
         }
 
@@ -115,6 +123,45 @@ public static class ProceduralChunkRenderUploader
             materialHandle,
             albedoTexture,
             textureHandles).Validate();
+    }
+
+    private static MeshHandle CreateMeshFromCpu(IRenderingFacade rendering, ProcMeshData mesh)
+    {
+        mesh = mesh.Validate();
+        var positions = new float[checked(mesh.Vertices.Count * 3)];
+        for (int i = 0; i < mesh.Vertices.Count; i++)
+        {
+            int offset = checked(i * 3);
+            positions[offset] = mesh.Vertices[i].Position.X;
+            positions[offset + 1] = mesh.Vertices[i].Position.Y;
+            positions[offset + 2] = mesh.Vertices[i].Position.Z;
+        }
+
+        var indices = new uint[mesh.Indices.Count];
+        for (int i = 0; i < mesh.Indices.Count; i++)
+        {
+            int index = mesh.Indices[i];
+            if (index < 0)
+            {
+                throw new InvalidDataException($"Mesh index '{index}' cannot be negative for CPU upload.");
+            }
+
+            indices[i] = checked((uint)index);
+        }
+
+        return rendering.CreateMeshFromCpu(positions, indices);
+    }
+
+    private static TextureHandle CreateTextureFromCpu(
+        IRenderingFacade rendering,
+        ProceduralTextureExport textureExport)
+    {
+        textureExport = textureExport.Validate();
+        return rendering.CreateTextureFromCpu(
+            checked((uint)textureExport.Width),
+            checked((uint)textureExport.Height),
+            textureExport.Rgba8,
+            strideBytes: checked((uint)(textureExport.Width * 4)));
     }
 
     private static byte[] EncodeMeshBlob(ProcMeshData mesh)

@@ -48,6 +48,26 @@ public sealed class ProceduralChunkRenderUploaderTests
     }
 
     [Fact]
+    public void Upload_WithCpuOptions_ShouldUseCpuCreationApis()
+    {
+        ProceduralChunkContent content = CreateChunkContent();
+        var rendering = new RecordingRenderingFacade();
+
+        ProceduralChunkUploadResult uploaded = ProceduralChunkRenderUploader.Upload(
+            rendering,
+            content,
+            new ProceduralChunkUploadOptions(UseCpuMeshPath: true, UseCpuTexturePath: true));
+
+        Assert.True(uploaded.Mesh.IsValid);
+        Assert.True(uploaded.Material.IsValid);
+        Assert.Empty(rendering.MeshBlobs);
+        Assert.Empty(rendering.TextureBlobs);
+        Assert.Single(rendering.MeshCpuUploads);
+        Assert.Equal(content.MaterialBundle.Textures.Count, rendering.TextureCpuUploads.Count);
+        Assert.Single(rendering.MaterialBlobs);
+    }
+
+    [Fact]
     public void UploadResult_Destroy_ShouldDestroyAllResourceHandles()
     {
         ProceduralChunkContent content = CreateChunkContent();
@@ -96,6 +116,10 @@ public sealed class ProceduralChunkRenderUploaderTests
 
         public List<byte[]> MaterialBlobs { get; } = [];
 
+        public List<(float[] Positions, uint[] Indices)> MeshCpuUploads { get; } = [];
+
+        public List<(uint Width, uint Height, byte[] Rgba8, uint StrideBytes)> TextureCpuUploads { get; } = [];
+
         public HashSet<ulong> DestroyedHandles { get; } = [];
 
         public FrameArena BeginFrame(int requestedBytes, int alignment)
@@ -127,8 +151,7 @@ public sealed class ProceduralChunkRenderUploaderTests
                 throw new ArgumentException("Mesh CPU payload must be non-empty.");
             }
 
-            var blob = new byte[checked((positions.Length * sizeof(float)) + (indices.Length * sizeof(uint)))];
-            MeshBlobs.Add(blob);
+            MeshCpuUploads.Add((positions.ToArray(), indices.ToArray()));
             return new MeshHandle(_nextHandle++);
         }
 
@@ -149,7 +172,7 @@ public sealed class ProceduralChunkRenderUploaderTests
                 throw new ArgumentException("Texture CPU payload must be valid.");
             }
 
-            TextureBlobs.Add(rgba8.ToArray());
+            TextureCpuUploads.Add((width, height, rgba8.ToArray(), strideBytes));
             return new TextureHandle(_nextHandle++);
         }
 
