@@ -64,7 +64,7 @@ public static partial class TextureBuilder
                 {
                     ProceduralTextureKind.Perlin => FractalNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
                     ProceduralTextureKind.Simplex => FractalSimplexNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Worley => Worley(u, v, recipe.Seed, recipe.Frequency),
+                    ProceduralTextureKind.Worley => FractalWorleyNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
                     ProceduralTextureKind.Grid => Grid(u, v),
                     ProceduralTextureKind.Brick => Brick(u, v),
                     ProceduralTextureKind.Stripes => Stripes(u),
@@ -172,6 +172,26 @@ public static partial class TextureBuilder
         {
             uint octaveSeed = seed ^ (uint)octave * 0x9E3779B9u;
             float sample = SimplexNoise2D(u * frequency, v * frequency, octaveSeed);
+            sum += sample * amplitude;
+            amplitudeSum += amplitude;
+            amplitude *= 0.5f;
+            frequency *= 2f;
+        }
+
+        return Math.Clamp(sum / MathF.Max(amplitudeSum, float.Epsilon), 0f, 1f);
+    }
+
+    private static float FractalWorleyNoise(float u, float v, uint seed, int octaves, float baseFrequency)
+    {
+        float amplitude = 1f;
+        float frequency = baseFrequency;
+        float sum = 0f;
+        float amplitudeSum = 0f;
+
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            uint octaveSeed = seed ^ (uint)octave * 0xA24BAED5u;
+            float sample = Worley(u, v, octaveSeed, frequency);
             sum += sample * amplitude;
             amplitudeSum += amplitude;
             amplitude *= 0.5f;
