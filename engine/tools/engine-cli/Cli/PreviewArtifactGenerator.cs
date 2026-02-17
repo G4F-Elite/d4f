@@ -66,70 +66,7 @@ internal static class PreviewArtifactGenerator
     private static GoldenImageBuffer BuildAssetPreviewImage(PakEntry entry)
     {
         uint seed = ComputeSeed($"{entry.Kind}|{entry.Path}");
-        string kind = entry.Kind.Trim().ToLowerInvariant();
-        return kind switch
-        {
-            "mesh" => BuildMeshPreview(seed),
-            "texture" => BuildTexturePreview(seed),
-            "material" => BuildMaterialPreview(seed),
-            _ => BuildGenericPreview(seed)
-        };
-    }
-
-    private static GoldenImageBuffer BuildMeshPreview(uint seed)
-    {
-        return BuildImage(PreviewWidth, PreviewHeight, (x, y) =>
-        {
-            float nx = (x - (PreviewWidth / 2f)) / (PreviewWidth / 2f);
-            float ny = (y - (PreviewHeight / 2f)) / (PreviewHeight / 2f);
-            float radial = MathF.Sqrt(nx * nx + ny * ny);
-            float shape = MathF.Max(0f, 1f - radial);
-            float light = MathF.Max(0.2f, 0.8f - ny * 0.5f);
-            byte r = ToByte((int)(40 + shape * light * 160 + (seed & 0x1Fu)));
-            byte g = ToByte((int)(50 + shape * light * 180 + ((seed >> 4) & 0x1Fu)));
-            byte b = ToByte((int)(70 + shape * light * 200 + ((seed >> 8) & 0x1Fu)));
-            return (r, g, b, 255);
-        });
-    }
-
-    private static GoldenImageBuffer BuildTexturePreview(uint seed)
-    {
-        int tile = 8 + (int)(seed % 8u);
-        return BuildImage(PreviewWidth, PreviewHeight, (x, y) =>
-        {
-            bool checker = ((x / tile) + (y / tile)) % 2 == 0;
-            byte baseValue = checker ? (byte)220 : (byte)90;
-            byte noise = (byte)((Hash(seed, (uint)x, (uint)y) >> 3) & 0x1F);
-            byte r = ToByte(baseValue + noise);
-            byte g = ToByte(baseValue - noise / 2);
-            byte b = ToByte(60 + (noise * 3));
-            return (r, g, b, 255);
-        });
-    }
-
-    private static GoldenImageBuffer BuildMaterialPreview(uint seed)
-    {
-        int stripe = 6 + (int)((seed >> 3) % 10u);
-        return BuildImage(PreviewWidth, PreviewHeight, (x, y) =>
-        {
-            bool alt = (x / stripe) % 2 == 0;
-            int roughBand = (y * 255) / (PreviewHeight - 1);
-            byte r = ToByte((alt ? 180 : 80) + roughBand / 8);
-            byte g = ToByte((alt ? 120 : 60) + roughBand / 6);
-            byte b = ToByte((alt ? 70 : 30) + roughBand / 5);
-            return (r, g, b, 255);
-        });
-    }
-
-    private static GoldenImageBuffer BuildGenericPreview(uint seed)
-    {
-        return BuildImage(PreviewWidth, PreviewHeight, (x, y) =>
-        {
-            byte r = ToByte((x * 255) / (PreviewWidth - 1) + (int)(seed & 0x0F));
-            byte g = ToByte((y * 255) / (PreviewHeight - 1) + (int)((seed >> 4) & 0x0F));
-            byte b = ToByte(((x + y) * 255) / (PreviewWidth + PreviewHeight - 2));
-            return (r, g, b, 255);
-        });
+        return ProceduralPreviewRasterizer.BuildPreview(entry.Kind, entry.Path, seed, PreviewWidth, PreviewHeight);
     }
 
     private static float[] BuildWaveformSamples(string sourceAssetPath)
@@ -180,28 +117,6 @@ internal static class PreviewArtifactGenerator
         }
 
         return new GoldenImageBuffer(WaveformWidth, WaveformHeight, rgba);
-    }
-
-    private static GoldenImageBuffer BuildImage(
-        int width,
-        int height,
-        Func<int, int, (byte R, byte G, byte B, byte A)> pixel)
-    {
-        var rgba = new byte[width * height * 4];
-        for (int y = 0; y < height; y++)
-        {
-            for (int x = 0; x < width; x++)
-            {
-                (byte r, byte g, byte b, byte a) = pixel(x, y);
-                int index = ((y * width) + x) * 4;
-                rgba[index] = r;
-                rgba[index + 1] = g;
-                rgba[index + 2] = b;
-                rgba[index + 3] = a;
-            }
-        }
-
-        return new GoldenImageBuffer(width, height, rgba);
     }
 
     private static void WriteWaveformMetadata(
@@ -313,16 +228,6 @@ internal static class PreviewArtifactGenerator
         value *= 1274126177u;
         value ^= value >> 16;
         return value;
-    }
-
-    private static byte ToByte(int value)
-    {
-        if (value < 0)
-        {
-            return 0;
-        }
-
-        return value > 255 ? (byte)255 : (byte)value;
     }
 
     private static void FillSolid(
