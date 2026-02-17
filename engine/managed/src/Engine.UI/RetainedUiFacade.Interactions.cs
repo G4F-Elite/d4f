@@ -7,6 +7,7 @@ public sealed partial class RetainedUiFacade
 {
     private void DispatchQueuedInteractions()
     {
+        InvalidateHoveredElementIfDetached();
         while (_queuedInteractions.Count > 0)
         {
             UiQueuedInteraction interaction = _queuedInteractions.Dequeue();
@@ -17,6 +18,9 @@ public sealed partial class RetainedUiFacade
                     break;
                 case UiInteractionKind.PointerClick:
                     DispatchPointerClick(interaction.PointerX, interaction.PointerY);
+                    break;
+                case UiInteractionKind.PointerMove:
+                    DispatchPointerMove(interaction.PointerX, interaction.PointerY);
                     break;
                 case UiInteractionKind.PointerScroll:
                     DispatchPointerScroll(interaction.PointerX, interaction.PointerY, interaction.WheelDelta);
@@ -363,9 +367,10 @@ public sealed partial class RetainedUiFacade
     {
         ElementClick = 0,
         PointerClick = 1,
-        PointerScroll = 2,
-        TextInput = 3,
-        Backspace = 4
+        PointerMove = 2,
+        PointerScroll = 3,
+        TextInput = 4,
+        Backspace = 5
     }
 
     private readonly record struct UiQueuedInteraction(
@@ -381,6 +386,9 @@ public sealed partial class RetainedUiFacade
 
         public static UiQueuedInteraction CreatePointerClick(float x, float y) =>
             new(UiInteractionKind.PointerClick, string.Empty, x, y, 0.0f, string.Empty);
+
+        public static UiQueuedInteraction CreatePointerMove(float x, float y) =>
+            new(UiInteractionKind.PointerMove, string.Empty, x, y, 0.0f, string.Empty);
 
         public static UiQueuedInteraction CreatePointerScroll(float x, float y, float wheelDelta) =>
             new(UiInteractionKind.PointerScroll, string.Empty, x, y, wheelDelta, string.Empty);

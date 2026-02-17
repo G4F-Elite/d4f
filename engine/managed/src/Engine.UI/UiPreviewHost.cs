@@ -43,6 +43,8 @@ public sealed class UiPreviewHost
 
     public void QueuePointerClick(float x, float y) => _facade.QueuePointerClick(x, y);
 
+    public void QueuePointerMove(float x, float y) => _facade.QueuePointerMove(x, y);
+
     public void QueueScroll(float x, float y, float wheelDelta) => _facade.QueueScroll(x, y, wheelDelta);
 
     public void QueueTextInput(string text) => _facade.QueueTextInput(text);

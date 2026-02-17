@@ -63,6 +63,7 @@ public sealed class UiPreviewHostTests
         document.AddRoot(root);
 
         var host = new UiPreviewHost(document);
+        host.QueuePointerMove(15, 15);
         host.QueuePointerClick(15, 15);
         host.QueuePointerClick(15, 45);
         host.QueueTextInput("abc");
@@ -72,6 +73,7 @@ public sealed class UiPreviewHostTests
         Assert.True(toggle.IsOn);
         Assert.Equal("ab", input.Text);
         Assert.True(input.IsFocused);
+        Assert.True(toggle.IsHovered);
     }
 
     [Fact]

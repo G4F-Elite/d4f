@@ -216,6 +216,14 @@ public abstract class UiElement
 
     public UiStyle? StyleOverride { get; set; }
 
+    public bool IsHovered { get; private set; }
+
+    public Action? OnPointerEnter { get; set; }
+
+    public Action? OnPointerLeave { get; set; }
+
+    public Action<float, float>? OnPointerMove { get; set; }
+
     public RectF LayoutBounds { get; private set; } = RectF.Empty;
 
     public UiElement? Parent { get; private set; }
@@ -261,5 +269,27 @@ public abstract class UiElement
     internal void SetLayoutBounds(RectF bounds)
     {
         LayoutBounds = bounds;
+    }
+
+    internal void SetHoverState(bool isHovered)
+    {
+        if (IsHovered == isHovered)
+        {
+            return;
+        }
+
+        IsHovered = isHovered;
+        if (isHovered)
+        {
+            OnPointerEnter?.Invoke();
+            return;
+        }
+
+        OnPointerLeave?.Invoke();
+    }
+
+    internal void InvokePointerMove(float pointerX, float pointerY)
+    {
+        OnPointerMove?.Invoke(pointerX, pointerY);
     }
 }

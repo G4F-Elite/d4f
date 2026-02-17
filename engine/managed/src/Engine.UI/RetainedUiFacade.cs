@@ -13,6 +13,7 @@ public sealed partial class RetainedUiFacade : IUiFacade
     private readonly UiDocument _document;
     private EntityId _renderBatchEntity = EntityId.Invalid;
     private UiInputField? _focusedInput;
+    private UiElement? _hoveredElement;
 
     public RetainedUiFacade()
         : this(new UiDocument())
@@ -81,6 +82,21 @@ public sealed partial class RetainedUiFacade : IUiFacade
         }
 
         _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerScroll(x, y, wheelDelta));
+    }
+
+    public void QueuePointerMove(float x, float y)
+    {
+        if (!float.IsFinite(x))
+        {
+            throw new ArgumentOutOfRangeException(nameof(x), "Pointer X coordinate must be finite.");
+        }
+
+        if (!float.IsFinite(y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(y), "Pointer Y coordinate must be finite.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerMove(x, y));
     }
 
     public void QueueTextInput(string text)
