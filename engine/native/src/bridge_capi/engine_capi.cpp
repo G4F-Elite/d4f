@@ -34,6 +34,9 @@ engine_native_status_t engine_create(
   engine->physics.owner = engine;
   engine->audio.state = &engine->state.audio;
   engine->audio.owner = engine;
+  engine->net.state = &engine->state.net;
+  engine->net.owner = engine;
+  engine->net.owned_state = nullptr;
 
   *out_engine = engine;
   return ENGINE_NATIVE_STATUS_OK;
@@ -85,6 +88,16 @@ engine_native_status_t engine_get_audio(engine_native_engine_t* engine,
   }
 
   *out_audio = &engine->audio;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t engine_get_net(engine_native_engine_t* engine,
+                                      engine_native_net_t** out_net) {
+  if (engine == nullptr || out_net == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_net = &engine->net;
   return ENGINE_NATIVE_STATUS_OK;
 }
 

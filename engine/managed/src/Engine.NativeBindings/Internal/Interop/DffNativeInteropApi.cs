@@ -36,6 +36,9 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio)
         => NativeMethods.EngineGetAudio(engine, out audio);
 
+    public EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net)
+        => NativeMethods.EngineGetNet(engine, out net);
+
     public EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,
@@ -128,6 +131,18 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         in EngineNativeEmitterParams emitterParams)
         => NativeMethods.AudioSetEmitterParams(audio, emitterId, in emitterParams);
 
+    public EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net)
+        => NativeMethods.NetCreate(in desc, out net);
+
+    public EngineNativeStatus NetDestroy(IntPtr net)
+        => NativeMethods.NetDestroy(net);
+
+    public EngineNativeStatus NetPump(IntPtr net, out EngineNativeNetEvents events)
+        => NativeMethods.NetPump(net, out events);
+
+    public EngineNativeStatus NetSend(IntPtr net, in EngineNativeNetSendDesc sendDesc)
+        => NativeMethods.NetSend(net, in sendDesc);
+
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
         => NativeMethods.PhysicsStep(physics, deltaSeconds);
 
@@ -201,6 +216,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus EngineGetAudio(
             IntPtr engine,
             out IntPtr outAudio);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_net")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus EngineGetNet(
+            IntPtr engine,
+            out IntPtr outNet);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_begin_frame")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -317,6 +338,28 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             IntPtr audio,
             ulong emitterId,
             in EngineNativeEmitterParams emitterParams);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_create")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus NetCreate(
+            in EngineNativeNetDesc desc,
+            out IntPtr outNet);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_destroy")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus NetDestroy(IntPtr net);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_pump")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus NetPump(
+            IntPtr net,
+            out EngineNativeNetEvents outEvents);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_send")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus NetSend(
+            IntPtr net,
+            in EngineNativeNetSendDesc sendDesc);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

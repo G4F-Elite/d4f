@@ -65,6 +65,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 "engine_get_renderer",
                 "engine_get_physics",
                 "engine_get_audio",
+                "engine_get_net",
                 "engine_pump_events",
                 "renderer_begin_frame",
                 "renderer_submit",
@@ -115,6 +116,21 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         Assert.Contains("renderer_get_last_frame_stats", exception.Message, StringComparison.Ordinal);
         Assert.Contains("InternalError", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NativeRuntimeThrowsWhenNetHandleAcquisitionFails()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            EngineGetNetStatus = EngineNativeStatus.InternalError
+        };
+
+        NativeCallException exception =
+            Assert.Throws<NativeCallException>(() => NativeFacadeFactory.CreateNativeFacadeSet(backend));
+
+        Assert.Contains("engine_get_net", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, backend.CountCall("engine_destroy"));
     }
 
     [Fact]

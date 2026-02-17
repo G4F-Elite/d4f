@@ -20,11 +20,18 @@ struct engine_native_audio {
   engine_native_engine* owner = nullptr;
 };
 
+struct engine_native_net {
+  dff::native::NetState* state = nullptr;
+  engine_native_engine* owner = nullptr;
+  dff::native::NetState* owned_state = nullptr;
+};
+
 struct engine_native_engine {
   dff::native::EngineState state;
   engine_native_renderer renderer;
   engine_native_physics physics;
   engine_native_audio audio;
+  engine_native_net net;
 };
 
 #endif

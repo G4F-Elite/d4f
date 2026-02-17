@@ -11,6 +11,7 @@
 
 #include "content/content_runtime.h"
 #include "engine_native.h"
+#include "core/net_state.h"
 #include "core/resource_table.h"
 #include "render/material_system.h"
 #include "platform/platform_state.h"
@@ -220,6 +221,7 @@ struct EngineState {
 
   platform::PlatformState platform;
   content::ContentRuntime content;
+  NetState net;
   rhi::RhiDevice rhi_device;
   RendererState renderer;
   PhysicsState physics;

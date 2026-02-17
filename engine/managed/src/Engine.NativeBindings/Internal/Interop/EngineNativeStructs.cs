@@ -182,6 +182,55 @@ internal struct EngineNativeEmitterParams
     public float ReverbSend;
 }
 
+internal enum EngineNativeNetEventKind : byte
+{
+    Connected = 1,
+    Disconnected = 2,
+    Message = 3
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeNetDesc
+{
+    public uint LocalPeerId;
+    public uint MaxEventsPerPump;
+    public uint MaxPayloadBytes;
+    public byte LoopbackEnabled;
+    public byte Reserved0;
+    public byte Reserved1;
+    public byte Reserved2;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeNetSendDesc
+{
+    public uint PeerId;
+    public byte Channel;
+    public byte Reserved0;
+    public byte Reserved1;
+    public byte Reserved2;
+    public IntPtr Payload;
+    public uint PayloadSize;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeNetEvent
+{
+    public byte Kind;
+    public byte Channel;
+    public ushort Reserved0;
+    public uint PeerId;
+    public IntPtr Payload;
+    public uint PayloadSize;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeNetEvents
+{
+    public IntPtr Events;
+    public uint EventCount;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeBodyWrite
 {

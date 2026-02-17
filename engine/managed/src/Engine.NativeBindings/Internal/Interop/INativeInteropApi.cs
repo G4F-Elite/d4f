@@ -21,6 +21,8 @@ internal interface INativeInteropApi
 
     EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio);
 
+    EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net);
+
     EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,
@@ -95,6 +97,14 @@ internal interface INativeInteropApi
         IntPtr audio,
         ulong emitterId,
         in EngineNativeEmitterParams emitterParams);
+
+    EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net);
+
+    EngineNativeStatus NetDestroy(IntPtr net);
+
+    EngineNativeStatus NetPump(IntPtr net, out EngineNativeNetEvents events);
+
+    EngineNativeStatus NetSend(IntPtr net, in EngineNativeNetSendDesc sendDesc);
 
     EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds);
 

@@ -11,6 +11,7 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     private readonly IntPtr _rendererHandle = new(202);
     private readonly IntPtr _physicsHandle = new(303);
     private readonly IntPtr _audioHandle = new(404);
+    private readonly IntPtr _netHandle = new(505);
 
     public List<string> Calls { get; } = [];
 
@@ -53,6 +54,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus EngineGetPhysicsStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus EngineGetAudioStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus EngineGetNetStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus RendererBeginFrameStatus { get; set; } = EngineNativeStatus.Ok;
 
@@ -97,6 +100,14 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus AudioSetListenerStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus AudioSetEmitterParamsStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus NetCreateStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus NetDestroyStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus NetPumpStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus NetSendStatus { get; set; } = EngineNativeStatus.Ok;
 
     public ulong CaptureRequestIdToReturn { get; set; } = 1u;
 
@@ -207,6 +218,13 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         Calls.Add("engine_get_audio");
         audio = EngineGetAudioStatus == EngineNativeStatus.Ok ? _audioHandle : IntPtr.Zero;
         return EngineGetAudioStatus;
+    }
+
+    public EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net)
+    {
+        Calls.Add("engine_get_net");
+        net = EngineGetNetStatus == EngineNativeStatus.Ok ? _netHandle : IntPtr.Zero;
+        return EngineGetNetStatus;
     }
 
     public EngineNativeStatus RendererBeginFrame(
@@ -424,6 +442,32 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         LastAudioSetEmitterId = emitterId;
         LastAudioEmitterParams = emitterParams;
         return AudioSetEmitterParamsStatus;
+    }
+
+    public EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net)
+    {
+        Calls.Add("net_create");
+        net = NetCreateStatus == EngineNativeStatus.Ok ? _netHandle : IntPtr.Zero;
+        return NetCreateStatus;
+    }
+
+    public EngineNativeStatus NetDestroy(IntPtr net)
+    {
+        Calls.Add("net_destroy");
+        return NetDestroyStatus;
+    }
+
+    public EngineNativeStatus NetPump(IntPtr net, out EngineNativeNetEvents events)
+    {
+        Calls.Add("net_pump");
+        events = default;
+        return NetPumpStatus;
+    }
+
+    public EngineNativeStatus NetSend(IntPtr net, in EngineNativeNetSendDesc sendDesc)
+    {
+        Calls.Add("net_send");
+        return NetSendStatus;
     }
 
     public EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount)

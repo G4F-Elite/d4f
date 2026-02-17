@@ -18,12 +18,13 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 9u
+#define ENGINE_NATIVE_API_VERSION 10u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
 typedef struct engine_native_physics engine_native_physics_t;
 typedef struct engine_native_audio engine_native_audio_t;
+typedef struct engine_native_net engine_native_net_t;
 
 typedef uint64_t engine_native_resource_handle_t;
 
@@ -171,6 +172,46 @@ typedef struct engine_native_emitter_params {
   float reverb_send;
 } engine_native_emitter_params_t;
 
+typedef enum engine_native_net_event_kind {
+  ENGINE_NATIVE_NET_EVENT_KIND_CONNECTED = 1,
+  ENGINE_NATIVE_NET_EVENT_KIND_DISCONNECTED = 2,
+  ENGINE_NATIVE_NET_EVENT_KIND_MESSAGE = 3
+} engine_native_net_event_kind_t;
+
+typedef struct engine_native_net_desc {
+  uint32_t local_peer_id;
+  uint32_t max_events_per_pump;
+  uint32_t max_payload_bytes;
+  uint8_t loopback_enabled;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
+} engine_native_net_desc_t;
+
+typedef struct engine_native_net_send_desc {
+  uint32_t peer_id;
+  uint8_t channel;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
+  const uint8_t* payload;
+  uint32_t payload_size;
+} engine_native_net_send_desc_t;
+
+typedef struct engine_native_net_event {
+  uint8_t kind;
+  uint8_t channel;
+  uint16_t reserved0;
+  uint32_t peer_id;
+  const uint8_t* payload;
+  uint32_t payload_size;
+} engine_native_net_event_t;
+
+typedef struct engine_native_net_events {
+  const engine_native_net_event_t* events;
+  uint32_t event_count;
+} engine_native_net_events_t;
+
 typedef struct engine_native_body_write {
   engine_native_resource_handle_t body;
   float position[3];
@@ -285,6 +326,10 @@ ENGINE_NATIVE_API engine_native_status_t engine_get_audio(
     engine_native_engine_t* engine,
     engine_native_audio_t** out_audio);
 
+ENGINE_NATIVE_API engine_native_status_t engine_get_net(
+    engine_native_engine_t* engine,
+    engine_native_net_t** out_net);
+
 ENGINE_NATIVE_API engine_native_status_t content_mount_pak(
     engine_native_engine_t* engine,
     const char* pak_path);
@@ -382,6 +427,21 @@ ENGINE_NATIVE_API engine_native_status_t audio_set_emitter_params(
     engine_native_audio_t* audio,
     uint64_t emitter_id,
     const engine_native_emitter_params_t* params);
+
+ENGINE_NATIVE_API engine_native_status_t net_create(
+    const engine_native_net_desc_t* desc,
+    engine_native_net_t** out_net);
+
+ENGINE_NATIVE_API engine_native_status_t net_destroy(
+    engine_native_net_t* net);
+
+ENGINE_NATIVE_API engine_native_status_t net_pump(
+    engine_native_net_t* net,
+    engine_native_net_events_t* out_events);
+
+ENGINE_NATIVE_API engine_native_status_t net_send(
+    engine_native_net_t* net,
+    const engine_native_net_send_desc_t* send_desc);
 
 ENGINE_NATIVE_API engine_native_status_t physics_step(
     engine_native_physics_t* physics,
