@@ -2,7 +2,7 @@ using System.Reflection;
 
 namespace Engine.Net;
 
-public sealed class InMemoryNetSession
+public sealed partial class InMemoryNetSession
 {
     private readonly NetworkConfig _config;
     private readonly DeterministicNetClock _clock;
@@ -14,6 +14,7 @@ public sealed class InMemoryNetSession
     private readonly Queue<NetRpcEnvelope> _serverInbox = new();
     private readonly NetPeerStats _serverStats = new();
     private uint _nextClientId = 1u;
+    private ulong _packetDecisionCounter;
 
     public InMemoryNetSession(NetworkConfig config)
     {
@@ -134,18 +135,25 @@ public sealed class InMemoryNetSession
                 throw new KeyNotFoundException($"Entity '{message.EntityId}' is not available on server.");
             }
 
-            if (entity.OwnerClientId is uint ownerClientId && ownerClientId != sourceClientId)
-            {
-                client.Stats.RecordDropped();
-                throw new InvalidOperationException(
-                    $"Client '{sourceClientId}' cannot send RPC for entity '{message.EntityId}' owned by '{ownerClientId}'.");
-            }
+        if (entity.OwnerClientId is uint ownerClientId && ownerClientId != sourceClientId)
+        {
+            client.Stats.RecordDropped();
+            throw new InvalidOperationException(
+                $"Client '{sourceClientId}' cannot send RPC for entity '{message.EntityId}' owned by '{ownerClientId}'.");
         }
-
-        _pendingClientRpcs.Enqueue(new PendingClientRpc(sourceClientId, message));
-        client.QueuedRpcsThisTick++;
-        client.Stats.RecordSent(message.Payload.Length);
     }
+
+    client.Stats.RecordSent(message.Payload.Length);
+    if (ShouldDropPacket(TransportPacketKind.ClientRpc, sourceClientId))
+    {
+        client.Stats.RecordDropped();
+        _serverStats.RecordDropped();
+        return;
+    }
+
+    _pendingClientRpcs.Enqueue(new PendingClientRpc(sourceClientId, message));
+    client.QueuedRpcsThisTick++;
+}
 
     public void QueueServerRpc(NetRpcMessage message)
     {
@@ -173,13 +181,21 @@ public sealed class InMemoryNetSession
 
         NetSnapshot snapshot = new(tick, _entities.Values.ToArray());
         int snapshotSize = EstimateSnapshotSizeBytes(snapshot);
-        foreach (ClientState client in _clients.Values)
+        foreach ((uint clientId, ClientState client) in _clients)
         {
+            _serverStats.RecordSent(snapshotSize);
+            if (ShouldDropPacket(TransportPacketKind.Snapshot, clientId))
+            {
+                client.Stats.RecordDropped();
+                _serverStats.RecordDropped();
+                client.QueuedRpcsThisTick = 0;
+                continue;
+            }
+
             client.Interpolation.Push(snapshot);
             client.LatestSnapshot = snapshot;
             client.QueuedRpcsThisTick = 0;
             client.Stats.RecordReceived(snapshotSize);
-            _serverStats.RecordSent(snapshotSize);
         }
 
         while (_pendingServerRpcs.Count > 0)
@@ -196,6 +212,8 @@ public sealed class InMemoryNetSession
                 DeliverServerRpcToClient(clientId, message, tick);
             }
         }
+
+        ApplySimulatedRtt();
 
         return tick;
     }
@@ -295,9 +313,16 @@ public sealed class InMemoryNetSession
     private void DeliverServerRpcToClient(uint clientId, NetRpcMessage message, long tick)
     {
         ClientState client = GetClientState(clientId);
+        _serverStats.RecordSent(message.Payload.Length);
+        if (ShouldDropPacket(TransportPacketKind.ServerRpc, clientId))
+        {
+            client.Stats.RecordDropped();
+            _serverStats.RecordDropped();
+            return;
+        }
+
         client.Inbox.Enqueue(new NetRpcEnvelope(0u, tick, message));
         client.Stats.RecordReceived(message.Payload.Length);
-        _serverStats.RecordSent(message.Payload.Length);
     }
 
     private static IReadOnlyList<NetRpcEnvelope> DrainQueue(Queue<NetRpcEnvelope> queue)
