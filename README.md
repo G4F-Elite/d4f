@@ -188,4 +188,4 @@ This file contains:
 
 ## License
 
-License file is not added yet. Add a `LICENSE` before public release.
+BSD0
