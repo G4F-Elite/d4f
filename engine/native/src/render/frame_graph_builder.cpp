@@ -13,6 +13,9 @@ constexpr const char* kFxaaPassName = "fxaa";
 constexpr const char* kDebugDepthPassName = "debug_depth";
 constexpr const char* kDebugNormalsPassName = "debug_normals";
 constexpr const char* kDebugAlbedoPassName = "debug_albedo";
+constexpr const char* kDebugRoughnessPassName = "debug_roughness";
+constexpr const char* kDebugAmbientOcclusionPassName =
+    "debug_ambient_occlusion";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
 constexpr const char* kShadowMapResourceName = "shadow_map";
@@ -20,6 +23,8 @@ constexpr const char* kHdrColorResourceName = "hdr_color";
 constexpr const char* kDepthResourceName = "scene_depth";
 constexpr const char* kNormalsResourceName = "scene_normals";
 constexpr const char* kAlbedoResourceName = "scene_albedo";
+constexpr const char* kRoughnessResourceName = "scene_roughness";
+constexpr const char* kAmbientOcclusionResourceName = "scene_ao";
 constexpr const char* kBloomColorResourceName = "bloom_color";
 constexpr const char* kTonemappedColorResourceName = "tonemapped_ldr_color";
 constexpr const char* kLdrColorResourceName = "ldr_color";
@@ -55,7 +60,9 @@ bool IsSupportedDebugViewMode(engine_native_debug_view_mode_t mode) {
   return mode == ENGINE_NATIVE_DEBUG_VIEW_NONE ||
          mode == ENGINE_NATIVE_DEBUG_VIEW_DEPTH ||
          mode == ENGINE_NATIVE_DEBUG_VIEW_NORMALS ||
-         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO;
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION;
 }
 
 engine_native_status_t AddDebugViewPass(engine_native_debug_view_mode_t mode,
@@ -81,6 +88,15 @@ engine_native_status_t AddDebugViewPass(engine_native_debug_view_mode_t mode,
       *out_resource_name = kAlbedoResourceName;
       return AddPass(graph, output, kDebugAlbedoPassName,
                      rhi::RhiDevice::PassKind::kDebugAlbedo, out_pass_id);
+    case ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS:
+      *out_resource_name = kRoughnessResourceName;
+      return AddPass(graph, output, kDebugRoughnessPassName,
+                     rhi::RhiDevice::PassKind::kDebugRoughness, out_pass_id);
+    case ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION:
+      *out_resource_name = kAmbientOcclusionResourceName;
+      return AddPass(graph, output, kDebugAmbientOcclusionPassName,
+                     rhi::RhiDevice::PassKind::kDebugAmbientOcclusion,
+                     out_pass_id);
     case ENGINE_NATIVE_DEBUG_VIEW_NONE:
       break;
   }
@@ -163,6 +179,16 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
     }
 
     status = graph->AddWrite(pbr_pass, kAlbedoResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddWrite(pbr_pass, kRoughnessResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddWrite(pbr_pass, kAmbientOcclusionResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }

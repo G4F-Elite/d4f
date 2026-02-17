@@ -74,7 +74,9 @@ typedef enum engine_native_debug_view_mode {
   ENGINE_NATIVE_DEBUG_VIEW_NONE = 0,
   ENGINE_NATIVE_DEBUG_VIEW_DEPTH = 1,
   ENGINE_NATIVE_DEBUG_VIEW_NORMALS = 2,
-  ENGINE_NATIVE_DEBUG_VIEW_ALBEDO = 3
+  ENGINE_NATIVE_DEBUG_VIEW_ALBEDO = 3,
+  ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS = 4,
+  ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION = 5
 } engine_native_debug_view_mode_t;
 
 typedef struct engine_native_render_packet {

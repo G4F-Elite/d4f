@@ -7,8 +7,11 @@ namespace Engine.Tests.NativeBindings;
 
 public sealed class NativeRuntimeRenderDebugViewTests
 {
-    [Fact]
-    public void NativeRuntimeSubmit_PropagatesRenderDebugViewModeToInteropPacket()
+    [Theory]
+    [InlineData(RenderDebugViewMode.Albedo)]
+    [InlineData(RenderDebugViewMode.Roughness)]
+    [InlineData(RenderDebugViewMode.AmbientOcclusion)]
+    public void NativeRuntimeSubmit_PropagatesRenderDebugViewModeToInteropPacket(RenderDebugViewMode debugViewMode)
     {
         var backend = new FakeNativeInteropApi();
         var world = new World();
@@ -17,11 +20,11 @@ public sealed class NativeRuntimeRenderDebugViewTests
         using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
 
         var draw = new DrawCommand(entity, new MeshHandle(10), new MaterialHandle(20), new TextureHandle(30));
-        var packet = new RenderPacket(0, [draw], Array.Empty<UiDrawCommand>(), RenderDebugViewMode.Albedo);
+        var packet = new RenderPacket(0, [draw], Array.Empty<UiDrawCommand>(), debugViewMode);
 
         nativeSet.Rendering.Submit(packet);
 
-        Assert.Equal((byte)RenderDebugViewMode.Albedo, backend.LastRendererSubmitPacket.DebugViewMode);
+        Assert.Equal((byte)debugViewMode, backend.LastRendererSubmitPacket.DebugViewMode);
         Assert.Equal((byte)0, backend.LastRendererSubmitPacket.Reserved0);
         Assert.Equal((byte)0, backend.LastRendererSubmitPacket.Reserved1);
         Assert.Equal((byte)0, backend.LastRendererSubmitPacket.Reserved2);

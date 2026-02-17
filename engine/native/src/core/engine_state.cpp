@@ -41,6 +41,10 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
       return "debug_normals";
     case rhi::RhiDevice::PassKind::kDebugAlbedo:
       return "debug_albedo";
+    case rhi::RhiDevice::PassKind::kDebugRoughness:
+      return "debug_roughness";
+    case rhi::RhiDevice::PassKind::kDebugAmbientOcclusion:
+      return "debug_ambient_occlusion";
     case rhi::RhiDevice::PassKind::kSceneOpaque:
       return "scene";
     case rhi::RhiDevice::PassKind::kUiOverlay:
@@ -72,7 +76,9 @@ bool IsSupportedDebugViewMode(uint8_t mode) {
   return mode == ENGINE_NATIVE_DEBUG_VIEW_NONE ||
          mode == ENGINE_NATIVE_DEBUG_VIEW_DEPTH ||
          mode == ENGINE_NATIVE_DEBUG_VIEW_NORMALS ||
-         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO;
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION;
 }
 
 uint32_t ExtractMaterialFeatureFlags(

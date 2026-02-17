@@ -81,6 +81,31 @@ void TestBuildCanonicalFrameGraphCombinations() {
        PassKind::kUiOverlay, PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = false,
+                 .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertKindsOrder(
+      output,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kDebugRoughness,
+       PassKind::kPresent});
+
+  assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = false,
+                 .debug_view_mode =
+                     ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertKindsOrder(
+      output,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque,
+       PassKind::kDebugAmbientOcclusion, PassKind::kPresent});
+
+  assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{.has_draws = false, .has_ui = false}, &graph,
              &output, &error) == ENGINE_NATIVE_STATUS_OK);
   assert(error.empty());
