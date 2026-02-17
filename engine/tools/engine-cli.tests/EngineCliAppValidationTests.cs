@@ -19,7 +19,7 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
-    public void Run_ShouldFailRun_WhenBuildArtifactMissing()
+    public void Run_ShouldFailRun_WhenRuntimeProjectMissing()
     {
         string tempRoot = CreateTempDirectory();
         try
@@ -33,7 +33,7 @@ public sealed class EngineCliAppValidationTests
             int code = app.Run(["run", "--project", tempRoot]);
 
             Assert.Equal(1, code);
-            Assert.Contains("Build artifact was not found", error.ToString(), StringComparison.Ordinal);
+            Assert.Contains("Runtime .csproj was not found", error.ToString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -47,20 +47,61 @@ public sealed class EngineCliAppValidationTests
         string tempRoot = CreateTempDirectory();
         try
         {
-            string buildDirectory = Path.Combine(tempRoot, "build", "Debug");
-            Directory.CreateDirectory(buildDirectory);
-            File.WriteAllText(Path.Combine(buildDirectory, "game.bin"), "placeholder");
+            string runtimeProjectPath = PrepareRuntimeProject(tempRoot, "DemoRuntime");
+            var runner = new RecordingCommandRunner();
 
             using var output = new StringWriter();
             using var error = new StringWriter();
-            EngineCliApp app = new(output, error);
+            EngineCliApp app = new(output, error, runner);
 
             int code = app.Run(["run", "--project", tempRoot, "--debug-view", "depth"]);
 
             Assert.Equal(0, code);
+            Assert.Single(runner.Invocations);
+            CommandInvocation invocation = runner.Invocations[0];
+            Assert.Equal("dotnet", invocation.ExecutablePath);
+            Assert.Equal(tempRoot, invocation.WorkingDirectory);
+            Assert.Contains("run", invocation.Arguments);
+            Assert.Contains("--project", invocation.Arguments);
+            Assert.Contains(runtimeProjectPath, invocation.Arguments);
+            Assert.Contains("--debug-view", invocation.Arguments);
+            Assert.Contains("depth", invocation.Arguments);
+
             string stdout = output.ToString();
-            Assert.Contains("Running project", stdout, StringComparison.Ordinal);
+            Assert.Contains("Run completed for", stdout, StringComparison.Ordinal);
             Assert.Contains("debug view: depth", stdout, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldInvokeDotnetBuild_WhenRuntimeProjectExists()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string runtimeProjectPath = PrepareRuntimeProject(tempRoot, "BuildRuntime");
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(["build", "--project", tempRoot, "--configuration", "Release"]);
+
+            Assert.Equal(0, code);
+            Assert.Single(runner.Invocations);
+            CommandInvocation invocation = runner.Invocations[0];
+            Assert.Equal("dotnet", invocation.ExecutablePath);
+            Assert.Equal(tempRoot, invocation.WorkingDirectory);
+            Assert.Contains("build", invocation.Arguments);
+            Assert.Contains(runtimeProjectPath, invocation.Arguments);
+            Assert.Contains("-c", invocation.Arguments);
+            Assert.Contains("Release", invocation.Arguments);
+            Assert.Contains("Build completed", output.ToString(), StringComparison.Ordinal);
             Assert.Equal(string.Empty, error.ToString());
         }
         finally
@@ -360,6 +401,23 @@ public sealed class EngineCliAppValidationTests
               ]
             }
             """);
+    }
+
+    private static string PrepareRuntimeProject(string rootPath, string runtimeName)
+    {
+        string runtimeDirectory = Path.Combine(rootPath, "src", runtimeName);
+        Directory.CreateDirectory(runtimeDirectory);
+        string projectPath = Path.Combine(runtimeDirectory, $"{runtimeName}.csproj");
+        File.WriteAllText(
+            projectPath,
+            """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <PropertyGroup>
+                <TargetFramework>net9.0</TargetFramework>
+              </PropertyGroup>
+            </Project>
+            """);
+        return projectPath;
     }
 
     private static string CreateTempDirectory()

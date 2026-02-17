@@ -92,25 +92,37 @@ public sealed partial class EngineCliApp
     private int HandleBuild(BuildCommand command)
     {
         string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
-        string srcDirectory = Path.Combine(projectDirectory, "src");
         if (!Directory.Exists(projectDirectory))
         {
             _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
             return 1;
         }
 
-        if (!Directory.Exists(srcDirectory))
+        string? runtimeProjectPath = ResolvePublishProjectPath(projectDirectory, configuredPath: null);
+        if (runtimeProjectPath is null)
         {
-            _stderr.WriteLine($"Missing source directory: {srcDirectory}");
+            _stderr.WriteLine(
+                $"Runtime .csproj was not found under '{Path.Combine(projectDirectory, "src")}'.");
             return 1;
         }
 
-        string outputDirectory = Path.Combine(projectDirectory, "build", command.Configuration);
-        Directory.CreateDirectory(outputDirectory);
-        string outputFile = Path.Combine(outputDirectory, "game.bin");
-        File.WriteAllText(outputFile, $"build:{DateTime.UtcNow:O}");
+        string[] arguments =
+        [
+            "build",
+            runtimeProjectPath,
+            "-c",
+            command.Configuration,
+            "--nologo"
+        ];
 
-        _stdout.WriteLine($"Build completed: {outputFile}");
+        int exitCode = _commandRunner.Run("dotnet", arguments, projectDirectory, _stdout, _stderr);
+        if (exitCode != 0)
+        {
+            _stderr.WriteLine($"dotnet build failed with exit code {exitCode}.");
+            return 1;
+        }
+
+        _stdout.WriteLine($"Build completed: {runtimeProjectPath}");
         return 0;
     }
 
@@ -123,15 +135,36 @@ public sealed partial class EngineCliApp
             return 1;
         }
 
-        string binaryPath = Path.Combine(projectDirectory, "build", command.Configuration, "game.bin");
-        if (!File.Exists(binaryPath))
+        string? runtimeProjectPath = ResolvePublishProjectPath(projectDirectory, configuredPath: null);
+        if (runtimeProjectPath is null)
         {
-            _stderr.WriteLine($"Build artifact was not found: {binaryPath}. Run 'build' first.");
+            _stderr.WriteLine(
+                $"Runtime .csproj was not found under '{Path.Combine(projectDirectory, "src")}'.");
             return 1;
         }
 
         string debugViewLabel = command.DebugViewMode.ToString().ToLowerInvariant();
-        _stdout.WriteLine($"Running project '{projectDirectory}' with '{binaryPath}'. Debug view: {debugViewLabel}.");
+        string[] arguments =
+        [
+            "run",
+            "--project",
+            runtimeProjectPath,
+            "-c",
+            command.Configuration,
+            "--no-launch-profile",
+            "--",
+            "--debug-view",
+            debugViewLabel
+        ];
+        int exitCode = _commandRunner.Run("dotnet", arguments, projectDirectory, _stdout, _stderr);
+        if (exitCode != 0)
+        {
+            _stderr.WriteLine($"dotnet run failed with exit code {exitCode}.");
+            return 1;
+        }
+
+        _stdout.WriteLine(
+            $"Run completed for '{runtimeProjectPath}'. Debug view: {debugViewLabel}.");
         return 0;
     }
 

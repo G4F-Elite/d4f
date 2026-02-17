@@ -31,15 +31,32 @@ public sealed class EngineCliAliasCommandTests
         string tempRoot = CreateTempDirectory();
         try
         {
-            Directory.CreateDirectory(Path.Combine(tempRoot, "src"));
+            string runtimeDirectory = Path.Combine(tempRoot, "src", "AliasRuntime");
+            Directory.CreateDirectory(runtimeDirectory);
+            string runtimeProjectPath = Path.Combine(runtimeDirectory, "AliasRuntime.csproj");
+            File.WriteAllText(
+                runtimeProjectPath,
+                """
+                <Project Sdk="Microsoft.NET.Sdk">
+                  <PropertyGroup>
+                    <TargetFramework>net9.0</TargetFramework>
+                  </PropertyGroup>
+                </Project>
+                """);
+            var runner = new RecordingCommandRunner();
             using var output = new StringWriter();
             using var error = new StringWriter();
-            EngineCliApp app = new(output, error);
+            EngineCliApp app = new(output, error, runner);
 
             int code = app.Run(["build", "-p", tempRoot, "-c", "Release"]);
 
             Assert.Equal(0, code);
-            Assert.True(File.Exists(Path.Combine(tempRoot, "build", "Release", "game.bin")));
+            Assert.Single(runner.Invocations);
+            CommandInvocation invocation = runner.Invocations[0];
+            Assert.Equal("dotnet", invocation.ExecutablePath);
+            Assert.Contains("build", invocation.Arguments);
+            Assert.Contains(runtimeProjectPath, invocation.Arguments);
+            Assert.Contains("Release", invocation.Arguments);
         }
         finally
         {
@@ -53,4 +70,22 @@ public sealed class EngineCliAliasCommandTests
         Directory.CreateDirectory(path);
         return path;
     }
+
+    private sealed class RecordingCommandRunner : IExternalCommandRunner
+    {
+        public List<CommandInvocation> Invocations { get; } = [];
+
+        public int Run(
+            string executablePath,
+            IReadOnlyList<string> arguments,
+            string workingDirectory,
+            TextWriter stdout,
+            TextWriter stderr)
+        {
+            Invocations.Add(new CommandInvocation(executablePath, arguments.ToArray(), workingDirectory));
+            return 0;
+        }
+    }
+
+    private sealed record CommandInvocation(string ExecutablePath, string[] Arguments, string WorkingDirectory);
 }
