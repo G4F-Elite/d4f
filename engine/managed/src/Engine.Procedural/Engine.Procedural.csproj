@@ -1,6 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\Engine.Net\Engine.Net.csproj" />
     <ProjectReference Include="..\Engine.Rendering\Engine.Rendering.csproj" />
   </ItemGroup>
 
