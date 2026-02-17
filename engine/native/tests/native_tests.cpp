@@ -96,13 +96,14 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                   "fxaa",
                    "present"});
   engine_native_renderer_frame_stats_t renderer_stats{};
   assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(renderer_stats.draw_item_count == 2u);
   assert(renderer_stats.ui_item_count == 0u);
-  assert(renderer_stats.executed_pass_count == 6u);
+  assert(renderer_stats.executed_pass_count == 7u);
   assert(renderer_stats.present_count == 1u);
   assert(renderer_stats.pipeline_cache_hits == 0u);
   assert(renderer_stats.pipeline_cache_misses == 2u);
@@ -112,6 +113,8 @@ void TestEngineAndSubsystemFlow() {
           (static_cast<uint64_t>(1u) << 6u)) != 0u);  // bloom
   assert((renderer_stats.pass_mask &
           (static_cast<uint64_t>(1u) << 7u)) != 0u);  // color grading
+  assert((renderer_stats.pass_mask &
+          (static_cast<uint64_t>(1u) << 8u)) != 0u);  // fxaa
   assert((renderer_stats.pass_mask &
           (static_cast<uint64_t>(1u) << 2u)) != 0u);  // present
   assert(internal_engine->state.renderer.pipeline_cache_misses() == 2u);
@@ -310,6 +313,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                   "fxaa",
                    "present"});
 
   frame_memory = nullptr;
@@ -355,6 +359,7 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                   "fxaa",
                    "ui", "present"});
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);

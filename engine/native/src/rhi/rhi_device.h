@@ -20,6 +20,7 @@ class RhiDevice {
     kTonemap = 5u,
     kBloom = 6u,
     kColorGrading = 7u,
+    kFxaa = 8u,
   };
 
   engine_native_status_t BeginFrame();

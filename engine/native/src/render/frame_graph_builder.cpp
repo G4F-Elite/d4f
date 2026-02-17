@@ -9,6 +9,7 @@ constexpr const char* kPbrPassName = "pbr_opaque";
 constexpr const char* kBloomPassName = "bloom";
 constexpr const char* kTonemapPassName = "tonemap";
 constexpr const char* kColorGradingPassName = "color_grading";
+constexpr const char* kFxaaPassName = "fxaa";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
 constexpr const char* kShadowMapResourceName = "shadow_map";
@@ -16,6 +17,7 @@ constexpr const char* kHdrColorResourceName = "hdr_color";
 constexpr const char* kBloomColorResourceName = "bloom_color";
 constexpr const char* kTonemappedColorResourceName = "tonemapped_ldr_color";
 constexpr const char* kLdrColorResourceName = "ldr_color";
+constexpr const char* kFxaaColorResourceName = "fxaa_ldr_color";
 
 engine_native_status_t AddPass(RenderGraph* graph,
                                FrameGraphBuildOutput* output,
@@ -64,8 +66,10 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
   RenderPassId bloom_pass = 0u;
   RenderPassId tonemap_pass = 0u;
   RenderPassId color_grading_pass = 0u;
+  RenderPassId fxaa_pass = 0u;
   RenderPassId ui_pass = 0u;
   RenderPassId present_pass = 0u;
+  const char* final_color_resource = nullptr;
 
   engine_native_status_t status = ENGINE_NATIVE_STATUS_OK;
   if (config.has_draws) {
@@ -144,6 +148,24 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
+
+    status = AddPass(graph, output, kFxaaPassName, rhi::RhiDevice::PassKind::kFxaa,
+                     &fxaa_pass);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddRead(fxaa_pass, kLdrColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    status = graph->AddWrite(fxaa_pass, kFxaaColorResourceName);
+    if (status != ENGINE_NATIVE_STATUS_OK) {
+      return status;
+    }
+
+    final_color_resource = kFxaaColorResourceName;
   }
 
   if (config.has_ui) {
@@ -154,15 +176,20 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
     }
 
     if (config.has_draws) {
-      status = graph->AddRead(ui_pass, kLdrColorResourceName);
+      status = graph->AddRead(ui_pass, final_color_resource);
       if (status != ENGINE_NATIVE_STATUS_OK) {
         return status;
       }
-    }
-
-    status = graph->AddWrite(ui_pass, kLdrColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
+      status = graph->AddWrite(ui_pass, final_color_resource);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+    } else {
+      status = graph->AddWrite(ui_pass, kLdrColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+      final_color_resource = kLdrColorResourceName;
     }
   }
 
@@ -173,7 +200,7 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
   }
 
   if (config.has_draws || config.has_ui) {
-    status = graph->AddRead(present_pass, kLdrColorResourceName);
+    status = graph->AddRead(present_pass, final_color_resource);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
