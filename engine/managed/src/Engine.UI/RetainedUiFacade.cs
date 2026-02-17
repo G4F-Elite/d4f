@@ -26,6 +26,13 @@ public sealed partial class RetainedUiFacade : IUiFacade
 
     public UiDocument Document => _document;
 
+    public string DumpTree()
+    {
+        UiLayoutEngine.Apply(_document);
+        UpdateScrollViewMeasurements();
+        return UiTreeDumper.Dump(_document);
+    }
+
     public void QueueClick(string elementId)
     {
         if (string.IsNullOrWhiteSpace(elementId))
