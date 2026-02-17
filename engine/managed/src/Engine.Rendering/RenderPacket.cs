@@ -6,12 +6,21 @@ namespace Engine.Rendering;
 public sealed unsafe class RenderPacket
 {
     public RenderPacket(long frameNumber, IReadOnlyList<DrawCommand> drawCommands)
-        : this(frameNumber, drawCommands, Array.Empty<UiDrawCommand>())
+        : this(frameNumber, drawCommands, Array.Empty<UiDrawCommand>(), RenderDebugViewMode.None)
     {
     }
 
     public RenderPacket(long frameNumber, IReadOnlyList<DrawCommand> drawCommands, IReadOnlyList<UiDrawCommand> uiDrawCommands)
-        : this(frameNumber, drawCommands, uiDrawCommands, IntPtr.Zero, 0, IntPtr.Zero, 0)
+        : this(frameNumber, drawCommands, uiDrawCommands, RenderDebugViewMode.None)
+    {
+    }
+
+    public RenderPacket(
+        long frameNumber,
+        IReadOnlyList<DrawCommand> drawCommands,
+        IReadOnlyList<UiDrawCommand> uiDrawCommands,
+        RenderDebugViewMode debugViewMode)
+        : this(frameNumber, drawCommands, uiDrawCommands, IntPtr.Zero, 0, IntPtr.Zero, 0, debugViewMode)
     {
     }
 
@@ -22,7 +31,8 @@ public sealed unsafe class RenderPacket
         IntPtr nativeDrawItemsPointer,
         int nativeDrawItemCount,
         IntPtr nativeUiDrawItemsPointer,
-        int nativeUiDrawItemCount)
+        int nativeUiDrawItemCount,
+        RenderDebugViewMode debugViewMode)
     {
         if (frameNumber < 0)
         {
@@ -33,6 +43,10 @@ public sealed unsafe class RenderPacket
         ArgumentNullException.ThrowIfNull(uiDrawCommands);
         ValidatePointerCountPair(nameof(nativeDrawItemsPointer), nativeDrawItemsPointer, nameof(nativeDrawItemCount), nativeDrawItemCount);
         ValidatePointerCountPair(nameof(nativeUiDrawItemsPointer), nativeUiDrawItemsPointer, nameof(nativeUiDrawItemCount), nativeUiDrawItemCount);
+        if (!Enum.IsDefined(debugViewMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(debugViewMode), $"Unsupported debug view mode value: {debugViewMode}.");
+        }
 
         FrameNumber = frameNumber;
         DrawCommands = drawCommands;
@@ -41,6 +55,7 @@ public sealed unsafe class RenderPacket
         NativeDrawItemCount = nativeDrawItemCount;
         NativeUiDrawItemsPointer = nativeUiDrawItemsPointer;
         NativeUiDrawItemCount = nativeUiDrawItemCount;
+        DebugViewMode = debugViewMode;
     }
 
     public long FrameNumber { get; }
@@ -56,6 +71,8 @@ public sealed unsafe class RenderPacket
     public IntPtr NativeUiDrawItemsPointer { get; }
 
     public int NativeUiDrawItemCount { get; }
+
+    public RenderDebugViewMode DebugViewMode { get; }
 
     public ReadOnlySpan<NativeDrawItem> NativeDrawItems
         => NativeDrawItemCount == 0
@@ -74,7 +91,8 @@ public sealed unsafe class RenderPacket
         IntPtr nativeDrawItemsPointer,
         int nativeDrawItemCount,
         IntPtr nativeUiDrawItemsPointer,
-        int nativeUiDrawItemCount)
+        int nativeUiDrawItemCount,
+        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None)
         => new(
             frameNumber,
             drawCommands,
@@ -82,7 +100,8 @@ public sealed unsafe class RenderPacket
             nativeDrawItemsPointer,
             nativeDrawItemCount,
             nativeUiDrawItemsPointer,
-            nativeUiDrawItemCount);
+            nativeUiDrawItemCount,
+            debugViewMode);
 
     public static RenderPacket Empty(long frameNumber)
         => new(
@@ -92,7 +111,8 @@ public sealed unsafe class RenderPacket
             IntPtr.Zero,
             0,
             IntPtr.Zero,
-            0);
+            0,
+            RenderDebugViewMode.None);
 
     private static void ValidatePointerCountPair(string pointerParam, IntPtr pointer, string countParam, int count)
     {

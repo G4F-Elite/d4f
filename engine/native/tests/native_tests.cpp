@@ -362,6 +362,23 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
                    "fxaa",
                    "ui", "present"});
 
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_render_packet_t debug_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u,
+      .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_DEPTH};
+
+  assert(renderer_submit(renderer, &debug_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"shadow", "pbr_opaque", "debug_depth", "present"});
+
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
 

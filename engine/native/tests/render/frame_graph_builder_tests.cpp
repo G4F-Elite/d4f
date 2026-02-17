@@ -57,6 +57,30 @@ void TestBuildCanonicalFrameGraphCombinations() {
        PassKind::kUiOverlay, PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = false,
+                 .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_DEPTH},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertKindsOrder(
+      output,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kDebugDepth,
+       PassKind::kPresent});
+
+  assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = true,
+                 .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NORMALS},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertKindsOrder(
+      output,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kDebugNormals,
+       PassKind::kUiOverlay, PassKind::kPresent});
+
+  assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{.has_draws = false, .has_ui = false}, &graph,
              &output, &error) == ENGINE_NATIVE_STATUS_OK);
   assert(error.empty());
@@ -74,6 +98,19 @@ void TestBuildCanonicalFrameGraphValidation() {
   assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{}, &graph, nullptr, &error) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = false,
+                 .has_ui = true,
+                 .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_ALBEDO},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = false,
+                 .debug_view_mode =
+                     static_cast<engine_native_debug_view_mode_t>(255u)},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 }
 
 }  // namespace

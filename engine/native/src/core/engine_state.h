@@ -64,6 +64,8 @@ class RendererState {
   std::vector<std::string> last_executed_rhi_passes_;
   std::array<float, 4> last_clear_color_{0.05f, 0.07f, 0.10f, 1.0f};
   std::vector<engine_native_draw_item_t> submitted_draw_items_;
+  engine_native_debug_view_mode_t submitted_debug_view_mode_ =
+      ENGINE_NATIVE_DEBUG_VIEW_NONE;
   render::MaterialSystem material_system_;
   rhi::PipelineStateCache pipeline_cache_;
   uint64_t last_pass_mask_ = 0u;

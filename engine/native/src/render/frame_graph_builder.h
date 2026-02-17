@@ -12,6 +12,7 @@ namespace dff::native::render {
 struct FrameGraphBuildConfig {
   bool has_draws = false;
   bool has_ui = false;
+  engine_native_debug_view_mode_t debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE;
 };
 
 struct FrameGraphBuildOutput {

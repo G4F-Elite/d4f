@@ -10,14 +10,21 @@ constexpr const char* kBloomPassName = "bloom";
 constexpr const char* kTonemapPassName = "tonemap";
 constexpr const char* kColorGradingPassName = "color_grading";
 constexpr const char* kFxaaPassName = "fxaa";
+constexpr const char* kDebugDepthPassName = "debug_depth";
+constexpr const char* kDebugNormalsPassName = "debug_normals";
+constexpr const char* kDebugAlbedoPassName = "debug_albedo";
 constexpr const char* kUiPassName = "ui";
 constexpr const char* kPresentPassName = "present";
 constexpr const char* kShadowMapResourceName = "shadow_map";
 constexpr const char* kHdrColorResourceName = "hdr_color";
+constexpr const char* kDepthResourceName = "scene_depth";
+constexpr const char* kNormalsResourceName = "scene_normals";
+constexpr const char* kAlbedoResourceName = "scene_albedo";
 constexpr const char* kBloomColorResourceName = "bloom_color";
 constexpr const char* kTonemappedColorResourceName = "tonemapped_ldr_color";
 constexpr const char* kLdrColorResourceName = "ldr_color";
 constexpr const char* kFxaaColorResourceName = "fxaa_ldr_color";
+constexpr const char* kDebugColorResourceName = "debug_ldr_color";
 
 engine_native_status_t AddPass(RenderGraph* graph,
                                FrameGraphBuildOutput* output,
@@ -44,6 +51,43 @@ engine_native_status_t AddPass(RenderGraph* graph,
   return ENGINE_NATIVE_STATUS_OK;
 }
 
+bool IsSupportedDebugViewMode(engine_native_debug_view_mode_t mode) {
+  return mode == ENGINE_NATIVE_DEBUG_VIEW_NONE ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_DEPTH ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_NORMALS ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO;
+}
+
+engine_native_status_t AddDebugViewPass(engine_native_debug_view_mode_t mode,
+                                        RenderGraph* graph,
+                                        FrameGraphBuildOutput* output,
+                                        RenderPassId* out_pass_id,
+                                        const char** out_resource_name) {
+  if (graph == nullptr || output == nullptr || out_pass_id == nullptr ||
+      out_resource_name == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  switch (mode) {
+    case ENGINE_NATIVE_DEBUG_VIEW_DEPTH:
+      *out_resource_name = kDepthResourceName;
+      return AddPass(graph, output, kDebugDepthPassName,
+                     rhi::RhiDevice::PassKind::kDebugDepth, out_pass_id);
+    case ENGINE_NATIVE_DEBUG_VIEW_NORMALS:
+      *out_resource_name = kNormalsResourceName;
+      return AddPass(graph, output, kDebugNormalsPassName,
+                     rhi::RhiDevice::PassKind::kDebugNormals, out_pass_id);
+    case ENGINE_NATIVE_DEBUG_VIEW_ALBEDO:
+      *out_resource_name = kAlbedoResourceName;
+      return AddPass(graph, output, kDebugAlbedoPassName,
+                     rhi::RhiDevice::PassKind::kDebugAlbedo, out_pass_id);
+    case ENGINE_NATIVE_DEBUG_VIEW_NONE:
+      break;
+  }
+
+  return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+}
+
 }  // namespace
 
 engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& config,
@@ -51,6 +95,13 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
                                                 FrameGraphBuildOutput* output,
                                                 std::string* out_error) {
   if (graph == nullptr || output == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (!IsSupportedDebugViewMode(config.debug_view_mode)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (config.debug_view_mode != ENGINE_NATIVE_DEBUG_VIEW_NONE &&
+      !config.has_draws) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -67,6 +118,7 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
   RenderPassId tonemap_pass = 0u;
   RenderPassId color_grading_pass = 0u;
   RenderPassId fxaa_pass = 0u;
+  RenderPassId debug_view_pass = 0u;
   RenderPassId ui_pass = 0u;
   RenderPassId present_pass = 0u;
   const char* final_color_resource = nullptr;
@@ -100,72 +152,112 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
       return status;
     }
 
-    status = AddPass(graph, output, kBloomPassName, rhi::RhiDevice::PassKind::kBloom,
-                     &bloom_pass);
+    status = graph->AddWrite(pbr_pass, kDepthResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = graph->AddRead(bloom_pass, kHdrColorResourceName);
+    status = graph->AddWrite(pbr_pass, kNormalsResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = graph->AddWrite(bloom_pass, kBloomColorResourceName);
+    status = graph->AddWrite(pbr_pass, kAlbedoResourceName);
     if (status != ENGINE_NATIVE_STATUS_OK) {
       return status;
     }
 
-    status = AddPass(graph, output, kTonemapPassName, rhi::RhiDevice::PassKind::kTonemap,
-                     &tonemap_pass);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+    if (config.debug_view_mode == ENGINE_NATIVE_DEBUG_VIEW_NONE) {
+      status = AddPass(graph, output, kBloomPassName, rhi::RhiDevice::PassKind::kBloom,
+                       &bloom_pass);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddRead(tonemap_pass, kBloomColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddRead(bloom_pass, kHdrColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddWrite(tonemap_pass, kTonemappedColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddWrite(bloom_pass, kBloomColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = AddPass(graph, output, kColorGradingPassName,
-                     rhi::RhiDevice::PassKind::kColorGrading,
-                     &color_grading_pass);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = AddPass(graph, output, kTonemapPassName, rhi::RhiDevice::PassKind::kTonemap,
+                       &tonemap_pass);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddRead(color_grading_pass, kTonemappedColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddRead(tonemap_pass, kBloomColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddWrite(color_grading_pass, kLdrColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddWrite(tonemap_pass, kTonemappedColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = AddPass(graph, output, kFxaaPassName, rhi::RhiDevice::PassKind::kFxaa,
-                     &fxaa_pass);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = AddPass(graph, output, kColorGradingPassName,
+                       rhi::RhiDevice::PassKind::kColorGrading,
+                       &color_grading_pass);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddRead(fxaa_pass, kLdrColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddRead(color_grading_pass, kTonemappedColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    status = graph->AddWrite(fxaa_pass, kFxaaColorResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
-    }
+      status = graph->AddWrite(color_grading_pass, kLdrColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
 
-    final_color_resource = kFxaaColorResourceName;
+      status = AddPass(graph, output, kFxaaPassName, rhi::RhiDevice::PassKind::kFxaa,
+                       &fxaa_pass);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddRead(fxaa_pass, kLdrColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddWrite(fxaa_pass, kFxaaColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      final_color_resource = kFxaaColorResourceName;
+    } else {
+      const char* debug_input_resource = nullptr;
+      status = AddDebugViewPass(
+          config.debug_view_mode,
+          graph,
+          output,
+          &debug_view_pass,
+          &debug_input_resource);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddRead(debug_view_pass, debug_input_resource);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddWrite(debug_view_pass, kDebugColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      final_color_resource = kDebugColorResourceName;
+    }
   }
 
   if (config.has_ui) {

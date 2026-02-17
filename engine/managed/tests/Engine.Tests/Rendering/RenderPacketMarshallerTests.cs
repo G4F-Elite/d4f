@@ -77,6 +77,20 @@ public sealed class RenderPacketMarshallerTests
     }
 
     [Fact]
+    public void CreateNative_RejectsInvalidDebugViewMode()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => RenderPacket.CreateNative(
+            0,
+            Array.Empty<DrawCommand>(),
+            Array.Empty<UiDrawCommand>(),
+            IntPtr.Zero,
+            0,
+            IntPtr.Zero,
+            0,
+            (RenderDebugViewMode)255));
+    }
+
+    [Fact]
     public void Marshal_ThrowsWhenArenaOutOfMemory()
     {
         using var arena = new FrameArena(64, 16);
@@ -102,9 +116,15 @@ public sealed class RenderPacketMarshallerTests
             new UiDrawCommand(12, 4, 6, 3, 8)
         ];
 
-        var packet = RenderPacketMarshaller.Marshal(42, arena, drawCommands, uiCommands);
+        var packet = RenderPacketMarshaller.Marshal(
+            42,
+            arena,
+            drawCommands,
+            uiCommands,
+            RenderDebugViewMode.Normals);
 
         Assert.Equal(42, packet.FrameNumber);
+        Assert.Equal(RenderDebugViewMode.Normals, packet.DebugViewMode);
         Assert.Equal(2, packet.NativeDrawItemCount);
         Assert.NotEqual(IntPtr.Zero, packet.NativeDrawItemsPointer);
         Assert.Equal(1, packet.NativeUiDrawItemCount);
@@ -136,6 +156,7 @@ public sealed class RenderPacketMarshallerTests
         Assert.Equal(IntPtr.Zero, packet.NativeDrawItemsPointer);
         Assert.Equal(0, packet.NativeUiDrawItemCount);
         Assert.Equal(IntPtr.Zero, packet.NativeUiDrawItemsPointer);
+        Assert.Equal(RenderDebugViewMode.None, packet.DebugViewMode);
     }
 
     private static DrawCommand CreateDrawCommand(

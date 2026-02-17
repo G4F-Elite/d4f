@@ -21,6 +21,9 @@ class RhiDevice {
     kBloom = 6u,
     kColorGrading = 7u,
     kFxaa = 8u,
+    kDebugDepth = 9u,
+    kDebugNormals = 10u,
+    kDebugAlbedo = 11u,
   };
 
   engine_native_status_t BeginFrame();

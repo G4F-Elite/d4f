@@ -35,6 +35,12 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
       return "color_grading";
     case rhi::RhiDevice::PassKind::kFxaa:
       return "fxaa";
+    case rhi::RhiDevice::PassKind::kDebugDepth:
+      return "debug_depth";
+    case rhi::RhiDevice::PassKind::kDebugNormals:
+      return "debug_normals";
+    case rhi::RhiDevice::PassKind::kDebugAlbedo:
+      return "debug_albedo";
     case rhi::RhiDevice::PassKind::kSceneOpaque:
       return "scene";
     case rhi::RhiDevice::PassKind::kUiOverlay:
@@ -60,6 +66,13 @@ bool IsSupportedColliderShape(uint8_t collider_shape) {
 
 bool IsUnitRange(float value) {
   return value >= 0.0f && value <= 1.0f;
+}
+
+bool IsSupportedDebugViewMode(uint8_t mode) {
+  return mode == ENGINE_NATIVE_DEBUG_VIEW_NONE ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_DEPTH ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_NORMALS ||
+         mode == ENGINE_NATIVE_DEBUG_VIEW_ALBEDO;
 }
 
 uint32_t ExtractMaterialFeatureFlags(
@@ -129,6 +142,7 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
   submitted_draw_items_.clear();
+  submitted_debug_view_mode_ = ENGINE_NATIVE_DEBUG_VIEW_NONE;
   last_executed_rhi_passes_.clear();
   last_pass_mask_ = 0u;
 
@@ -162,6 +176,9 @@ engine_native_status_t RendererState::Submit(
   if (packet.ui_item_count > 0u && packet.ui_items == nullptr) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
+  if (!IsSupportedDebugViewMode(packet.debug_view_mode)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
 
   if (packet.draw_item_count >
           std::numeric_limits<uint32_t>::max() - submitted_draw_count_ ||
@@ -188,6 +205,16 @@ engine_native_status_t RendererState::Submit(
 
   submitted_draw_count_ = total_draw_count;
   submitted_ui_count_ = total_ui_count;
+  if (packet.debug_view_mode != ENGINE_NATIVE_DEBUG_VIEW_NONE) {
+    if (submitted_debug_view_mode_ == ENGINE_NATIVE_DEBUG_VIEW_NONE) {
+      submitted_debug_view_mode_ =
+          static_cast<engine_native_debug_view_mode_t>(packet.debug_view_mode);
+    } else if (submitted_debug_view_mode_ !=
+               static_cast<engine_native_debug_view_mode_t>(
+                   packet.debug_view_mode)) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+  }
 
   if (packet.draw_item_count > 0u) {
     const size_t old_size = submitted_draw_items_.size();
@@ -264,7 +291,8 @@ engine_native_status_t RendererState::Present() {
 engine_native_status_t RendererState::BuildFrameGraph() {
   render::FrameGraphBuildConfig build_config{
       .has_draws = submitted_draw_count_ > 0u,
-      .has_ui = submitted_ui_count_ > 0u};
+      .has_ui = submitted_ui_count_ > 0u,
+      .debug_view_mode = submitted_debug_view_mode_};
   render::FrameGraphBuildOutput build_output;
   std::string compile_error;
   const engine_native_status_t status = render::BuildCanonicalFrameGraph(
@@ -323,6 +351,7 @@ void RendererState::ResetFrameState() {
   frame_capacity_ = 0u;
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
+  submitted_debug_view_mode_ = ENGINE_NATIVE_DEBUG_VIEW_NONE;
   frame_graph_.Clear();
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();

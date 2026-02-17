@@ -275,7 +275,11 @@ internal sealed partial class NativeRuntime
                 DrawItems = drawItemsPtr,
                 DrawItemCount = checked((uint)drawItemsCount),
                 UiItems = uiItemsPtr,
-                UiItemCount = checked((uint)uiItemsCount)
+                UiItemCount = checked((uint)uiItemsCount),
+                DebugViewMode = (byte)packet.DebugViewMode,
+                Reserved0 = 0,
+                Reserved1 = 0,
+                Reserved2 = 0
             };
 
             NativeStatusGuard.ThrowIfFailed(

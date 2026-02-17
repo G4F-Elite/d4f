@@ -58,6 +58,22 @@ void TestFrameLifecycleWithUiOnlyPass() {
   assert(device.executed_passes()[1] == PassKind::kPresent);
 }
 
+void TestFrameLifecycleWithDebugViewPasses() {
+  dff::native::rhi::RhiDevice device;
+  const std::array<float, 4> clear{0.0f, 0.0f, 0.0f, 1.0f};
+
+  assert(device.BeginFrame() == ENGINE_NATIVE_STATUS_OK);
+  assert(device.Clear(clear) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kShadowMap) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kPbrOpaque) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kDebugDepth) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.ExecutePass(PassKind::kPresent) == ENGINE_NATIVE_STATUS_OK);
+  assert(device.EndFrame() == ENGINE_NATIVE_STATUS_OK);
+
+  assert(device.executed_passes().size() == 4u);
+  assert(device.executed_passes()[2] == PassKind::kDebugDepth);
+}
+
 void TestValidationAndPassOrdering() {
   dff::native::rhi::RhiDevice device;
 
@@ -90,6 +106,7 @@ void TestValidationAndPassOrdering() {
 void RunRhiDeviceTests() {
   TestFrameLifecycleWithPbrPipelinePasses();
   TestFrameLifecycleWithUiOnlyPass();
+  TestFrameLifecycleWithDebugViewPasses();
   TestValidationAndPassOrdering();
 }
 

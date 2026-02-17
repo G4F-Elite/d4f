@@ -48,6 +48,9 @@ engine_native_status_t RhiDevice::ExecutePass(PassKind pass_kind) {
     case PassKind::kTonemap:
     case PassKind::kColorGrading:
     case PassKind::kFxaa:
+    case PassKind::kDebugDepth:
+    case PassKind::kDebugNormals:
+    case PassKind::kDebugAlbedo:
     case PassKind::kUiOverlay:
       executed_passes_.push_back(pass_kind);
       return ENGINE_NATIVE_STATUS_OK;

@@ -69,6 +69,10 @@ internal struct EngineNativeRenderPacket
     public uint DrawItemCount;
     public IntPtr UiItems;
     public uint UiItemCount;
+    public byte DebugViewMode;
+    public byte Reserved0;
+    public byte Reserved1;
+    public byte Reserved2;
 }
 
 [StructLayout(LayoutKind.Sequential)]

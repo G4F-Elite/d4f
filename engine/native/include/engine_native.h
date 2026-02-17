@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 7u
+#define ENGINE_NATIVE_API_VERSION 8u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -70,11 +70,22 @@ typedef struct engine_native_ui_draw_item {
   uint32_t index_count;
 } engine_native_ui_draw_item_t;
 
+typedef enum engine_native_debug_view_mode {
+  ENGINE_NATIVE_DEBUG_VIEW_NONE = 0,
+  ENGINE_NATIVE_DEBUG_VIEW_DEPTH = 1,
+  ENGINE_NATIVE_DEBUG_VIEW_NORMALS = 2,
+  ENGINE_NATIVE_DEBUG_VIEW_ALBEDO = 3
+} engine_native_debug_view_mode_t;
+
 typedef struct engine_native_render_packet {
   const engine_native_draw_item_t* draw_items;
   uint32_t draw_item_count;
   const engine_native_ui_draw_item_t* ui_items;
   uint32_t ui_item_count;
+  uint8_t debug_view_mode;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  uint8_t reserved2;
 } engine_native_render_packet_t;
 
 typedef struct engine_native_renderer_frame_stats {
