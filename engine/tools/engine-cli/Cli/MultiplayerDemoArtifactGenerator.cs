@@ -1,0 +1,282 @@
+using System.Globalization;
+using System.Text.Json;
+using Engine.Net;
+using Engine.Procedural;
+using Engine.Rendering;
+
+namespace Engine.Cli;
+
+internal sealed record MultiplayerDemoStats(
+    long BytesSent,
+    long BytesReceived,
+    int MessagesSent,
+    int MessagesReceived,
+    int MessagesDropped,
+    double RoundTripTimeMs,
+    double LossPercent);
+
+internal sealed record MultiplayerDemoClientStats(
+    uint ClientId,
+    MultiplayerDemoStats Stats);
+
+internal sealed record MultiplayerDemoSummary(
+    ulong Seed,
+    uint ProceduralSeed,
+    double FixedDeltaSeconds,
+    int TickRateHz,
+    int SimulatedTicks,
+    int ConnectedClients,
+    int GeneratedChunkCount,
+    int ServerEntityCount,
+    bool Synchronized,
+    IReadOnlyList<string> SampleAssetKeys,
+    MultiplayerDemoStats ServerStats,
+    IReadOnlyList<MultiplayerDemoClientStats> ClientStats);
+
+internal static class MultiplayerDemoArtifactGenerator
+{
+    private const string ComponentId = "transform";
+    private const int DefaultSurfaceWidth = 64;
+    private const int DefaultSurfaceHeight = 64;
+    private const int SimulatedTickCount = 3;
+
+    public static string Generate(string outputDirectory, ulong seed, double fixedDeltaSeconds)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        if (fixedDeltaSeconds <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(fixedDeltaSeconds), "Fixed delta must be greater than zero.");
+        }
+
+        MultiplayerDemoSummary summary = BuildSummary(seed, fixedDeltaSeconds);
+        string relativePath = Path.Combine("net", "multiplayer-demo.json");
+        string fullPath = Path.Combine(outputDirectory, relativePath);
+
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string json = JsonSerializer.Serialize(summary, ArtifactOutputWriter.SerializerOptions);
+        File.WriteAllText(fullPath, json);
+        return NormalizePath(relativePath);
+    }
+
+    private static MultiplayerDemoSummary BuildSummary(ulong seed, double fixedDeltaSeconds)
+    {
+        uint proceduralSeed = unchecked((uint)seed);
+        int tickRate = ResolveTickRate(fixedDeltaSeconds);
+        LevelGenResult level = LevelGenerator.Generate(new LevelGenOptions(
+            Seed: proceduralSeed,
+            TargetNodes: 16,
+            Density: 0.72f,
+            Danger: 0.45f,
+            Complexity: 0.58f));
+        IReadOnlyList<LevelMeshChunk> chunks = level.MeshChunks;
+
+        InMemoryNetSession session = CreateSession(tickRate);
+        session.RegisterReplicatedComponent(ComponentId);
+        uint firstClientId = session.ConnectClient();
+        uint secondClientId = session.ConnectClient();
+
+        var firstReplicator = new NetProceduralChunkReplicator(NoopRenderingFacade.Instance);
+        var secondReplicator = new NetProceduralChunkReplicator(NoopRenderingFacade.Instance);
+        NetProceduralChunkApplyResult firstResult;
+        NetProceduralChunkApplyResult secondResult;
+        try
+        {
+            UpsertProceduralEntities(session, chunks, proceduralSeed);
+
+            firstResult = default!;
+            secondResult = default!;
+            for (int tick = 0; tick < SimulatedTickCount; tick++)
+            {
+                session.Pump();
+                firstResult = firstReplicator.Apply(session.GetClientSnapshot(firstClientId));
+                secondResult = secondReplicator.Apply(session.GetClientSnapshot(secondClientId));
+            }
+        }
+        finally
+        {
+            firstReplicator.Dispose();
+            secondReplicator.Dispose();
+        }
+
+        bool synchronized = AreSnapshotsEquivalent(firstResult.ActiveEntities, secondResult.ActiveEntities);
+        if (!synchronized)
+        {
+            throw new InvalidDataException("Multiplayer demo produced divergent client snapshots.");
+        }
+
+        string[] sampleAssetKeys = firstResult.ActiveEntities
+            .Select(static x => x.AssetKey)
+            .Distinct(StringComparer.Ordinal)
+            .Take(8)
+            .ToArray();
+
+        return new MultiplayerDemoSummary(
+            Seed: seed,
+            ProceduralSeed: proceduralSeed,
+            FixedDeltaSeconds: fixedDeltaSeconds,
+            TickRateHz: tickRate,
+            SimulatedTicks: SimulatedTickCount,
+            ConnectedClients: session.ConnectedClientCount,
+            GeneratedChunkCount: chunks.Count,
+            ServerEntityCount: firstResult.ActiveEntities.Count,
+            Synchronized: synchronized,
+            SampleAssetKeys: sampleAssetKeys,
+            ServerStats: ToStats(session.GetServerStats()),
+            ClientStats:
+            [
+                new MultiplayerDemoClientStats(firstClientId, ToStats(session.GetClientStats(firstClientId))),
+                new MultiplayerDemoClientStats(secondClientId, ToStats(session.GetClientStats(secondClientId)))
+            ]);
+    }
+
+    private static InMemoryNetSession CreateSession(int tickRate)
+    {
+        var config = new NetworkConfig(
+            TickRateHz: tickRate,
+            MaxPayloadBytes: 4096,
+            MaxRpcPerTickPerClient: 32,
+            MaxEntitiesPerSnapshot: 8192,
+            SimulatedRttMs: 42.0,
+            SimulatedPacketLossPercent: 1.5);
+        return new InMemoryNetSession(config);
+    }
+
+    private static void UpsertProceduralEntities(
+        InMemoryNetSession session,
+        IReadOnlyList<LevelMeshChunk> chunks,
+        uint proceduralSeed)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(chunks);
+
+        for (int i = 0; i < chunks.Count; i++)
+        {
+            LevelMeshChunk chunk = chunks[i];
+            NetProceduralRecipeRef recipe = BuildRecipe(chunk);
+            string assetKey = BuildAssetKey(chunk, recipe);
+            byte[] payload = BuildTransformPayload(chunk, i);
+            var entity = new NetEntityState(
+                entityId: checked((uint)(i + 1)),
+                ownerClientId: null,
+                proceduralSeed: proceduralSeed,
+                assetKey: assetKey,
+                components: [new NetComponentState(ComponentId, payload)],
+                proceduralRecipe: recipe);
+            session.UpsertServerEntity(entity);
+        }
+    }
+
+    private static NetProceduralRecipeRef BuildRecipe(LevelMeshChunk chunk)
+    {
+        LevelChunkTag tag = LevelChunkTag.Parse(chunk.MeshTag);
+        int surfaceSizeBias = tag.NodeType is LevelNodeType.Room or LevelNodeType.Junction ? 16 : 0;
+        int surfaceWidth = DefaultSurfaceWidth + surfaceSizeBias;
+        int surfaceHeight = DefaultSurfaceHeight + surfaceSizeBias;
+        string recipeHash = ComputeRecipeHash(chunk, surfaceWidth, surfaceHeight);
+
+        return new NetProceduralRecipeRef(
+            generatorId: "proc/chunk/content",
+            generatorVersion: 1,
+            recipeVersion: 1,
+            recipeHash: recipeHash,
+            parameters: new Dictionary<string, string>
+            {
+                ["meshTag"] = chunk.MeshTag,
+                ["nodeId"] = chunk.NodeId.ToString(CultureInfo.InvariantCulture),
+                ["surfaceWidth"] = surfaceWidth.ToString(CultureInfo.InvariantCulture),
+                ["surfaceHeight"] = surfaceHeight.ToString(CultureInfo.InvariantCulture)
+            });
+    }
+
+    private static string BuildAssetKey(LevelMeshChunk chunk, NetProceduralRecipeRef recipe)
+    {
+        return string.Create(
+            CultureInfo.InvariantCulture,
+            $"proc/chunk/{chunk.NodeId}/{recipe.RecipeHash}");
+    }
+
+    private static string ComputeRecipeHash(LevelMeshChunk chunk, int surfaceWidth, int surfaceHeight)
+    {
+        string payload = string.Create(
+            CultureInfo.InvariantCulture,
+            $"{chunk.MeshTag}|{chunk.NodeId}|{surfaceWidth}|{surfaceHeight}");
+        uint hash = 2166136261u;
+        foreach (char ch in payload)
+        {
+            hash ^= ch;
+            hash *= 16777619u;
+        }
+
+        return hash.ToString("X8", CultureInfo.InvariantCulture);
+    }
+
+    private static byte[] BuildTransformPayload(LevelMeshChunk chunk, int index)
+    {
+        var bytes = new byte[8];
+        WriteInt32LittleEndian(bytes, 0, chunk.NodeId);
+        WriteInt32LittleEndian(bytes, 4, index);
+        return bytes;
+    }
+
+    private static void WriteInt32LittleEndian(byte[] destination, int offset, int value)
+    {
+        destination[offset] = (byte)(value & 0xFF);
+        destination[offset + 1] = (byte)((value >> 8) & 0xFF);
+        destination[offset + 2] = (byte)((value >> 16) & 0xFF);
+        destination[offset + 3] = (byte)((value >> 24) & 0xFF);
+    }
+
+    private static int ResolveTickRate(double fixedDeltaSeconds)
+    {
+        int tickRate = checked((int)Math.Round(1.0 / fixedDeltaSeconds, MidpointRounding.AwayFromZero));
+        return Math.Clamp(tickRate, 10, 240);
+    }
+
+    private static bool AreSnapshotsEquivalent(
+        IReadOnlyList<NetProceduralChunkEntityBinding> first,
+        IReadOnlyList<NetProceduralChunkEntityBinding> second)
+    {
+        if (first.Count != second.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < first.Count; i++)
+        {
+            NetProceduralChunkEntityBinding left = first[i];
+            NetProceduralChunkEntityBinding right = second[i];
+            if (left.EntityId != right.EntityId ||
+                !string.Equals(left.AssetKey, right.AssetKey, StringComparison.Ordinal) ||
+                left.ProceduralSeed != right.ProceduralSeed)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static MultiplayerDemoStats ToStats(NetPeerStats stats)
+    {
+        ArgumentNullException.ThrowIfNull(stats);
+
+        return new MultiplayerDemoStats(
+            BytesSent: stats.BytesSent,
+            BytesReceived: stats.BytesReceived,
+            MessagesSent: stats.MessagesSent,
+            MessagesReceived: stats.MessagesReceived,
+            MessagesDropped: stats.MessagesDropped,
+            RoundTripTimeMs: stats.RoundTripTimeMs,
+            LossPercent: stats.LossPercent);
+    }
+
+    private static string NormalizePath(string path)
+    {
+        return path.Replace('\\', '/');
+    }
+}

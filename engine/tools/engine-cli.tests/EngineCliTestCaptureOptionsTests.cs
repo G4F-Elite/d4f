@@ -36,6 +36,8 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "normals-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "depth-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "shadow-0012.png")));
+            string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
+            Assert.True(File.Exists(multiplayerPath));
 
             string replayPath = Path.Combine(artifactsRoot, "replay", "recording.json");
             Assert.True(File.Exists(replayPath));
@@ -50,6 +52,25 @@ public sealed class EngineCliTestCaptureOptionsTests
             JsonElement networkEvents = replayJson.RootElement.GetProperty("networkEvents");
             Assert.Single(networkEvents.EnumerateArray());
             Assert.Equal("capture.frame=12", networkEvents[0].GetString());
+
+            using JsonDocument multiplayerJson = JsonDocument.Parse(File.ReadAllText(multiplayerPath));
+            JsonElement multiplayerRoot = multiplayerJson.RootElement;
+            Assert.Equal(9001UL, multiplayerRoot.GetProperty("seed").GetUInt64());
+            Assert.Equal(2, multiplayerRoot.GetProperty("connectedClients").GetInt32());
+            Assert.True(multiplayerRoot.GetProperty("serverEntityCount").GetInt32() > 0);
+            Assert.True(multiplayerRoot.GetProperty("synchronized").GetBoolean());
+            Assert.Equal(2, multiplayerRoot.GetProperty("clientStats").GetArrayLength());
+            Assert.True(multiplayerRoot.GetProperty("serverStats").GetProperty("messagesSent").GetInt32() > 0);
+
+            string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
+            using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
+            JsonElement artifacts = manifestJson.RootElement.GetProperty("artifacts");
+            bool hasMultiplayerEntry = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "multiplayer-demo",
+                    StringComparison.Ordinal));
+            Assert.True(hasMultiplayerEntry);
         }
         finally
         {
