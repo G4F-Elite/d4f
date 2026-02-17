@@ -44,6 +44,8 @@ public sealed class EngineCliPackPipelineTests
             string runtimeConfigPath = Path.Combine(projectRoot, "dist", "package", "config", "runtime.json");
             using JsonDocument runtimeConfig = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
             Assert.Equal("pak-only", runtimeConfig.RootElement.GetProperty("contentMode").GetString());
+            Assert.Equal("dff_native.dll", runtimeConfig.RootElement.GetProperty("nativeLibrary").GetString());
+            Assert.True(runtimeConfig.RootElement.GetProperty("nativeLibrarySearchPath").ValueKind is JsonValueKind.Null);
             Assert.False(runtimeConfig.RootElement.TryGetProperty("compiledManifest", out _));
         }
         finally
@@ -98,6 +100,11 @@ public sealed class EngineCliPackPipelineTests
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
             Assert.False(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
             Assert.False(Directory.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled")));
+            using JsonDocument runtimeConfig = JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
+            Assert.Equal("win-x64", runtimeConfig.RootElement.GetProperty("runtime").GetString());
+            Assert.Equal("dff_native.dll", runtimeConfig.RootElement.GetProperty("nativeLibrary").GetString());
+            Assert.True(runtimeConfig.RootElement.GetProperty("nativeLibrarySearchPath").ValueKind is JsonValueKind.Null);
             Assert.Contains("Package archive created", output.ToString(), StringComparison.Ordinal);
         }
         finally
@@ -143,11 +150,51 @@ public sealed class EngineCliPackPipelineTests
             Assert.True(File.Exists(archivePath));
             Assert.Equal([0x1F, 0x8B], File.ReadAllBytes(archivePath).Take(2).ToArray());
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "App", "libdff_native.so")));
+            using JsonDocument runtimeConfig = JsonDocument.Parse(
+                File.ReadAllText(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
+            Assert.Equal("linux-x64", runtimeConfig.RootElement.GetProperty("runtime").GetString());
+            Assert.Equal("libdff_native.so", runtimeConfig.RootElement.GetProperty("nativeLibrary").GetString());
+            Assert.Equal("$ORIGIN", runtimeConfig.RootElement.GetProperty("nativeLibrarySearchPath").GetString());
 
             string[] archiveEntries = ListTarGzEntries(archivePath);
             Assert.Contains("App/libdff_native.so", archiveEntries);
             Assert.Contains("Content/Game.pak", archiveEntries);
             Assert.Contains("config/runtime.json", archiveEntries);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailPack_WhenArchiveExtensionUnsupported()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareAssetManifest(tempRoot);
+            string runtimeProjectPath = Path.Combine(tempRoot, "src", "Game.Runtime", "Game.Runtime.csproj");
+            Directory.CreateDirectory(Path.GetDirectoryName(runtimeProjectPath)!);
+            File.WriteAllText(runtimeProjectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(
+            [
+                "pack",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--publish-project", "src/Game.Runtime/Game.Runtime.csproj",
+                "--runtime", "linux-x64",
+                "--zip", "dist/build.7z"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Unsupported archive extension", error.ToString(), StringComparison.Ordinal);
         }
         finally
         {

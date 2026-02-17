@@ -40,8 +40,8 @@ public sealed partial class EngineCliApp
             _stdout.WriteLine("Publish skipped: runtime .csproj was not found and '--publish-project' is not set.");
         }
 
-        CopyNativeLibrary(projectDirectory, command, appDirectory);
-        WritePackConfig(packageRoot, command);
+        string? nativeLibraryFileName = CopyNativeLibrary(projectDirectory, command, appDirectory);
+        WritePackConfig(packageRoot, command, nativeLibraryFileName);
 
         if (!string.IsNullOrWhiteSpace(command.ZipOutputPath))
         {
@@ -120,18 +120,20 @@ public sealed partial class EngineCliApp
         }
     }
 
-    private void CopyNativeLibrary(string projectDirectory, PackCommand command, string appDirectory)
+    private string? CopyNativeLibrary(string projectDirectory, PackCommand command, string appDirectory)
     {
         string? nativeLibraryPath = ResolveNativeLibraryPath(projectDirectory, command);
         if (nativeLibraryPath is null)
         {
-            _stdout.WriteLine("Native library copy skipped: native DLL was not found.");
-            return;
+            _stdout.WriteLine("Native library copy skipped: native runtime library was not found.");
+            return null;
         }
 
         Directory.CreateDirectory(appDirectory);
-        string destinationPath = Path.Combine(appDirectory, Path.GetFileName(nativeLibraryPath));
+        string fileName = Path.GetFileName(nativeLibraryPath);
+        string destinationPath = Path.Combine(appDirectory, fileName);
         File.Copy(nativeLibraryPath, destinationPath, overwrite: true);
+        return fileName;
     }
 
     private static string? ResolveNativeLibraryPath(string projectDirectory, PackCommand command)
@@ -171,10 +173,22 @@ public sealed partial class EngineCliApp
         return null;
     }
 
-    private static void WritePackConfig(string packageRoot, PackCommand command)
+    private static void WritePackConfig(
+        string packageRoot,
+        PackCommand command,
+        string? nativeLibraryFileName)
     {
         string configDirectory = Path.Combine(packageRoot, "config");
         Directory.CreateDirectory(configDirectory);
+        string resolvedNativeLibraryName = string.IsNullOrWhiteSpace(nativeLibraryFileName)
+            ? InferDefaultNativeLibraryName(command.RuntimeIdentifier)
+            : nativeLibraryFileName;
+        string? nativeLibrarySearchPath = string.Equals(
+            command.RuntimeIdentifier,
+            "linux-x64",
+            StringComparison.OrdinalIgnoreCase)
+            ? "$ORIGIN"
+            : null;
 
         var config = new
         {
@@ -183,6 +197,8 @@ public sealed partial class EngineCliApp
             contentPak = "Content/Game.pak",
             contentMode = "pak-only",
             appDirectory = "App",
+            nativeLibrary = resolvedNativeLibraryName,
+            nativeLibrarySearchPath,
             generatedAtUtc = DateTime.UtcNow
         };
 
@@ -201,6 +217,15 @@ public sealed partial class EngineCliApp
             "win-x64" => ["dff_native.dll"],
             "linux-x64" => ["libdff_native.so", "dff_native.so"],
             _ => ["dff_native.dll", "libdff_native.so", "dff_native.so"]
+        };
+    }
+
+    private static string InferDefaultNativeLibraryName(string runtimeIdentifier)
+    {
+        return runtimeIdentifier.ToLowerInvariant() switch
+        {
+            "linux-x64" => "libdff_native.so",
+            _ => "dff_native.dll"
         };
     }
 
