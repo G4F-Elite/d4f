@@ -137,7 +137,7 @@ public sealed class GameHost
         stageStart = Stopwatch.GetTimestamp();
         using var frameArena = _renderingFacade.BeginFrame(_options.FrameArenaBytes, _options.FrameArenaAlignment);
         _world.RunStage(SystemStage.PreRender, timing);
-        var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena);
+        var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena, _options.RenderSettings);
         TimeSpan preRenderCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
         stageStart = Stopwatch.GetTimestamp();

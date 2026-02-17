@@ -78,6 +78,21 @@ public sealed class DefaultRenderPacketBuilderTests
     }
 
     [Fact]
+    public void Build_PropagatesDebugViewModeFromRenderSettings()
+    {
+        var world = new World();
+        using var arena = new FrameArena(1024, 64);
+
+        RenderPacket packet = DefaultRenderPacketBuilder.Instance.Build(
+            world,
+            new FrameTiming(3, TimeSpan.FromMilliseconds(16), TimeSpan.FromMilliseconds(48)),
+            arena,
+            new RenderSettings(RenderDebugViewMode.Albedo));
+
+        Assert.Equal(RenderDebugViewMode.Albedo, packet.DebugViewMode);
+    }
+
+    [Fact]
     public void Build_IgnoresDefaultOrEmptyUiBatches()
     {
         var world = new World();

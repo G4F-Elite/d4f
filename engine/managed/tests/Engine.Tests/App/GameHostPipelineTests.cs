@@ -65,6 +65,37 @@ public sealed class GameHostPipelineTests
     }
 
     [Fact]
+    public void RunFrames_PassesRenderSettingsToPacketBuilder()
+    {
+        var execution = new List<string>();
+        var world = new World();
+        world.RegisterSystem(SystemStage.PreRender, new RecordingWorldSystem("stage.prerender", execution));
+
+        var options = new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 1024,
+            frameArenaAlignment: 64,
+            renderSettings: new RenderSettings(RenderDebugViewMode.Normals));
+        var timing = new FrameTiming(0, TimeSpan.FromMilliseconds(16), TimeSpan.FromMilliseconds(16));
+        var packetBuilder = new RecordingPacketBuilder(execution);
+        var host = GameHostFactory.CreateHost(
+            world,
+            new RecordingPlatformFacade(execution, true),
+            new RecordingTimingFacade(execution, timing),
+            new RecordingPhysicsFacade(execution),
+            new RecordingUiFacade(execution),
+            packetBuilder,
+            new RecordingRenderingFacade(execution),
+            options);
+
+        int frames = host.RunFrames(1);
+
+        Assert.Equal(1, frames);
+        Assert.Equal(RenderDebugViewMode.Normals, packetBuilder.LastRenderSettings.DebugViewMode);
+    }
+
+    [Fact]
     public void RunFrames_SkipsPhysicsWhenNoSubstepsReady()
     {
         var execution = new List<string>();

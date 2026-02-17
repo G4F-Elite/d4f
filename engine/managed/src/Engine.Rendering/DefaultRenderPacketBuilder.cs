@@ -15,6 +15,11 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 
     public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena)
     {
+        return Build(world, timing, frameArena, RenderSettings.Default);
+    }
+
+    public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena, in RenderSettings renderSettings)
+    {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(frameArena);
         IReadOnlyList<UiDrawCommand> uiCommands = CollectUiCommands(world);
@@ -23,7 +28,8 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             timing.FrameNumber,
             frameArena,
             Array.Empty<DrawCommand>(),
-            uiCommands);
+            uiCommands,
+            renderSettings.DebugViewMode);
     }
 
     private static IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)

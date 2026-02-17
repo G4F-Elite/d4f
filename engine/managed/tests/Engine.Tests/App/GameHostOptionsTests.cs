@@ -1,5 +1,6 @@
 using System;
 using Engine.App;
+using Engine.Rendering;
 using Xunit;
 
 namespace Engine.Tests.App;
@@ -20,7 +21,8 @@ public sealed class GameHostOptionsTests
                 seed: 42,
                 fixedDeltaTimeOverride: TimeSpan.FromMilliseconds(16),
                 disableAutoExposure: true,
-                disableJitterEffects: true));
+                disableJitterEffects: true),
+            renderSettings: new RenderSettings(RenderDebugViewMode.Albedo));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
@@ -32,6 +34,7 @@ public sealed class GameHostOptionsTests
         Assert.Equal(TimeSpan.FromMilliseconds(16), options.DeterministicMode.FixedDeltaTimeOverride);
         Assert.True(options.DeterministicMode.DisableAutoExposure);
         Assert.True(options.DeterministicMode.DisableJitterEffects);
+        Assert.Equal(RenderDebugViewMode.Albedo, options.RenderSettings.DebugViewMode);
     }
 
     [Fact]
@@ -46,6 +49,7 @@ public sealed class GameHostOptionsTests
         Assert.Equal(0, options.FrameArenaAlignment & (options.FrameArenaAlignment - 1));
         Assert.True(options.MaxAccumulatedTime >= options.FixedDt);
         Assert.False(options.DeterministicMode.Enabled);
+        Assert.Equal(RenderDebugViewMode.None, options.RenderSettings.DebugViewMode);
     }
 
     [Fact]

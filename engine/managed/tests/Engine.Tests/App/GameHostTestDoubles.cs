@@ -195,9 +195,12 @@ internal sealed class RecordingPacketBuilder : IRenderPacketBuilder
         _execution = execution;
     }
 
-    public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena)
+    public RenderSettings LastRenderSettings { get; private set; } = RenderSettings.Default;
+
+    public RenderPacket Build(World world, in FrameTiming timing, FrameArena frameArena, in RenderSettings renderSettings)
     {
         Assert.NotNull(frameArena);
+        LastRenderSettings = renderSettings;
         _execution.Add("render.build");
         return RenderPacket.Empty(timing.FrameNumber);
     }
