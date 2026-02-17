@@ -11,11 +11,12 @@ internal static class UiLayoutEngine
 
         foreach (UiElement root in document.Roots)
         {
-            ApplyElementLayout(root, 0.0f, 0.0f, null, null, null, null);
+            ApplyElementLayout(document, root, 0.0f, 0.0f, null, null, null, null);
         }
     }
 
     private static void ApplyElementLayout(
+        UiDocument document,
         UiElement element,
         float parentContentX,
         float parentContentY,
@@ -45,22 +46,23 @@ internal static class UiLayoutEngine
         float contentY = bounds.Y + element.Padding.Top;
         float contentWidth = Math.Max(0.0f, bounds.Width - element.Padding.Left - element.Padding.Right);
         float contentHeight = Math.Max(0.0f, bounds.Height - element.Padding.Top - element.Padding.Bottom);
+        float layoutGap = ResolveElementLayoutGap(document, element);
 
         switch (element.LayoutMode)
         {
             case UiLayoutMode.VerticalStack:
-                ApplyVerticalLayout(element.Children, contentX, contentY, contentWidth, contentHeight, element.LayoutGap);
+                ApplyVerticalLayout(document, element.Children, contentX, contentY, contentWidth, contentHeight, layoutGap);
                 return;
             case UiLayoutMode.HorizontalStack:
-                ApplyHorizontalLayout(element.Children, contentX, contentY, contentWidth, contentHeight, element.LayoutGap);
+                ApplyHorizontalLayout(document, element.Children, contentX, contentY, contentWidth, contentHeight, layoutGap);
                 return;
             case UiLayoutMode.Flex:
-                ApplyFlexLayout(element, contentX, contentY, contentWidth, contentHeight);
+                ApplyFlexLayout(document, element, contentX, contentY, contentWidth, contentHeight, layoutGap);
                 return;
             default:
                 foreach (UiElement child in element.Children)
                 {
-                    ApplyElementLayout(child, contentX, contentY, null, null, null, null);
+                    ApplyElementLayout(document, child, contentX, contentY, null, null, null, null);
                 }
 
                 return;
@@ -68,6 +70,7 @@ internal static class UiLayoutEngine
     }
 
     private static void ApplyVerticalLayout(
+        UiDocument document,
         IReadOnlyList<UiElement> children,
         float contentX,
         float contentY,
@@ -84,7 +87,7 @@ internal static class UiLayoutEngine
             float childX = child.X;
             float childY = cursorY - contentY + child.Y;
 
-            ApplyElementLayout(child, contentX, contentY, childX, childY, childWidth, childHeight);
+            ApplyElementLayout(document, child, contentX, contentY, childX, childY, childWidth, childHeight);
 
             if (child.Visible)
             {
@@ -94,6 +97,7 @@ internal static class UiLayoutEngine
     }
 
     private static void ApplyHorizontalLayout(
+        UiDocument document,
         IReadOnlyList<UiElement> children,
         float contentX,
         float contentY,
@@ -110,7 +114,7 @@ internal static class UiLayoutEngine
             float childX = cursorX - contentX + child.X;
             float childY = child.Y;
 
-            ApplyElementLayout(child, contentX, contentY, childX, childY, childWidth, childHeight);
+            ApplyElementLayout(document, child, contentX, contentY, childX, childY, childWidth, childHeight);
 
             if (child.Visible)
             {
@@ -120,16 +124,17 @@ internal static class UiLayoutEngine
     }
 
     private static void ApplyFlexLayout(
+        UiDocument document,
         UiElement container,
         float contentX,
         float contentY,
         float contentWidth,
-        float contentHeight)
+        float contentHeight,
+        float gap)
     {
         bool isRow = container.FlexDirection == UiFlexDirection.Row;
         float contentMain = Math.Max(0.0f, isRow ? contentWidth : contentHeight);
         float contentCross = Math.Max(0.0f, isRow ? contentHeight : contentWidth);
-        float gap = container.LayoutGap;
         var lines = new List<FlexLine>();
         var currentLine = new FlexLine();
         lines.Add(currentLine);
@@ -138,7 +143,7 @@ internal static class UiLayoutEngine
         {
             if (!child.Visible)
             {
-                ApplyElementLayout(child, contentX, contentY, null, null, null, null);
+                ApplyElementLayout(document, child, contentX, contentY, null, null, null, null);
                 continue;
             }
 
@@ -219,7 +224,7 @@ internal static class UiLayoutEngine
                 float localY = isRow ? localCross + item.Child.Y : localMain + item.Child.Y;
                 float width = isRow ? item.MainSize : crossSize;
                 float height = isRow ? crossSize : item.MainSize;
-                ApplyElementLayout(item.Child, contentX, contentY, localX, localY, width, height);
+                ApplyElementLayout(document, item.Child, contentX, contentY, localX, localY, width, height);
 
                 mainCursor += item.TotalMain + spacing;
             }
@@ -230,6 +235,17 @@ internal static class UiLayoutEngine
                 crossCursor += gap;
             }
         }
+    }
+
+    private static float ResolveElementLayoutGap(UiDocument document, UiElement element)
+    {
+        if (element.LayoutGap > 0f)
+        {
+            return element.LayoutGap;
+        }
+
+        UiResolvedStyle resolved = UiStyleResolver.Resolve(document, element);
+        return resolved.Spacing;
     }
 
     private static FlexItem CreateFlexItem(UiElement child, bool isRow)
