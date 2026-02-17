@@ -63,7 +63,7 @@ public static partial class TextureBuilder
                 data[y * recipe.Width + x] = recipe.Kind switch
                 {
                     ProceduralTextureKind.Perlin => FractalNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Simplex => FractalNoise(u + 13.37f, v - 3.11f, recipe.Seed ^ 0x9E3779B9u, recipe.FbmOctaves, recipe.Frequency),
+                    ProceduralTextureKind.Simplex => FractalSimplexNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
                     ProceduralTextureKind.Worley => Worley(u, v, recipe.Seed, recipe.Frequency),
                     ProceduralTextureKind.Grid => Grid(u, v),
                     ProceduralTextureKind.Brick => Brick(u, v),
@@ -161,6 +161,84 @@ public static partial class TextureBuilder
         return Math.Clamp(sum / MathF.Max(amplitudeSum, float.Epsilon), 0f, 1f);
     }
 
+    private static float FractalSimplexNoise(float u, float v, uint seed, int octaves, float baseFrequency)
+    {
+        float amplitude = 1f;
+        float frequency = baseFrequency;
+        float sum = 0f;
+        float amplitudeSum = 0f;
+
+        for (int octave = 0; octave < octaves; octave++)
+        {
+            uint octaveSeed = seed ^ (uint)octave * 0x9E3779B9u;
+            float sample = SimplexNoise2D(u * frequency, v * frequency, octaveSeed);
+            sum += sample * amplitude;
+            amplitudeSum += amplitude;
+            amplitude *= 0.5f;
+            frequency *= 2f;
+        }
+
+        return Math.Clamp(sum / MathF.Max(amplitudeSum, float.Epsilon), 0f, 1f);
+    }
+
+    private static float SimplexNoise2D(float x, float y, uint seed)
+    {
+        const float f2 = 0.366025403f; // (sqrt(3)-1)/2
+        const float g2 = 0.211324865f; // (3-sqrt(3))/6
+
+        float skew = (x + y) * f2;
+        int i = (int)MathF.Floor(x + skew);
+        int j = (int)MathF.Floor(y + skew);
+
+        float unskew = (i + j) * g2;
+        float x0 = x - (i - unskew);
+        float y0 = y - (j - unskew);
+
+        int i1 = x0 > y0 ? 1 : 0;
+        int j1 = x0 > y0 ? 0 : 1;
+
+        float x1 = x0 - i1 + g2;
+        float y1 = y0 - j1 + g2;
+        float x2 = x0 - 1f + 2f * g2;
+        float y2 = y0 - 1f + 2f * g2;
+
+        float n0 = SimplexContribution(i, j, x0, y0, seed);
+        float n1 = SimplexContribution(i + i1, j + j1, x1, y1, seed);
+        float n2 = SimplexContribution(i + 1, j + 1, x2, y2, seed);
+
+        float value = 70f * (n0 + n1 + n2);
+        return Math.Clamp(value * 0.5f + 0.5f, 0f, 1f);
+    }
+
+    private static float SimplexContribution(int i, int j, float x, float y, uint seed)
+    {
+        float radius = 0.5f - x * x - y * y;
+        if (radius <= 0f)
+        {
+            return 0f;
+        }
+
+        uint hash = Hash(unchecked((uint)i), unchecked((uint)j), seed);
+        float gradientDot = GradientDot2D(hash, x, y);
+        float radius2 = radius * radius;
+        return radius2 * radius2 * gradientDot;
+    }
+
+    private static float GradientDot2D(uint hash, float x, float y)
+    {
+        return (hash & 7u) switch
+        {
+            0u => x + y,
+            1u => -x + y,
+            2u => x - y,
+            3u => -x - y,
+            4u => x,
+            5u => -x,
+            6u => y,
+            _ => -y
+        };
+    }
+
     private static float Worley(float u, float v, uint seed, float frequency)
     {
         float x = u * frequency;
@@ -240,12 +318,18 @@ public static partial class TextureBuilder
 
     private static float Hash01(uint x, uint y, uint seed)
     {
+        uint hash = Hash(x, y, seed);
+        return (hash & 0x00FFFFFFu) / 16777215f;
+    }
+
+    private static uint Hash(uint x, uint y, uint seed)
+    {
         uint hash = x;
         hash = (hash * 0x27D4EB2Du) ^ y;
         hash = (hash * 0x165667B1u) ^ seed;
         hash ^= hash >> 15;
         hash *= 0x2C1B3C6Du;
         hash ^= hash >> 12;
-        return (hash & 0x00FFFFFFu) / 16777215f;
+        return hash;
     }
 }
