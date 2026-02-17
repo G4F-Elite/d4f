@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
@@ -93,6 +94,55 @@ public sealed class DefaultRenderPacketBuilderTests
     }
 
     [Fact]
+    public void Build_AggregatesDrawCommandsFromRenderMeshInstances()
+    {
+        var world = new World();
+        EntityId third = world.CreateEntity();
+        EntityId first = world.CreateEntity();
+        EntityId second = world.CreateEntity();
+
+        world.AddComponent(third, new RenderMeshInstance(
+            new MeshHandle(300),
+            new MaterialHandle(30),
+            new TextureHandle(3),
+            CreateWorldMatrix(30),
+            sortKeyHigh: 3,
+            sortKeyLow: 30));
+        world.AddComponent(first, new RenderMeshInstance(
+            new MeshHandle(100),
+            new MaterialHandle(10),
+            new TextureHandle(1),
+            CreateWorldMatrix(10),
+            sortKeyHigh: 1,
+            sortKeyLow: 10));
+        world.AddComponent(second, new RenderMeshInstance(
+            new MeshHandle(200),
+            new MaterialHandle(20),
+            new TextureHandle(2),
+            CreateWorldMatrix(20),
+            sortKeyHigh: 2,
+            sortKeyLow: 20));
+
+        using var arena = new FrameArena(2048, 64);
+        RenderPacket packet = DefaultRenderPacketBuilder.Instance.Build(
+            world,
+            new FrameTiming(5, TimeSpan.FromMilliseconds(16), TimeSpan.FromMilliseconds(80)),
+            arena);
+
+        Assert.Equal(3, packet.NativeDrawItemCount);
+        Assert.Equal((ulong)100, packet.NativeDrawItems[0].Mesh);
+        Assert.Equal((ulong)200, packet.NativeDrawItems[1].Mesh);
+        Assert.Equal((ulong)300, packet.NativeDrawItems[2].Mesh);
+
+        Assert.Equal((uint)1, packet.DrawCommands[0].SortKeyHigh);
+        Assert.Equal((uint)2, packet.DrawCommands[1].SortKeyHigh);
+        Assert.Equal((uint)3, packet.DrawCommands[2].SortKeyHigh);
+
+        Assert.Equal(11.0f, packet.NativeDrawItems[0].World00);
+        Assert.Equal(34.0f, packet.NativeDrawItems[2].World03);
+    }
+
+    [Fact]
     public void Build_IgnoresDefaultOrEmptyUiBatches()
     {
         var world = new World();
@@ -109,4 +159,30 @@ public sealed class DefaultRenderPacketBuilderTests
         Assert.Equal(0, packet.NativeUiDrawItemCount);
         Assert.Equal(IntPtr.Zero, packet.NativeUiDrawItemsPointer);
     }
+
+    [Fact]
+    public void Build_IgnoresDefaultRenderMeshInstances()
+    {
+        var world = new World();
+        EntityId invalidEntity = world.CreateEntity();
+        EntityId validEntity = world.CreateEntity();
+        world.AddComponent(invalidEntity, default(RenderMeshInstance));
+        world.AddComponent(validEntity, new RenderMeshInstance(new MeshHandle(10), new MaterialHandle(20), new TextureHandle(30)));
+
+        using var arena = new FrameArena(1024, 64);
+        RenderPacket packet = DefaultRenderPacketBuilder.Instance.Build(
+            world,
+            new FrameTiming(1, TimeSpan.Zero, TimeSpan.Zero),
+            arena);
+
+        Assert.Equal(1, packet.NativeDrawItemCount);
+        Assert.Equal((ulong)10, packet.NativeDrawItems[0].Mesh);
+    }
+
+    private static Matrix4x4 CreateWorldMatrix(float start)
+        => new(
+            start + 1.0f, start + 2.0f, start + 3.0f, start + 4.0f,
+            start + 5.0f, start + 6.0f, start + 7.0f, start + 8.0f,
+            start + 9.0f, start + 10.0f, start + 11.0f, start + 12.0f,
+            start + 13.0f, start + 14.0f, start + 15.0f, start + 16.0f);
 }
