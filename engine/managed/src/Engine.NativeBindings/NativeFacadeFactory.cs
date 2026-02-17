@@ -121,8 +121,18 @@ public static class NativeFacadeFactory
         public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
             => _nativeApi.CreateMeshFromBlob(blob);
 
+        public MeshHandle CreateMeshFromCpu(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
+            => _nativeApi.CreateMeshFromCpu(positions, indices);
+
         public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
             => _nativeApi.CreateTextureFromBlob(blob);
+
+        public TextureHandle CreateTextureFromCpu(
+            uint width,
+            uint height,
+            ReadOnlySpan<byte> rgba8,
+            uint strideBytes = 0)
+            => _nativeApi.CreateTextureFromCpu(width, height, rgba8, strideBytes);
 
         public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
             => _nativeApi.CreateMaterialFromBlob(blob);

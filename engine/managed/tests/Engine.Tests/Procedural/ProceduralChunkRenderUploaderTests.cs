@@ -120,9 +120,36 @@ public sealed class ProceduralChunkRenderUploaderTests
             return new MeshHandle(_nextHandle++);
         }
 
+        public MeshHandle CreateMeshFromCpu(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
+        {
+            if (positions.Length == 0 || indices.Length == 0)
+            {
+                throw new ArgumentException("Mesh CPU payload must be non-empty.");
+            }
+
+            var blob = new byte[checked((positions.Length * sizeof(float)) + (indices.Length * sizeof(uint)))];
+            MeshBlobs.Add(blob);
+            return new MeshHandle(_nextHandle++);
+        }
+
         public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
         {
             TextureBlobs.Add(blob.ToArray());
+            return new TextureHandle(_nextHandle++);
+        }
+
+        public TextureHandle CreateTextureFromCpu(
+            uint width,
+            uint height,
+            ReadOnlySpan<byte> rgba8,
+            uint strideBytes = 0)
+        {
+            if (width == 0u || height == 0u || rgba8.Length == 0)
+            {
+                throw new ArgumentException("Texture CPU payload must be valid.");
+            }
+
+            TextureBlobs.Add(rgba8.ToArray());
             return new TextureHandle(_nextHandle++);
         }
 

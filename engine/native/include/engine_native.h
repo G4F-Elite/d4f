@@ -70,6 +70,20 @@ typedef struct engine_native_ui_draw_item {
   uint32_t index_count;
 } engine_native_ui_draw_item_t;
 
+typedef struct engine_native_mesh_cpu_data {
+  const float* positions;
+  uint32_t vertex_count;
+  const uint32_t* indices;
+  uint32_t index_count;
+} engine_native_mesh_cpu_data_t;
+
+typedef struct engine_native_texture_cpu_data {
+  const uint8_t* rgba8;
+  uint32_t width;
+  uint32_t height;
+  uint32_t stride;
+} engine_native_texture_cpu_data_t;
+
 typedef enum engine_native_debug_view_mode {
   ENGINE_NATIVE_DEBUG_VIEW_NONE = 0,
   ENGINE_NATIVE_DEBUG_VIEW_DEPTH = 1,
@@ -267,10 +281,20 @@ ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_blob(
     size_t size,
     engine_native_resource_handle_t* out_mesh);
 
+ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_cpu(
+    engine_native_renderer_t* renderer,
+    const engine_native_mesh_cpu_data_t* mesh_data,
+    engine_native_resource_handle_t* out_mesh);
+
 ENGINE_NATIVE_API engine_native_status_t renderer_create_texture_from_blob(
     engine_native_renderer_t* renderer,
     const void* data,
     size_t size,
+    engine_native_resource_handle_t* out_texture);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_texture_from_cpu(
+    engine_native_renderer_t* renderer,
+    const engine_native_texture_cpu_data_t* texture_data,
     engine_native_resource_handle_t* out_texture);
 
 ENGINE_NATIVE_API engine_native_status_t renderer_create_material_from_blob(

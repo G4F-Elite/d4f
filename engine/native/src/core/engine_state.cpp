@@ -301,11 +301,131 @@ engine_native_status_t RendererState::CreateMeshFromBlob(
   return CreateResourceFromBlob(ResourceKind::kMesh, data, size, out_mesh);
 }
 
+engine_native_status_t RendererState::CreateMeshFromCpu(
+    const engine_native_mesh_cpu_data_t& mesh_data,
+    engine_native_resource_handle_t* out_mesh) {
+  if (out_mesh == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_mesh = kInvalidResourceHandle;
+
+  if (mesh_data.positions == nullptr || mesh_data.indices == nullptr ||
+      mesh_data.vertex_count == 0u || mesh_data.index_count == 0u ||
+      (mesh_data.index_count % 3u) != 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const uint32_t vertex_count = mesh_data.vertex_count;
+  for (uint32_t i = 0u; i < mesh_data.index_count; ++i) {
+    if (mesh_data.indices[i] >= vertex_count) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+  }
+
+  const size_t position_component_count =
+      static_cast<size_t>(mesh_data.vertex_count) * 3u;
+  if (position_component_count >
+      (std::numeric_limits<size_t>::max() / sizeof(float))) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  const size_t position_bytes = position_component_count * sizeof(float);
+
+  const size_t index_count = static_cast<size_t>(mesh_data.index_count);
+  if (index_count > (std::numeric_limits<size_t>::max() / sizeof(uint32_t))) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  const size_t index_bytes = index_count * sizeof(uint32_t);
+
+  constexpr uint32_t kMeshCpuMagic = 0x4D435031u;  // "MCP1"
+  std::vector<uint8_t> encoded_blob;
+  try {
+    encoded_blob.reserve(sizeof(kMeshCpuMagic) + sizeof(uint32_t) * 2u +
+                         position_bytes + index_bytes);
+    auto append_bytes = [&encoded_blob](const void* src, size_t bytes) {
+      const auto* begin = static_cast<const uint8_t*>(src);
+      encoded_blob.insert(encoded_blob.end(), begin, begin + bytes);
+    };
+
+    append_bytes(&kMeshCpuMagic, sizeof(kMeshCpuMagic));
+    append_bytes(&mesh_data.vertex_count, sizeof(mesh_data.vertex_count));
+    append_bytes(&mesh_data.index_count, sizeof(mesh_data.index_count));
+    append_bytes(mesh_data.positions, position_bytes);
+    append_bytes(mesh_data.indices, index_bytes);
+  } catch (const std::bad_alloc&) {
+    return ENGINE_NATIVE_STATUS_OUT_OF_MEMORY;
+  }
+
+  return CreateResourceFromBlob(ResourceKind::kMesh, encoded_blob.data(),
+                                encoded_blob.size(), out_mesh);
+}
+
 engine_native_status_t RendererState::CreateTextureFromBlob(
     const void* data,
     size_t size,
     engine_native_resource_handle_t* out_texture) {
   return CreateResourceFromBlob(ResourceKind::kTexture, data, size, out_texture);
+}
+
+engine_native_status_t RendererState::CreateTextureFromCpu(
+    const engine_native_texture_cpu_data_t& texture_data,
+    engine_native_resource_handle_t* out_texture) {
+  if (out_texture == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  *out_texture = kInvalidResourceHandle;
+
+  if (texture_data.rgba8 == nullptr || texture_data.width == 0u ||
+      texture_data.height == 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (texture_data.width > (std::numeric_limits<uint32_t>::max() / 4u)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const uint32_t required_stride = texture_data.width * 4u;
+  const uint32_t stride =
+      texture_data.stride == 0u ? required_stride : texture_data.stride;
+  if (stride < required_stride) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const size_t row_bytes = static_cast<size_t>(required_stride);
+  const size_t source_row_bytes = static_cast<size_t>(stride);
+  const size_t row_count = static_cast<size_t>(texture_data.height);
+  if (row_count == 0u ||
+      row_bytes > (std::numeric_limits<size_t>::max() / row_count) ||
+      source_row_bytes > (std::numeric_limits<size_t>::max() / row_count)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const size_t payload_bytes = row_bytes * row_count;
+  constexpr uint32_t kTextureCpuMagic = 0x54435031u;  // "TCP1"
+  std::vector<uint8_t> encoded_blob;
+  try {
+    encoded_blob.reserve(sizeof(kTextureCpuMagic) + sizeof(uint32_t) * 3u +
+                         payload_bytes);
+    auto append_bytes = [&encoded_blob](const void* src, size_t bytes) {
+      const auto* begin = static_cast<const uint8_t*>(src);
+      encoded_blob.insert(encoded_blob.end(), begin, begin + bytes);
+    };
+
+    append_bytes(&kTextureCpuMagic, sizeof(kTextureCpuMagic));
+    append_bytes(&texture_data.width, sizeof(texture_data.width));
+    append_bytes(&texture_data.height, sizeof(texture_data.height));
+    append_bytes(&required_stride, sizeof(required_stride));
+
+    const auto* pixels = texture_data.rgba8;
+    for (size_t row = 0u; row < row_count; ++row) {
+      const uint8_t* row_ptr = pixels + row * source_row_bytes;
+      append_bytes(row_ptr, row_bytes);
+    }
+  } catch (const std::bad_alloc&) {
+    return ENGINE_NATIVE_STATUS_OUT_OF_MEMORY;
+  }
+
+  return CreateResourceFromBlob(ResourceKind::kTexture, encoded_blob.data(),
+                                encoded_blob.size(), out_texture);
 }
 
 engine_native_status_t RendererState::CreateMaterialFromBlob(

@@ -259,11 +259,46 @@ internal sealed class RecordingRenderingFacade : IRenderingFacade
         return new MeshHandle(_nextResourceHandle++);
     }
 
+    public MeshHandle CreateMeshFromCpu(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
+    {
+        if (positions.Length == 0 || (positions.Length % 3) != 0)
+        {
+            throw new ArgumentException("Positions must be non-empty and contain XYZ triplets.", nameof(positions));
+        }
+
+        if (indices.Length == 0 || (indices.Length % 3) != 0)
+        {
+            throw new ArgumentException("Indices must be non-empty and divisible by three.", nameof(indices));
+        }
+
+        return new MeshHandle(_nextResourceHandle++);
+    }
+
     public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
     {
         if (blob.Length == 0)
         {
             throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+        }
+
+        return new TextureHandle(_nextResourceHandle++);
+    }
+
+    public TextureHandle CreateTextureFromCpu(
+        uint width,
+        uint height,
+        ReadOnlySpan<byte> rgba8,
+        uint strideBytes = 0)
+    {
+        if (width == 0u || height == 0u)
+        {
+            throw new ArgumentOutOfRangeException(width == 0u ? nameof(width) : nameof(height));
+        }
+
+        uint stride = strideBytes == 0u ? checked(width * 4u) : strideBytes;
+        if (rgba8.Length != checked((int)(stride * height)))
+        {
+            throw new ArgumentException("Texture payload size does not match width/height/stride.", nameof(rgba8));
         }
 
         return new TextureHandle(_nextResourceHandle++);

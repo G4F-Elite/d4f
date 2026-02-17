@@ -35,10 +35,20 @@ internal interface INativeInteropApi
         nuint size,
         out ulong mesh);
 
+    EngineNativeStatus RendererCreateMeshFromCpu(
+        IntPtr renderer,
+        in EngineNativeMeshCpuData meshData,
+        out ulong mesh);
+
     EngineNativeStatus RendererCreateTextureFromBlob(
         IntPtr renderer,
         IntPtr data,
         nuint size,
+        out ulong texture);
+
+    EngineNativeStatus RendererCreateTextureFromCpu(
+        IntPtr renderer,
+        in EngineNativeTextureCpuData textureData,
         out ulong texture);
 
     EngineNativeStatus RendererCreateMaterialFromBlob(

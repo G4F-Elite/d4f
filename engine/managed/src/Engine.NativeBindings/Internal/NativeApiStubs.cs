@@ -97,8 +97,18 @@ internal sealed class NativeRenderingApiStub : INativeRenderingApi
     public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
         => NoopRenderingFacade.Instance.CreateMeshFromBlob(blob);
 
+    public MeshHandle CreateMeshFromCpu(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
+        => NoopRenderingFacade.Instance.CreateMeshFromCpu(positions, indices);
+
     public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
         => NoopRenderingFacade.Instance.CreateTextureFromBlob(blob);
+
+    public TextureHandle CreateTextureFromCpu(
+        uint width,
+        uint height,
+        ReadOnlySpan<byte> rgba8,
+        uint strideBytes = 0)
+        => NoopRenderingFacade.Instance.CreateTextureFromCpu(width, height, rgba8, strideBytes);
 
     public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
         => NoopRenderingFacade.Instance.CreateMaterialFromBlob(blob);

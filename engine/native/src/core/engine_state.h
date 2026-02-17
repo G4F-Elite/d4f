@@ -44,9 +44,15 @@ class RendererState {
       const void* data,
       size_t size,
       engine_native_resource_handle_t* out_mesh);
+  engine_native_status_t CreateMeshFromCpu(
+      const engine_native_mesh_cpu_data_t& mesh_data,
+      engine_native_resource_handle_t* out_mesh);
   engine_native_status_t CreateTextureFromBlob(
       const void* data,
       size_t size,
+      engine_native_resource_handle_t* out_texture);
+  engine_native_status_t CreateTextureFromCpu(
+      const engine_native_texture_cpu_data_t& texture_data,
       engine_native_resource_handle_t* out_texture);
   engine_native_status_t CreateMaterialFromBlob(
       const void* data,

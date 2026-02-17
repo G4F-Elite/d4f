@@ -63,6 +63,24 @@ internal struct EngineNativeUiDrawItem
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeMeshCpuData
+{
+    public IntPtr Positions;
+    public uint VertexCount;
+    public IntPtr Indices;
+    public uint IndexCount;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeTextureCpuData
+{
+    public IntPtr Rgba8;
+    public uint Width;
+    public uint Height;
+    public uint Stride;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeRenderPacket
 {
     public IntPtr DrawItems;

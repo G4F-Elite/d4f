@@ -35,6 +35,36 @@ public sealed class NoopRenderingFacadeCaptureTests
     }
 
     [Fact]
+    public void ResourceCpuApi_ShouldCreateAndDestroyHandles()
+    {
+        MeshHandle mesh = NoopRenderingFacade.Instance.CreateMeshFromCpu(
+            positions: [0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f, 0f],
+            indices: [0u, 1u, 2u]);
+        TextureHandle texture = NoopRenderingFacade.Instance.CreateTextureFromCpu(
+            width: 1u,
+            height: 1u,
+            rgba8: [10, 20, 30, 255]);
+
+        Assert.True(mesh.IsValid);
+        Assert.True(texture.IsValid);
+        NoopRenderingFacade.Instance.DestroyResource(mesh.Value);
+        NoopRenderingFacade.Instance.DestroyResource(texture.Value);
+    }
+
+    [Fact]
+    public void ResourceCpuApi_ShouldValidateInput()
+    {
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateMeshFromCpu([], [0u, 1u, 2u]));
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateMeshFromCpu([0f, 0f, 0f], []));
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateMeshFromCpu(
+            [0f, 0f, 0f, 1f, 0f, 0f, 0f, 1f, 0f],
+            [0u, 1u, 9u]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => NoopRenderingFacade.Instance.CreateTextureFromCpu(0u, 1u, [0, 0, 0, 255]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => NoopRenderingFacade.Instance.CreateTextureFromCpu(1u, 0u, [0, 0, 0, 255]));
+        Assert.Throws<ArgumentOutOfRangeException>(() => NoopRenderingFacade.Instance.CreateTextureFromCpu(1u, 1u, [0, 0, 0, 255], strideBytes: 3u));
+    }
+
+    [Fact]
     public void CaptureFrameRgba8_ReturnsDeterministicRgbaPayload()
     {
         byte[] first = NoopRenderingFacade.Instance.CaptureFrameRgba8(4u, 3u, includeAlpha: true);

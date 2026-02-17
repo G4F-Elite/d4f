@@ -414,7 +414,9 @@ void TestRendererResourceBlobLifecycle() {
   assert(renderer != nullptr);
 
   engine_native_resource_handle_t mesh = 0u;
+  engine_native_resource_handle_t mesh_from_cpu = 0u;
   engine_native_resource_handle_t texture = 0u;
+  engine_native_resource_handle_t texture_from_cpu = 0u;
   engine_native_resource_handle_t material = 0u;
   uint8_t mesh_blob[6]{1u, 2u, 3u, 4u, 5u, 6u};
   uint8_t texture_blob[5]{6u, 5u, 4u, 3u, 2u};
@@ -439,6 +441,36 @@ void TestRendererResourceBlobLifecycle() {
   assert(texture != 0u);
   assert(texture != mesh);
 
+  float positions[9]{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
+  uint32_t indices[3]{0u, 1u, 2u};
+  engine_native_mesh_cpu_data_t mesh_cpu{
+      .positions = positions,
+      .vertex_count = 3u,
+      .indices = indices,
+      .index_count = 3u};
+  assert(renderer_create_mesh_from_cpu(renderer, nullptr, &mesh_from_cpu) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_cpu(renderer, &mesh_cpu, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_cpu(renderer, &mesh_cpu, &mesh_from_cpu) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(mesh_from_cpu != 0u);
+  assert(mesh_from_cpu != mesh);
+
+  uint8_t texture_pixels[16]{10u, 20u, 30u, 255u, 40u, 50u, 60u, 255u,
+                             70u, 80u, 90u, 255u, 15u, 25u, 35u, 255u};
+  engine_native_texture_cpu_data_t texture_cpu{
+      .rgba8 = texture_pixels, .width = 2u, .height = 2u, .stride = 0u};
+  assert(renderer_create_texture_from_cpu(renderer, nullptr, &texture_from_cpu) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_texture_from_cpu(renderer, &texture_cpu, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_texture_from_cpu(renderer, &texture_cpu,
+                                          &texture_from_cpu) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(texture_from_cpu != 0u);
+  assert(texture_from_cpu != texture);
+
   assert(renderer_create_material_from_blob(renderer,
                                             material_blob,
                                             sizeof(material_blob),
@@ -448,15 +480,19 @@ void TestRendererResourceBlobLifecycle() {
   assert(material != texture);
 
   auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
-  assert(internal_engine->state.renderer.resource_count() == 3u);
+  assert(internal_engine->state.renderer.resource_count() == 5u);
 
   assert(renderer_destroy_resource(renderer, 0u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_destroy_resource(renderer, mesh) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_destroy_resource(renderer, mesh) ==
          ENGINE_NATIVE_STATUS_NOT_FOUND);
-  assert(internal_engine->state.renderer.resource_count() == 2u);
+  assert(internal_engine->state.renderer.resource_count() == 4u);
+  assert(renderer_destroy_resource(renderer, mesh_from_cpu) ==
+         ENGINE_NATIVE_STATUS_OK);
   assert(renderer_destroy_resource(renderer, texture) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_destroy_resource(renderer, texture_from_cpu) ==
+         ENGINE_NATIVE_STATUS_OK);
   assert(renderer_destroy_resource(renderer, material) == ENGINE_NATIVE_STATUS_OK);
   assert(internal_engine->state.renderer.resource_count() == 0u);
   assert(renderer_destroy_resource(renderer, material) ==

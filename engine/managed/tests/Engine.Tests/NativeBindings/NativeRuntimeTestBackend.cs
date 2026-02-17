@@ -59,7 +59,11 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus RendererCreateMeshFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus RendererCreateMeshFromCpuStatus { get; set; } = EngineNativeStatus.Ok;
+
     public EngineNativeStatus RendererCreateTextureFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererCreateTextureFromCpuStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus RendererCreateMaterialFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
 
@@ -214,6 +218,16 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         return RendererCreateMeshFromBlobStatus;
     }
 
+    public EngineNativeStatus RendererCreateMeshFromCpu(
+        IntPtr renderer,
+        in EngineNativeMeshCpuData meshData,
+        out ulong mesh)
+    {
+        Calls.Add("renderer_create_mesh_from_cpu");
+        mesh = RendererCreateMeshFromCpuStatus == EngineNativeStatus.Ok ? RendererMeshHandleToReturn : 0u;
+        return RendererCreateMeshFromCpuStatus;
+    }
+
     public EngineNativeStatus RendererCreateTextureFromBlob(
         IntPtr renderer,
         IntPtr data,
@@ -223,6 +237,16 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         Calls.Add("renderer_create_texture_from_blob");
         texture = RendererCreateTextureFromBlobStatus == EngineNativeStatus.Ok ? RendererTextureHandleToReturn : 0u;
         return RendererCreateTextureFromBlobStatus;
+    }
+
+    public EngineNativeStatus RendererCreateTextureFromCpu(
+        IntPtr renderer,
+        in EngineNativeTextureCpuData textureData,
+        out ulong texture)
+    {
+        Calls.Add("renderer_create_texture_from_cpu");
+        texture = RendererCreateTextureFromCpuStatus == EngineNativeStatus.Ok ? RendererTextureHandleToReturn : 0u;
+        return RendererCreateTextureFromCpuStatus;
     }
 
     public EngineNativeStatus RendererCreateMaterialFromBlob(

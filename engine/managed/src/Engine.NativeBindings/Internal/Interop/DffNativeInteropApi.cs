@@ -53,12 +53,24 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out ulong mesh)
         => NativeMethods.RendererCreateMeshFromBlob(renderer, data, size, out mesh);
 
+    public EngineNativeStatus RendererCreateMeshFromCpu(
+        IntPtr renderer,
+        in EngineNativeMeshCpuData meshData,
+        out ulong mesh)
+        => NativeMethods.RendererCreateMeshFromCpu(renderer, in meshData, out mesh);
+
     public EngineNativeStatus RendererCreateTextureFromBlob(
         IntPtr renderer,
         IntPtr data,
         nuint size,
         out ulong texture)
         => NativeMethods.RendererCreateTextureFromBlob(renderer, data, size, out texture);
+
+    public EngineNativeStatus RendererCreateTextureFromCpu(
+        IntPtr renderer,
+        in EngineNativeTextureCpuData textureData,
+        out ulong texture)
+        => NativeMethods.RendererCreateTextureFromCpu(renderer, in textureData, out texture);
 
     public EngineNativeStatus RendererCreateMaterialFromBlob(
         IntPtr renderer,
@@ -184,12 +196,26 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             nuint size,
             out ulong outMesh);
 
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_cpu")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererCreateMeshFromCpu(
+            IntPtr renderer,
+            in EngineNativeMeshCpuData meshData,
+            out ulong outMesh);
+
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_blob")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus RendererCreateTextureFromBlob(
             IntPtr renderer,
             IntPtr data,
             nuint size,
+            out ulong outTexture);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_cpu")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererCreateTextureFromCpu(
+            IntPtr renderer,
+            in EngineNativeTextureCpuData textureData,
             out ulong outTexture);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_material_from_blob")]

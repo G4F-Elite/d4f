@@ -64,6 +64,21 @@ engine_native_status_t renderer_create_mesh_from_blob(
   return renderer->state->CreateMeshFromBlob(data, size, out_mesh);
 }
 
+engine_native_status_t renderer_create_mesh_from_cpu(
+    engine_native_renderer_t* renderer,
+    const engine_native_mesh_cpu_data_t* mesh_data,
+    engine_native_resource_handle_t* out_mesh) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (mesh_data == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return renderer->state->CreateMeshFromCpu(*mesh_data, out_mesh);
+}
+
 engine_native_status_t renderer_create_texture_from_blob(
     engine_native_renderer_t* renderer,
     const void* data,
@@ -75,6 +90,21 @@ engine_native_status_t renderer_create_texture_from_blob(
   }
 
   return renderer->state->CreateTextureFromBlob(data, size, out_texture);
+}
+
+engine_native_status_t renderer_create_texture_from_cpu(
+    engine_native_renderer_t* renderer,
+    const engine_native_texture_cpu_data_t* texture_data,
+    engine_native_resource_handle_t* out_texture) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (texture_data == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return renderer->state->CreateTextureFromCpu(*texture_data, out_texture);
 }
 
 engine_native_status_t renderer_create_material_from_blob(
