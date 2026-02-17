@@ -1,5 +1,6 @@
 using Assetc;
 using Engine.AssetPipeline;
+using Engine.Content;
 
 namespace Assetc.Tests;
 
@@ -80,38 +81,96 @@ public sealed class CompiledAssetFormatTests
         }
     }
 
+    [Fact]
+    public void Build_CompilesMaterialAndSoundIntoVersionedBinaryFormats()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(tempRoot, "materials"));
+            Directory.CreateDirectory(Path.Combine(tempRoot, "audio"));
+
+            string materialPath = Path.Combine(tempRoot, "materials", "wall.mat");
+            string soundPath = Path.Combine(tempRoot, "audio", "click.snd");
+            File.WriteAllText(materialPath, "{ \"template\": \"lit\" }");
+            File.WriteAllBytes(soundPath, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+            string manifestPath = Path.Combine(tempRoot, "manifest.json");
+            string pakPath = Path.Combine(tempRoot, "content.pak");
+            File.WriteAllText(
+                manifestPath,
+                """
+                {
+                  "version": 1,
+                  "assets": [
+                    {
+                      "path": "materials/wall.mat",
+                      "kind": "material"
+                    },
+                    {
+                      "path": "audio/click.snd",
+                      "kind": "sound"
+                    }
+                  ]
+                }
+                """);
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            AssetcApp app = new(output, error);
+
+            int code = app.Run(["build", "--manifest", manifestPath, "--output", pakPath]);
+            Assert.Equal(0, code);
+
+            PakArchive pak = AssetPipelineService.ReadPak(pakPath);
+            Assert.Equal(2, pak.Entries.Count);
+
+            PakEntry materialEntry = pak.Entries.Single(x => x.Kind == "material");
+            string materialCompiledPath = ResolveCompiledPath(pakPath, materialEntry.CompiledPath);
+            MaterialBlobData material = MaterialBlobCodec.Read(File.ReadAllBytes(materialCompiledPath));
+            Assert.Equal("raw/material:v1", material.TemplateId);
+            Assert.NotEmpty(material.ParameterBlock);
+            Assert.Empty(material.TextureReferences);
+
+            PakEntry soundEntry = pak.Entries.Single(x => x.Kind == "sound");
+            string soundCompiledPath = ResolveCompiledPath(pakPath, soundEntry.CompiledPath);
+            SoundBlobData sound = SoundBlobCodec.Read(File.ReadAllBytes(soundCompiledPath));
+            Assert.Equal(SoundBlobEncoding.SourceEncoded, sound.Encoding);
+            Assert.Equal(48000, sound.SampleRate);
+            Assert.Equal(1, sound.Channels);
+            Assert.NotEmpty(sound.Data);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
     private static void VerifyTextureBinary(string filePath, uint expectedWidth, uint expectedHeight)
     {
-        using FileStream stream = File.OpenRead(filePath);
-        using BinaryReader reader = new(stream);
-
-        uint magic = reader.ReadUInt32();
-        uint version = reader.ReadUInt32();
-        uint width = reader.ReadUInt32();
-        uint height = reader.ReadUInt32();
-        ulong payloadLength = reader.ReadUInt64();
-
-        Assert.Equal(CompiledAssetFormat.TextureMagic, magic);
-        Assert.Equal(CompiledAssetFormat.TextureVersion, version);
-        Assert.Equal(expectedWidth, width);
-        Assert.Equal(expectedHeight, height);
-        Assert.True(payloadLength > 0u);
+        TextureBlobData texture = TextureBlobCodec.Read(File.ReadAllBytes(filePath));
+        Assert.Equal(CompiledAssetFormat.TextureMagic, TextureBlobCodec.Magic);
+        Assert.Equal(CompiledAssetFormat.TextureVersion, TextureBlobCodec.Version);
+        Assert.Equal(TextureBlobFormat.SourcePng, texture.Format);
+        Assert.Equal(TextureBlobColorSpace.Srgb, texture.ColorSpace);
+        Assert.Equal(checked((int)expectedWidth), texture.Width);
+        Assert.Equal(checked((int)expectedHeight), texture.Height);
+        Assert.Single(texture.MipChain);
+        Assert.NotEmpty(texture.MipChain[0].Data);
     }
 
     private static void VerifyMeshBinary(string filePath, uint expectedSourceKind)
     {
-        using FileStream stream = File.OpenRead(filePath);
-        using BinaryReader reader = new(stream);
-
-        uint magic = reader.ReadUInt32();
-        uint version = reader.ReadUInt32();
-        uint sourceKind = reader.ReadUInt32();
-        ulong payloadLength = reader.ReadUInt64();
-
-        Assert.Equal(CompiledAssetFormat.MeshMagic, magic);
-        Assert.Equal(CompiledAssetFormat.MeshVersion, version);
-        Assert.Equal(expectedSourceKind, sourceKind);
-        Assert.True(payloadLength > 0u);
+        MeshBlobData mesh = MeshBlobCodec.Read(File.ReadAllBytes(filePath));
+        Assert.Equal(CompiledAssetFormat.MeshMagic, MeshBlobCodec.Magic);
+        Assert.Equal(CompiledAssetFormat.MeshVersion, MeshBlobCodec.Version);
+        Assert.Equal(0, mesh.VertexCount);
+        Assert.Empty(mesh.VertexStreams);
+        Assert.Empty(mesh.IndexData);
+        Assert.Empty(mesh.Submeshes);
+        Assert.Equal(expectedSourceKind, mesh.SourceKind);
+        Assert.NotNull(mesh.SourcePayload);
+        Assert.NotEmpty(mesh.SourcePayload!);
     }
 
     private static string ResolveCompiledPath(string pakPath, string compiledRelativePath)

@@ -1,4 +1,5 @@
 using System.Text;
+using Engine.Content;
 using Engine.Core.Handles;
 using Engine.Rendering;
 
@@ -167,76 +168,57 @@ public static class ProceduralChunkRenderUploader
     private static byte[] EncodeMeshBlob(ProcMeshData mesh)
     {
         mesh = mesh.Validate();
+        uint[] indices = ToUnsignedIndices(mesh.Indices);
+        MeshBlobSubmesh[] submeshes = mesh.Submeshes
+            .Select(static x => new MeshBlobSubmesh(x.IndexStart, x.IndexCount, x.MaterialTag))
+            .ToArray();
+        MeshBlobLod[] lods = mesh.Lods
+            .Select(static x => new MeshBlobLod(
+                x.ScreenCoverage,
+                MeshBlobIndexFormat.UInt32,
+                EncodeUInt32Array(ToUnsignedIndices(x.Indices))))
+            .ToArray();
 
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
-        WriteMagic(writer, "DFF_MESH_V1");
-        writer.Write(mesh.Vertices.Count);
-        writer.Write(mesh.Indices.Count);
-        writer.Write(mesh.Submeshes.Count);
-        writer.Write(mesh.Lods.Count);
-
-        foreach (ProcVertex vertex in mesh.Vertices)
-        {
-            WriteVector3(writer, vertex.Position);
-            WriteVector3(writer, vertex.Normal);
-            WriteVector2(writer, vertex.Uv);
-            WriteVector4(writer, vertex.Color);
-            WriteVector4(writer, vertex.Tangent);
-        }
-
-        foreach (int index in mesh.Indices)
-        {
-            writer.Write(index);
-        }
-
-        WriteVector3(writer, mesh.Bounds.Min);
-        WriteVector3(writer, mesh.Bounds.Max);
-
-        foreach (ProcSubmesh submesh in mesh.Submeshes)
-        {
-            writer.Write(submesh.IndexStart);
-            writer.Write(submesh.IndexCount);
-            writer.Write(submesh.MaterialTag);
-        }
-
-        foreach (ProcMeshLod lod in mesh.Lods)
-        {
-            writer.Write(lod.ScreenCoverage);
-            writer.Write(lod.Indices.Count);
-            foreach (int index in lod.Indices)
-            {
-                writer.Write(index);
-            }
-        }
-
-        writer.Flush();
-        return stream.ToArray();
+        var meshData = new MeshBlobData(
+            VertexCount: mesh.Vertices.Count,
+            VertexStreams: BuildVertexStreams(mesh.Vertices),
+            IndexFormat: MeshBlobIndexFormat.UInt32,
+            IndexData: EncodeUInt32Array(indices),
+            Submeshes: submeshes,
+            Bounds: new MeshBlobBounds(
+                mesh.Bounds.Min.X,
+                mesh.Bounds.Min.Y,
+                mesh.Bounds.Min.Z,
+                mesh.Bounds.Max.X,
+                mesh.Bounds.Max.Y,
+                mesh.Bounds.Max.Z),
+            Lods: lods);
+        return MeshBlobCodec.Write(meshData);
     }
 
     private static byte[] EncodeTextureBlob(ProceduralTextureExport texture)
     {
         texture = texture.Validate();
+        TextureBlobColorSpace colorSpace = IsLinearTexture(texture.Key)
+            ? TextureBlobColorSpace.Linear
+            : TextureBlobColorSpace.Srgb;
 
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
-        WriteMagic(writer, "DFF_TEXTURE_V1");
-        writer.Write(texture.Key);
-        writer.Write(texture.Width);
-        writer.Write(texture.Height);
-        writer.Write(texture.MipChain.Count);
+        TextureBlobMip[] mips = texture.MipChain
+            .Select(static x =>
+            {
+                TextureMipLevel mip = x.Validate();
+                int rowPitch = checked(mip.Width * 4);
+                return new TextureBlobMip(mip.Width, mip.Height, rowPitch, mip.Rgba8);
+            })
+            .ToArray();
 
-        foreach (TextureMipLevel mip in texture.MipChain)
-        {
-            TextureMipLevel validatedMip = mip.Validate();
-            writer.Write(validatedMip.Width);
-            writer.Write(validatedMip.Height);
-            writer.Write(validatedMip.Rgba8.Length);
-            writer.Write(validatedMip.Rgba8);
-        }
-
-        writer.Flush();
-        return stream.ToArray();
+        var blobData = new TextureBlobData(
+            TextureBlobFormat.Rgba8Unorm,
+            colorSpace,
+            texture.Width,
+            texture.Height,
+            mips);
+        return TextureBlobCodec.Write(blobData);
     }
 
     private static byte[] EncodeMaterialBlob(
@@ -245,78 +227,146 @@ public static class ProceduralChunkRenderUploader
     {
         material = material.Validate();
         ArgumentNullException.ThrowIfNull(textureHandles);
-
-        using var stream = new MemoryStream();
-        using var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true);
-        WriteMagic(writer, "DFF_MATERIAL_V1");
-        writer.Write((int)material.Template);
-
-        KeyValuePair<string, float>[] scalars = material.Scalars
+        MaterialTextureReference[] textureReferences = material.TextureRefs
             .OrderBy(static x => x.Key, StringComparer.Ordinal)
-            .ToArray();
-        writer.Write(scalars.Length);
-        foreach (KeyValuePair<string, float> scalar in scalars)
-        {
-            writer.Write(scalar.Key);
-            writer.Write(scalar.Value);
-        }
-
-        KeyValuePair<string, System.Numerics.Vector4>[] vectors = material.Vectors
-            .OrderBy(static x => x.Key, StringComparer.Ordinal)
-            .ToArray();
-        writer.Write(vectors.Length);
-        foreach (KeyValuePair<string, System.Numerics.Vector4> vector in vectors)
-        {
-            writer.Write(vector.Key);
-            WriteVector4(writer, vector.Value);
-        }
-
-        KeyValuePair<string, string>[] refs = material.TextureRefs
-            .OrderBy(static x => x.Key, StringComparer.Ordinal)
-            .ToArray();
-        writer.Write(refs.Length);
-        foreach (KeyValuePair<string, string> textureRef in refs)
-        {
-            if (!textureHandles.TryGetValue(textureRef.Value, out TextureHandle textureHandle))
+            .Select(x =>
             {
-                throw new InvalidDataException(
-                    $"Material texture reference '{textureRef.Key}' points to missing texture key '{textureRef.Value}'.");
+                if (!textureHandles.TryGetValue(x.Value, out TextureHandle textureHandle))
+                {
+                    throw new InvalidDataException(
+                        $"Material texture reference '{x.Key}' points to missing texture key '{x.Value}'.");
+                }
+
+                return new MaterialTextureReference(x.Key, x.Value, textureHandle.Value);
+            })
+            .ToArray();
+
+        var blobData = new MaterialBlobData(
+            TemplateId: material.Template.ToString(),
+            ParameterBlock: EncodeMaterialParameterBlock(material),
+            TextureReferences: textureReferences);
+        return MaterialBlobCodec.Write(blobData);
+    }
+
+    private static MeshBlobStream[] BuildVertexStreams(IReadOnlyList<ProcVertex> vertices)
+    {
+        var positions = new float[checked(vertices.Count * 3)];
+        var normals = new float[checked(vertices.Count * 3)];
+        var uvs = new float[checked(vertices.Count * 2)];
+        var colors = new float[checked(vertices.Count * 4)];
+        var tangents = new float[checked(vertices.Count * 4)];
+
+        for (int i = 0; i < vertices.Count; i++)
+        {
+            ProcVertex vertex = vertices[i];
+
+            int positionOffset = checked(i * 3);
+            positions[positionOffset] = vertex.Position.X;
+            positions[positionOffset + 1] = vertex.Position.Y;
+            positions[positionOffset + 2] = vertex.Position.Z;
+
+            normals[positionOffset] = vertex.Normal.X;
+            normals[positionOffset + 1] = vertex.Normal.Y;
+            normals[positionOffset + 2] = vertex.Normal.Z;
+
+            int uvOffset = checked(i * 2);
+            uvs[uvOffset] = vertex.Uv.X;
+            uvs[uvOffset + 1] = vertex.Uv.Y;
+
+            int vector4Offset = checked(i * 4);
+            colors[vector4Offset] = vertex.Color.X;
+            colors[vector4Offset + 1] = vertex.Color.Y;
+            colors[vector4Offset + 2] = vertex.Color.Z;
+            colors[vector4Offset + 3] = vertex.Color.W;
+
+            tangents[vector4Offset] = vertex.Tangent.X;
+            tangents[vector4Offset + 1] = vertex.Tangent.Y;
+            tangents[vector4Offset + 2] = vertex.Tangent.Z;
+            tangents[vector4Offset + 3] = vertex.Tangent.W;
+        }
+
+        return
+        [
+            new MeshBlobStream("POSITION", 3, sizeof(float), sizeof(float) * 3, EncodeFloatArray(positions)),
+            new MeshBlobStream("NORMAL", 3, sizeof(float), sizeof(float) * 3, EncodeFloatArray(normals)),
+            new MeshBlobStream("TEXCOORD0", 2, sizeof(float), sizeof(float) * 2, EncodeFloatArray(uvs)),
+            new MeshBlobStream("COLOR0", 4, sizeof(float), sizeof(float) * 4, EncodeFloatArray(colors)),
+            new MeshBlobStream("TANGENT", 4, sizeof(float), sizeof(float) * 4, EncodeFloatArray(tangents))
+        ];
+    }
+
+    private static uint[] ToUnsignedIndices(IReadOnlyList<int> indices)
+    {
+        var converted = new uint[indices.Count];
+        for (int i = 0; i < indices.Count; i++)
+        {
+            int index = indices[i];
+            if (index < 0)
+            {
+                throw new InvalidDataException($"Mesh index '{index}' cannot be negative.");
             }
 
-            writer.Write(textureRef.Key);
-            writer.Write(textureRef.Value);
-            writer.Write(textureHandle.Value);
+            converted[i] = checked((uint)index);
         }
 
-        writer.Flush();
+        return converted;
+    }
+
+    private static byte[] EncodeFloatArray(float[] values)
+    {
+        var payload = new byte[checked(values.Length * sizeof(float))];
+        Buffer.BlockCopy(values, 0, payload, 0, payload.Length);
+        return payload;
+    }
+
+    private static byte[] EncodeUInt32Array(uint[] values)
+    {
+        var payload = new byte[checked(values.Length * sizeof(uint))];
+        Buffer.BlockCopy(values, 0, payload, 0, payload.Length);
+        return payload;
+    }
+
+    private static bool IsLinearTexture(string textureKey)
+    {
+        if (textureKey.Contains("normal", StringComparison.OrdinalIgnoreCase) ||
+            textureKey.Contains("roughness", StringComparison.OrdinalIgnoreCase) ||
+            textureKey.Contains("ao", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static byte[] EncodeMaterialParameterBlock(ProceduralMaterial material)
+    {
+        using var stream = new MemoryStream();
+        using (var writer = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
+        {
+            KeyValuePair<string, float>[] scalars = material.Scalars
+                .OrderBy(static x => x.Key, StringComparer.Ordinal)
+                .ToArray();
+            writer.Write(scalars.Length);
+            foreach (KeyValuePair<string, float> scalar in scalars)
+            {
+                writer.Write(scalar.Key);
+                writer.Write(scalar.Value);
+            }
+
+            KeyValuePair<string, System.Numerics.Vector4>[] vectors = material.Vectors
+                .OrderBy(static x => x.Key, StringComparer.Ordinal)
+                .ToArray();
+            writer.Write(vectors.Length);
+            foreach (KeyValuePair<string, System.Numerics.Vector4> vector in vectors)
+            {
+                writer.Write(vector.Key);
+                writer.Write(vector.Value.X);
+                writer.Write(vector.Value.Y);
+                writer.Write(vector.Value.Z);
+                writer.Write(vector.Value.W);
+            }
+        }
+
         return stream.ToArray();
-    }
-
-    private static void WriteMagic(BinaryWriter writer, string magic)
-    {
-        byte[] bytes = Encoding.ASCII.GetBytes(magic);
-        writer.Write(bytes.Length);
-        writer.Write(bytes);
-    }
-
-    private static void WriteVector2(BinaryWriter writer, System.Numerics.Vector2 value)
-    {
-        writer.Write(value.X);
-        writer.Write(value.Y);
-    }
-
-    private static void WriteVector3(BinaryWriter writer, System.Numerics.Vector3 value)
-    {
-        writer.Write(value.X);
-        writer.Write(value.Y);
-        writer.Write(value.Z);
-    }
-
-    private static void WriteVector4(BinaryWriter writer, System.Numerics.Vector4 value)
-    {
-        writer.Write(value.X);
-        writer.Write(value.Y);
-        writer.Write(value.Z);
-        writer.Write(value.W);
     }
 }

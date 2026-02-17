@@ -1,14 +1,24 @@
+using Engine.Content;
+
 namespace Engine.AssetPipeline;
 
 public static class CompiledAssetFormat
 {
-    public const uint TextureMagic = 0x58544644; // DFTX
+    public const uint TextureMagic = TextureBlobCodec.Magic;
 
-    public const uint TextureVersion = 1;
+    public const uint TextureVersion = TextureBlobCodec.Version;
 
-    public const uint MeshMagic = 0x48534644; // DFSH
+    public const uint MeshMagic = MeshBlobCodec.Magic;
 
-    public const uint MeshVersion = 1;
+    public const uint MeshVersion = MeshBlobCodec.Version;
+
+    public const uint MaterialMagic = MaterialBlobCodec.Magic;
+
+    public const uint MaterialVersion = MaterialBlobCodec.Version;
+
+    public const uint SoundMagic = SoundBlobCodec.Magic;
+
+    public const uint SoundVersion = SoundBlobCodec.Version;
 
     public const uint RawMagic = 0x57524644; // DFRW
 

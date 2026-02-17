@@ -46,6 +46,12 @@ internal static class AssetCompiler
             case "mesh":
                 CompiledAssetWriter.WriteMesh(sourcePath, compiledFullPath);
                 return;
+            case "material":
+                CompiledAssetWriter.WriteMaterial(sourcePath, compiledFullPath);
+                return;
+            case "sound":
+                CompiledAssetWriter.WriteSound(sourcePath, compiledFullPath);
+                return;
             case "scene":
                 CompileScene(sourcePath, compiledFullPath);
                 return;

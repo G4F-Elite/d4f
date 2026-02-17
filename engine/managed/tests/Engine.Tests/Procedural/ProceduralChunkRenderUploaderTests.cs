@@ -1,4 +1,5 @@
 using Engine.Core.Handles;
+using Engine.Content;
 using Engine.Procedural;
 using Engine.Rendering;
 
@@ -24,6 +25,21 @@ public sealed class ProceduralChunkRenderUploaderTests
         Assert.Single(rendering.MeshBlobs);
         Assert.Equal(content.MaterialBundle.Textures.Count, rendering.TextureBlobs.Count);
         Assert.Single(rendering.MaterialBlobs);
+
+        MeshBlobData meshBlob = MeshBlobCodec.Read(rendering.MeshBlobs[0]);
+        Assert.True(meshBlob.VertexCount > 0);
+        Assert.NotEmpty(meshBlob.VertexStreams);
+        Assert.NotEmpty(meshBlob.IndexData);
+        Assert.NotEmpty(meshBlob.Submeshes);
+
+        TextureBlobData textureBlob = TextureBlobCodec.Read(rendering.TextureBlobs[0]);
+        Assert.Equal(TextureBlobFormat.Rgba8Unorm, textureBlob.Format);
+        Assert.True(textureBlob.Width > 0);
+        Assert.True(textureBlob.Height > 0);
+
+        MaterialBlobData materialBlob = MaterialBlobCodec.Read(rendering.MaterialBlobs[0]);
+        Assert.Equal(MaterialTemplateId.DffLitPbr.ToString(), materialBlob.TemplateId);
+        Assert.NotEmpty(materialBlob.TextureReferences);
     }
 
     [Fact]
