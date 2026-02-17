@@ -15,10 +15,16 @@ struct engine_native_physics {
   engine_native_engine* owner = nullptr;
 };
 
+struct engine_native_audio {
+  dff::native::AudioState* state = nullptr;
+  engine_native_engine* owner = nullptr;
+};
+
 struct engine_native_engine {
   dff::native::EngineState state;
   engine_native_renderer renderer;
   engine_native_physics physics;
+  engine_native_audio audio;
 };
 
 #endif

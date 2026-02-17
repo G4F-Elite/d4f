@@ -8,8 +8,10 @@ add_library(dff_native SHARED
   src/bridge_capi/renderer_capi.cpp
   src/bridge_capi/physics_capi.cpp
   src/bridge_capi/capture_capi.cpp
+  src/bridge_capi/audio_capi.cpp
   src/content/content_runtime.cpp
   src/content/pak_index.cpp
+  src/core/audio_state.cpp
   src/core/capture_store.cpp
   src/core/engine_state.cpp
   src/core/physics_raycast.cpp
@@ -83,4 +85,20 @@ if(BUILD_TESTING)
   target_link_libraries(dff_native_capture_tests PRIVATE dff_native)
 
   add_test(NAME dff_native_capture_tests COMMAND dff_native_capture_tests)
+
+  add_executable(dff_native_audio_tests
+    tests/audio/audio_capi_tests.cpp
+  )
+
+  target_compile_features(dff_native_audio_tests PRIVATE cxx_std_20)
+
+  target_include_directories(dff_native_audio_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+
+  target_link_libraries(dff_native_audio_tests PRIVATE dff_native)
+
+  add_test(NAME dff_native_audio_tests COMMAND dff_native_audio_tests)
 endif()

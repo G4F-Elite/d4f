@@ -64,6 +64,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 "engine_create",
                 "engine_get_renderer",
                 "engine_get_physics",
+                "engine_get_audio",
                 "engine_pump_events",
                 "renderer_begin_frame",
                 "renderer_submit",

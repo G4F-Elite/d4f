@@ -151,6 +151,70 @@ class PhysicsState {
   std::unordered_map<engine_native_resource_handle_t, PhysicsBodyState> bodies_;
 };
 
+struct AudioSoundResource {
+  std::vector<uint8_t> bytes;
+};
+
+struct AudioEmitterState {
+  engine_native_resource_handle_t sound = kInvalidResourceHandle;
+  float volume = 1.0f;
+  float pitch = 1.0f;
+  uint8_t bus = ENGINE_NATIVE_AUDIO_BUS_MASTER;
+  uint8_t loop = 0u;
+  uint8_t is_spatialized = 0u;
+  uint8_t reserved0 = 0u;
+  std::array<float, 3> position{0.0f, 0.0f, 0.0f};
+  std::array<float, 3> velocity{0.0f, 0.0f, 0.0f};
+  float lowpass = 1.0f;
+  float reverb_send = 0.0f;
+};
+
+struct AudioListenerState {
+  std::array<float, 3> position{0.0f, 0.0f, 0.0f};
+  std::array<float, 3> forward{0.0f, 0.0f, -1.0f};
+  std::array<float, 3> up{0.0f, 1.0f, 0.0f};
+};
+
+class AudioState {
+ public:
+  engine_native_status_t CreateSoundFromBlob(
+      const void* data,
+      size_t size,
+      engine_native_resource_handle_t* out_sound);
+  engine_native_status_t Play(
+      engine_native_resource_handle_t sound,
+      const engine_native_audio_play_desc_t& play_desc,
+      uint64_t* out_emitter_id);
+  engine_native_status_t SetListener(
+      const engine_native_listener_desc_t& listener_desc);
+  engine_native_status_t SetEmitterParams(
+      uint64_t emitter_id,
+      const engine_native_emitter_params_t& params);
+
+  size_t sound_count() const { return sounds_.Size(); }
+  size_t emitter_count() const { return emitters_.size(); }
+  const AudioEmitterState* FindEmitter(uint64_t emitter_id) const {
+    const auto emitter_it = emitters_.find(emitter_id);
+    if (emitter_it == emitters_.end()) {
+      return nullptr;
+    }
+
+    return &emitter_it->second;
+  }
+  const AudioListenerState& listener() const { return listener_; }
+
+ private:
+  static bool IsSupportedBus(uint8_t bus);
+  static bool IsFiniteScalar(float value);
+  static bool IsFiniteVector(const float* values, size_t count);
+  static bool IsValidNormalizedValue(float value);
+
+  ResourceTable<AudioSoundResource> sounds_;
+  std::unordered_map<uint64_t, AudioEmitterState> emitters_;
+  uint64_t next_emitter_id_ = 1u;
+  AudioListenerState listener_;
+};
+
 struct EngineState {
   EngineState();
 
@@ -159,6 +223,7 @@ struct EngineState {
   rhi::RhiDevice rhi_device;
   RendererState renderer;
   PhysicsState physics;
+  AudioState audio;
 };
 
 }  // namespace dff::native

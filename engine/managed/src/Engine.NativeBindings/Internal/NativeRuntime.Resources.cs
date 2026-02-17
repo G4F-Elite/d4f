@@ -6,8 +6,8 @@ namespace Engine.NativeBindings.Internal;
 
 internal sealed partial class NativeRuntime
 {
-    private delegate EngineNativeStatus RendererCreateFromBlobDelegate(
-        IntPtr renderer,
+    private delegate EngineNativeStatus CreateResourceFromBlobDelegate(
+        IntPtr subsystem,
         IntPtr data,
         nuint size,
         out ulong handle);
@@ -16,6 +16,7 @@ internal sealed partial class NativeRuntime
     {
         ulong handle = CreateResourceFromBlob(
             blob,
+            _renderer,
             _interop.RendererCreateMeshFromBlob,
             "renderer_create_mesh_from_blob");
         return new MeshHandle(handle);
@@ -56,6 +57,7 @@ internal sealed partial class NativeRuntime
     {
         ulong handle = CreateResourceFromBlob(
             blob,
+            _renderer,
             _interop.RendererCreateTextureFromBlob,
             "renderer_create_texture_from_blob");
         return new TextureHandle(handle);
@@ -97,6 +99,7 @@ internal sealed partial class NativeRuntime
     {
         ulong handle = CreateResourceFromBlob(
             blob,
+            _renderer,
             _interop.RendererCreateMaterialFromBlob,
             "renderer_create_material_from_blob");
         return new MaterialHandle(handle);
@@ -116,7 +119,8 @@ internal sealed partial class NativeRuntime
 
     private ulong CreateResourceFromBlob(
         ReadOnlySpan<byte> blob,
-        RendererCreateFromBlobDelegate createDelegate,
+        IntPtr subsystem,
+        CreateResourceFromBlobDelegate createDelegate,
         string callName)
     {
         ThrowIfDisposed();
@@ -133,7 +137,7 @@ internal sealed partial class NativeRuntime
         {
             IntPtr payloadPtr = pinned.AddrOfPinnedObject();
             NativeStatusGuard.ThrowIfFailed(
-                createDelegate(_renderer, payloadPtr, checked((nuint)payload.Length), out ulong handle),
+                createDelegate(subsystem, payloadPtr, checked((nuint)payload.Length), out ulong handle),
                 callName);
             return handle;
         }

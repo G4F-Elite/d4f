@@ -128,6 +128,60 @@ internal struct EngineNativeCaptureResult
     public nuint PixelBytes;
 }
 
+internal enum EngineNativeAudioBus : byte
+{
+    Master = 0,
+    Music = 1,
+    Sfx = 2,
+    Ambience = 3
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeAudioPlayDesc
+{
+    public float Volume;
+    public float Pitch;
+    public byte Bus;
+    public byte Loop;
+    public byte IsSpatialized;
+    public byte Reserved0;
+    public float Position0;
+    public float Position1;
+    public float Position2;
+    public float Velocity0;
+    public float Velocity1;
+    public float Velocity2;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeListenerDesc
+{
+    public float Position0;
+    public float Position1;
+    public float Position2;
+    public float Forward0;
+    public float Forward1;
+    public float Forward2;
+    public float Up0;
+    public float Up1;
+    public float Up2;
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeEmitterParams
+{
+    public float Volume;
+    public float Pitch;
+    public float Position0;
+    public float Position1;
+    public float Position2;
+    public float Velocity0;
+    public float Velocity1;
+    public float Velocity2;
+    public float Lowpass;
+    public float ReverbSend;
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeBodyWrite
 {

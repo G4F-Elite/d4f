@@ -33,6 +33,9 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus EngineGetPhysics(IntPtr engine, out IntPtr physics)
         => NativeMethods.EngineGetPhysics(engine, out physics);
 
+    public EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio)
+        => NativeMethods.EngineGetAudio(engine, out audio);
+
     public EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,
@@ -102,6 +105,29 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus CaptureFreeResult(ref EngineNativeCaptureResult result)
         => NativeMethods.CaptureFreeResult(ref result);
 
+    public EngineNativeStatus AudioCreateSoundFromBlob(
+        IntPtr audio,
+        IntPtr data,
+        nuint size,
+        out ulong sound)
+        => NativeMethods.AudioCreateSoundFromBlob(audio, data, size, out sound);
+
+    public EngineNativeStatus AudioPlay(
+        IntPtr audio,
+        ulong sound,
+        in EngineNativeAudioPlayDesc playDesc,
+        out ulong emitterId)
+        => NativeMethods.AudioPlay(audio, sound, in playDesc, out emitterId);
+
+    public EngineNativeStatus AudioSetListener(IntPtr audio, in EngineNativeListenerDesc listenerDesc)
+        => NativeMethods.AudioSetListener(audio, in listenerDesc);
+
+    public EngineNativeStatus AudioSetEmitterParams(
+        IntPtr audio,
+        ulong emitterId,
+        in EngineNativeEmitterParams emitterParams)
+        => NativeMethods.AudioSetEmitterParams(audio, emitterId, in emitterParams);
+
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
         => NativeMethods.PhysicsStep(physics, deltaSeconds);
 
@@ -169,6 +195,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus EngineGetPhysics(
             IntPtr engine,
             out IntPtr outPhysics);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_audio")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus EngineGetAudio(
+            IntPtr engine,
+            out IntPtr outAudio);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_begin_frame")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
@@ -256,6 +288,35 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus CaptureFreeResult(
             ref EngineNativeCaptureResult result);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_create_sound_from_blob")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus AudioCreateSoundFromBlob(
+            IntPtr audio,
+            IntPtr data,
+            nuint size,
+            out ulong outSound);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_play")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus AudioPlay(
+            IntPtr audio,
+            ulong sound,
+            in EngineNativeAudioPlayDesc playDesc,
+            out ulong outEmitterId);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_listener")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus AudioSetListener(
+            IntPtr audio,
+            in EngineNativeListenerDesc listenerDesc);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_emitter_params")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus AudioSetEmitterParams(
+            IntPtr audio,
+            ulong emitterId,
+            in EngineNativeEmitterParams emitterParams);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

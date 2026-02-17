@@ -19,6 +19,8 @@ internal interface INativeInteropApi
 
     EngineNativeStatus EngineGetPhysics(IntPtr engine, out IntPtr physics);
 
+    EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio);
+
     EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,
@@ -74,6 +76,25 @@ internal interface INativeInteropApi
         out byte isReady);
 
     EngineNativeStatus CaptureFreeResult(ref EngineNativeCaptureResult result);
+
+    EngineNativeStatus AudioCreateSoundFromBlob(
+        IntPtr audio,
+        IntPtr data,
+        nuint size,
+        out ulong sound);
+
+    EngineNativeStatus AudioPlay(
+        IntPtr audio,
+        ulong sound,
+        in EngineNativeAudioPlayDesc playDesc,
+        out ulong emitterId);
+
+    EngineNativeStatus AudioSetListener(IntPtr audio, in EngineNativeListenerDesc listenerDesc);
+
+    EngineNativeStatus AudioSetEmitterParams(
+        IntPtr audio,
+        ulong emitterId,
+        in EngineNativeEmitterParams emitterParams);
 
     EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds);
 

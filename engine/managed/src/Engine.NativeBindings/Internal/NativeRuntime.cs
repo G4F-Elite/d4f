@@ -21,6 +21,7 @@ internal sealed partial class NativeRuntime
     private IntPtr _engine;
     private IntPtr _renderer;
     private IntPtr _physics;
+    private IntPtr _audio;
     private bool _disposed;
     private RenderingFrameStats _lastFrameStats = RenderingFrameStats.Empty;
 
@@ -40,6 +41,7 @@ internal sealed partial class NativeRuntime
         {
             NativeStatusGuard.ThrowIfFailed(_interop.EngineGetRenderer(_engine, out _renderer), "engine_get_renderer");
             NativeStatusGuard.ThrowIfFailed(_interop.EngineGetPhysics(_engine, out _physics), "engine_get_physics");
+            NativeStatusGuard.ThrowIfFailed(_interop.EngineGetAudio(_engine, out _audio), "engine_get_audio");
         }
         catch (Exception initializationException)
         {
@@ -393,6 +395,7 @@ internal sealed partial class NativeRuntime
         {
             _renderer = IntPtr.Zero;
             _physics = IntPtr.Zero;
+            _audio = IntPtr.Zero;
             return null;
         }
 
@@ -400,6 +403,7 @@ internal sealed partial class NativeRuntime
         _engine = IntPtr.Zero;
         _renderer = IntPtr.Zero;
         _physics = IntPtr.Zero;
+        _audio = IntPtr.Zero;
 
         return status == EngineNativeStatus.Ok
             ? null

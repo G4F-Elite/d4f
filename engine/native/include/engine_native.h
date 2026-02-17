@@ -18,11 +18,12 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 8u
+#define ENGINE_NATIVE_API_VERSION 9u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
 typedef struct engine_native_physics engine_native_physics_t;
+typedef struct engine_native_audio engine_native_audio_t;
 
 typedef uint64_t engine_native_resource_handle_t;
 
@@ -137,6 +138,39 @@ typedef struct engine_native_capture_result {
   size_t pixel_bytes;
 } engine_native_capture_result_t;
 
+typedef enum engine_native_audio_bus {
+  ENGINE_NATIVE_AUDIO_BUS_MASTER = 0,
+  ENGINE_NATIVE_AUDIO_BUS_MUSIC = 1,
+  ENGINE_NATIVE_AUDIO_BUS_SFX = 2,
+  ENGINE_NATIVE_AUDIO_BUS_AMBIENCE = 3
+} engine_native_audio_bus_t;
+
+typedef struct engine_native_audio_play_desc {
+  float volume;
+  float pitch;
+  uint8_t bus;
+  uint8_t loop;
+  uint8_t is_spatialized;
+  uint8_t reserved0;
+  float position[3];
+  float velocity[3];
+} engine_native_audio_play_desc_t;
+
+typedef struct engine_native_listener_desc {
+  float position[3];
+  float forward[3];
+  float up[3];
+} engine_native_listener_desc_t;
+
+typedef struct engine_native_emitter_params {
+  float volume;
+  float pitch;
+  float position[3];
+  float velocity[3];
+  float lowpass;
+  float reverb_send;
+} engine_native_emitter_params_t;
+
 typedef struct engine_native_body_write {
   engine_native_resource_handle_t body;
   float position[3];
@@ -247,6 +281,10 @@ ENGINE_NATIVE_API engine_native_status_t engine_get_physics(
     engine_native_engine_t* engine,
     engine_native_physics_t** out_physics);
 
+ENGINE_NATIVE_API engine_native_status_t engine_get_audio(
+    engine_native_engine_t* engine,
+    engine_native_audio_t** out_audio);
+
 ENGINE_NATIVE_API engine_native_status_t content_mount_pak(
     engine_native_engine_t* engine,
     const char* pak_path);
@@ -323,6 +361,27 @@ ENGINE_NATIVE_API engine_native_status_t capture_poll(
 
 ENGINE_NATIVE_API engine_native_status_t capture_free_result(
     engine_native_capture_result_t* result);
+
+ENGINE_NATIVE_API engine_native_status_t audio_create_sound_from_blob(
+    engine_native_audio_t* audio,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_sound);
+
+ENGINE_NATIVE_API engine_native_status_t audio_play(
+    engine_native_audio_t* audio,
+    engine_native_resource_handle_t sound,
+    const engine_native_audio_play_desc_t* play_desc,
+    uint64_t* out_emitter_id);
+
+ENGINE_NATIVE_API engine_native_status_t audio_set_listener(
+    engine_native_audio_t* audio,
+    const engine_native_listener_desc_t* listener_desc);
+
+ENGINE_NATIVE_API engine_native_status_t audio_set_emitter_params(
+    engine_native_audio_t* audio,
+    uint64_t emitter_id,
+    const engine_native_emitter_params_t* params);
 
 ENGINE_NATIVE_API engine_native_status_t physics_step(
     engine_native_physics_t* physics,

@@ -10,6 +10,7 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     private readonly IntPtr _engineHandle = new(101);
     private readonly IntPtr _rendererHandle = new(202);
     private readonly IntPtr _physicsHandle = new(303);
+    private readonly IntPtr _audioHandle = new(404);
 
     public List<string> Calls { get; } = [];
 
@@ -51,6 +52,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus EngineGetPhysicsStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus EngineGetAudioStatus { get; set; } = EngineNativeStatus.Ok;
+
     public EngineNativeStatus RendererBeginFrameStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus RendererSubmitStatus { get; set; } = EngineNativeStatus.Ok;
@@ -87,7 +90,19 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus CaptureFreeResultStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus AudioCreateSoundFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus AudioPlayStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus AudioSetListenerStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus AudioSetEmitterParamsStatus { get; set; } = EngineNativeStatus.Ok;
+
     public ulong CaptureRequestIdToReturn { get; set; } = 1u;
+
+    public ulong AudioSoundHandleToReturn { get; set; } = 0x1_0000_1001UL;
+
+    public ulong AudioEmitterIdToReturn { get; set; } = 0x1_0000_1002UL;
 
     public EngineNativeCaptureRequest? LastCaptureRequest { get; private set; }
 
@@ -106,6 +121,16 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public byte[] CapturePixelsToReturn { get; set; } = [0, 0, 0, 255];
 
     public bool CaptureResultFreed { get; private set; }
+
+    public EngineNativeAudioPlayDesc? LastAudioPlayDesc { get; private set; }
+
+    public ulong LastAudioPlaySoundHandle { get; private set; }
+
+    public ulong LastAudioSetEmitterId { get; private set; }
+
+    public EngineNativeListenerDesc? LastAudioListenerDesc { get; private set; }
+
+    public EngineNativeEmitterParams? LastAudioEmitterParams { get; private set; }
 
     public EngineNativeStatus PhysicsStepStatus { get; set; } = EngineNativeStatus.Ok;
 
@@ -175,6 +200,13 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         Calls.Add("engine_get_physics");
         physics = EngineGetPhysicsStatus == EngineNativeStatus.Ok ? _physicsHandle : IntPtr.Zero;
         return EngineGetPhysicsStatus;
+    }
+
+    public EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio)
+    {
+        Calls.Add("engine_get_audio");
+        audio = EngineGetAudioStatus == EngineNativeStatus.Ok ? _audioHandle : IntPtr.Zero;
+        return EngineGetAudioStatus;
     }
 
     public EngineNativeStatus RendererBeginFrame(
@@ -350,6 +382,48 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
         result = default;
         return EngineNativeStatus.Ok;
+    }
+
+    public EngineNativeStatus AudioCreateSoundFromBlob(
+        IntPtr audio,
+        IntPtr data,
+        nuint size,
+        out ulong sound)
+    {
+        Calls.Add("audio_create_sound_from_blob");
+        sound = AudioCreateSoundFromBlobStatus == EngineNativeStatus.Ok ? AudioSoundHandleToReturn : 0u;
+        return AudioCreateSoundFromBlobStatus;
+    }
+
+    public EngineNativeStatus AudioPlay(
+        IntPtr audio,
+        ulong sound,
+        in EngineNativeAudioPlayDesc playDesc,
+        out ulong emitterId)
+    {
+        Calls.Add("audio_play");
+        LastAudioPlaySoundHandle = sound;
+        LastAudioPlayDesc = playDesc;
+        emitterId = AudioPlayStatus == EngineNativeStatus.Ok ? AudioEmitterIdToReturn : 0u;
+        return AudioPlayStatus;
+    }
+
+    public EngineNativeStatus AudioSetListener(IntPtr audio, in EngineNativeListenerDesc listenerDesc)
+    {
+        Calls.Add("audio_set_listener");
+        LastAudioListenerDesc = listenerDesc;
+        return AudioSetListenerStatus;
+    }
+
+    public EngineNativeStatus AudioSetEmitterParams(
+        IntPtr audio,
+        ulong emitterId,
+        in EngineNativeEmitterParams emitterParams)
+    {
+        Calls.Add("audio_set_emitter_params");
+        LastAudioSetEmitterId = emitterId;
+        LastAudioEmitterParams = emitterParams;
+        return AudioSetEmitterParamsStatus;
     }
 
     public EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount)
