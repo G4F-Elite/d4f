@@ -1,4 +1,5 @@
 using Engine.Cli;
+using Engine.Rendering;
 
 namespace Engine.Cli.Tests;
 
@@ -315,5 +316,36 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--project' is duplicated.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_RunShouldDefaultDebugViewToNone()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["run", "--project", "."]);
+
+        RunCommand command = Assert.IsType<RunCommand>(result.Command);
+        Assert.Equal(RenderDebugViewMode.None, command.DebugViewMode);
+    }
+
+    [Theory]
+    [InlineData("depth", RenderDebugViewMode.Depth)]
+    [InlineData("normals", RenderDebugViewMode.Normals)]
+    [InlineData("albedo", RenderDebugViewMode.Albedo)]
+    [InlineData("none", RenderDebugViewMode.None)]
+    public void Parse_RunShouldAcceptKnownDebugViews(string debugView, RenderDebugViewMode expected)
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["run", "--project", ".", "--debug-view", debugView]);
+
+        RunCommand command = Assert.IsType<RunCommand>(result.Command);
+        Assert.Equal(expected, command.DebugViewMode);
+    }
+
+    [Fact]
+    public void Parse_ShouldFail_WhenDebugViewInvalid()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["run", "--project", ".", "--debug-view", "ambient"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--debug-view' must be one of: none, depth, normals, albedo.", result.Error);
     }
 }

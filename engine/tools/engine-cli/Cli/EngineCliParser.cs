@@ -1,4 +1,5 @@
 using System.Globalization;
+using Engine.Rendering;
 
 namespace Engine.Cli;
 
@@ -15,6 +16,14 @@ public static partial class EngineCliParser
         "win-x64",
         "linux-x64"
     };
+    private static readonly Dictionary<string, RenderDebugViewMode> ValidDebugViewModes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["none"] = RenderDebugViewMode.None,
+        ["depth"] = RenderDebugViewMode.Depth,
+        ["normals"] = RenderDebugViewMode.Normals,
+        ["albedo"] = RenderDebugViewMode.Albedo
+    };
+    private const string DebugViewOptionError = "Option '--debug-view' must be one of: none, depth, normals, albedo.";
 
     public static EngineCliParseResult Parse(string[] args)
     {
@@ -155,7 +164,21 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--configuration' must be 'Debug' or 'Release'.");
         }
 
-        return EngineCliParseResult.Success(new RunCommand(project, configuration));
+        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None;
+        if (options.TryGetValue("debug-view", out string? debugViewValue))
+        {
+            if (string.IsNullOrWhiteSpace(debugViewValue))
+            {
+                return EngineCliParseResult.Failure("Option '--debug-view' cannot be empty.");
+            }
+
+            if (!ValidDebugViewModes.TryGetValue(debugViewValue, out debugViewMode))
+            {
+                return EngineCliParseResult.Failure(DebugViewOptionError);
+            }
+        }
+
+        return EngineCliParseResult.Success(new RunCommand(project, configuration, debugViewMode));
     }
 
     private static EngineCliParseResult ParseBake(IReadOnlyDictionary<string, string> options)

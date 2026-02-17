@@ -42,6 +42,34 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldReportDebugView_WhenFlagProvided()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string buildDirectory = Path.Combine(tempRoot, "build", "Debug");
+            Directory.CreateDirectory(buildDirectory);
+            File.WriteAllText(Path.Combine(buildDirectory, "game.bin"), "placeholder");
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(["run", "--project", tempRoot, "--debug-view", "depth"]);
+
+            Assert.Equal(0, code);
+            string stdout = output.ToString();
+            Assert.Contains("Running project", stdout, StringComparison.Ordinal);
+            Assert.Contains("debug view: depth", stdout, StringComparison.OrdinalIgnoreCase);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailPack_WhenManifestMissing()
     {
         string tempRoot = CreateTempDirectory();

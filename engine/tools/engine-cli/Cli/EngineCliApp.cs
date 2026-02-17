@@ -130,7 +130,8 @@ public sealed partial class EngineCliApp
             return 1;
         }
 
-        _stdout.WriteLine($"Running project '{projectDirectory}' with '{binaryPath}'.");
+        string debugViewLabel = command.DebugViewMode.ToString().ToLowerInvariant();
+        _stdout.WriteLine($"Running project '{projectDirectory}' with '{binaryPath}'. Debug view: {debugViewLabel}.");
         return 0;
     }
 
