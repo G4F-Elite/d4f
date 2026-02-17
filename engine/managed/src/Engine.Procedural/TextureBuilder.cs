@@ -65,9 +65,9 @@ public static partial class TextureBuilder
                     ProceduralTextureKind.Perlin => FractalNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
                     ProceduralTextureKind.Simplex => FractalSimplexNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
                     ProceduralTextureKind.Worley => FractalWorleyNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Grid => Grid(u, v),
-                    ProceduralTextureKind.Brick => Brick(u, v),
-                    ProceduralTextureKind.Stripes => Stripes(u),
+                    ProceduralTextureKind.Grid => Grid(u, v, recipe.Frequency, recipe.Seed),
+                    ProceduralTextureKind.Brick => Brick(u, v, recipe.Frequency, recipe.Seed),
+                    ProceduralTextureKind.Stripes => Stripes(u, recipe.Frequency, recipe.Seed),
                     _ => throw new InvalidDataException($"Unsupported procedural texture kind: {recipe.Kind}.")
                 };
             }
@@ -284,26 +284,49 @@ public static partial class TextureBuilder
         return 1f - Math.Clamp(nearest, 0f, 1f);
     }
 
-    private static float Grid(float u, float v)
+    private static float Grid(float u, float v, float frequency, uint seed)
     {
-        float gx = MathF.Abs((u * 10f) % 1f - 0.5f);
-        float gy = MathF.Abs((v * 10f) % 1f - 0.5f);
-        return gx < 0.05f || gy < 0.05f ? 1f : 0.1f;
+        float frequencyScale = 0.75f + Hash01(seed, 10u, 0x60D17B5Bu) * 0.5f;
+        float repeat = MathF.Max(1f, frequency * 2.5f * frequencyScale);
+        float offsetU = Hash01(seed, 0u, 0x5F356495u);
+        float offsetV = Hash01(0u, seed, 0xB79F3ABDu);
+        float gx = MathF.Abs(Frac(u * repeat + offsetU) - 0.5f);
+        float gy = MathF.Abs(Frac(v * repeat + offsetV) - 0.5f);
+        float lineWidth = Math.Clamp(0.04f + 0.06f / repeat, 0.015f, 0.06f);
+        float lineValue = 0.85f + Hash01(seed, 20u, 0xD331A5E7u) * 0.15f;
+        float fillValue = 0.05f + Hash01(seed, 21u, 0x54A9BFC1u) * 0.2f;
+        return gx < lineWidth || gy < lineWidth ? lineValue : fillValue;
     }
 
-    private static float Brick(float u, float v)
+    private static float Brick(float u, float v, float frequency, uint seed)
     {
-        float row = MathF.Floor(v * 8f);
-        float offset = ((int)row & 1) == 0 ? 0f : 0.5f;
-        float cellU = (u * 8f + offset) % 1f;
-        float cellV = (v * 8f) % 1f;
-        bool mortar = cellU < 0.08f || cellV < 0.08f;
-        return mortar ? 0.05f : 0.7f;
+        float repeatXScale = 0.8f + Hash01(seed, 11u, 0x9A4FC29Du) * 0.4f;
+        float repeatYScale = 0.8f + Hash01(seed, 12u, 0x3B70E4F3u) * 0.4f;
+        float repeatY = MathF.Max(1f, frequency * 2f * repeatYScale);
+        float repeatX = MathF.Max(1f, frequency * 2f * repeatXScale);
+        float rowNoise = Hash01(seed, 1u, 0xC7A4B61Du);
+        float row = MathF.Floor(v * repeatY + rowNoise);
+        float stagger = ((int)row & 1) == 0 ? 0f : 0.5f;
+
+        float offsetU = Hash01(seed, 2u, 0xA53A89EFu);
+        float offsetV = Hash01(seed, 3u, 0x23F5A4C9u);
+        float cellU = Frac(u * repeatX + stagger + offsetU);
+        float cellV = Frac(v * repeatY + offsetV);
+        float mortarWidth = Math.Clamp(0.03f + 0.08f / repeatX, 0.015f, 0.08f);
+        bool mortar = cellU < mortarWidth || cellV < mortarWidth;
+        float mortarValue = 0.03f + Hash01(seed, 22u, 0xF1EBC7A9u) * 0.08f;
+        float brickValue = 0.55f + Hash01(seed, 23u, 0x8C52B4D1u) * 0.35f;
+        return mortar ? mortarValue : brickValue;
     }
 
-    private static float Stripes(float u)
+    private static float Stripes(float u, float frequency, uint seed)
     {
-        return ((int)MathF.Floor(u * 16f) & 1) == 0 ? 0.2f : 0.8f;
+        float frequencyScale = 0.75f + Hash01(seed, 13u, 0xE79A5C31u) * 0.5f;
+        float repeat = MathF.Max(1f, frequency * 4f * frequencyScale);
+        float offset = Hash01(seed, 4u, 0x4B1C9E3Du);
+        float lowValue = 0.15f + Hash01(seed, 24u, 0x53A8D1B7u) * 0.2f;
+        float highValue = 0.65f + Hash01(seed, 25u, 0xA24197E3u) * 0.3f;
+        return ((int)MathF.Floor(u * repeat + offset) & 1) == 0 ? lowValue : highValue;
     }
 
     private static float ValueNoise(float x, float y, uint seed)
@@ -329,6 +352,11 @@ public static partial class TextureBuilder
     private static float SmoothStep(float t)
     {
         return t * t * (3f - 2f * t);
+    }
+
+    private static float Frac(float value)
+    {
+        return value - MathF.Floor(value);
     }
 
     private static float Lerp(float a, float b, float t)
