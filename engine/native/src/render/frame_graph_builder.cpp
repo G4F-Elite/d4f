@@ -6,6 +6,7 @@ namespace {
 
 constexpr const char* kShadowPassName = "shadow";
 constexpr const char* kPbrPassName = "pbr_opaque";
+constexpr const char* kAmbientOcclusionPassName = "ambient_occlusion";
 constexpr const char* kBloomPassName = "bloom";
 constexpr const char* kTonemapPassName = "tonemap";
 constexpr const char* kColorGradingPassName = "color_grading";
@@ -130,6 +131,7 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
 
   RenderPassId shadow_pass = 0u;
   RenderPassId pbr_pass = 0u;
+  RenderPassId ambient_occlusion_pass = 0u;
   RenderPassId bloom_pass = 0u;
   RenderPassId tonemap_pass = 0u;
   RenderPassId color_grading_pass = 0u;
@@ -188,9 +190,32 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
       return status;
     }
 
-    status = graph->AddWrite(pbr_pass, kAmbientOcclusionResourceName);
-    if (status != ENGINE_NATIVE_STATUS_OK) {
-      return status;
+    const bool needs_ambient_occlusion_pass =
+        config.debug_view_mode == ENGINE_NATIVE_DEBUG_VIEW_NONE ||
+        config.debug_view_mode == ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION;
+    if (needs_ambient_occlusion_pass) {
+      status = AddPass(graph, output, kAmbientOcclusionPassName,
+                       rhi::RhiDevice::PassKind::kAmbientOcclusion,
+                       &ambient_occlusion_pass);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddRead(ambient_occlusion_pass, kDepthResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddRead(ambient_occlusion_pass, kNormalsResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddWrite(ambient_occlusion_pass,
+                               kAmbientOcclusionResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
     }
 
     if (config.debug_view_mode == ENGINE_NATIVE_DEBUG_VIEW_NONE) {
@@ -201,6 +226,11 @@ engine_native_status_t BuildCanonicalFrameGraph(const FrameGraphBuildConfig& con
       }
 
       status = graph->AddRead(bloom_pass, kHdrColorResourceName);
+      if (status != ENGINE_NATIVE_STATUS_OK) {
+        return status;
+      }
+
+      status = graph->AddRead(bloom_pass, kAmbientOcclusionResourceName);
       if (status != ENGINE_NATIVE_STATUS_OK) {
         return status;
       }

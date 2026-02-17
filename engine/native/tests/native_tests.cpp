@@ -95,7 +95,8 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                  {"shadow", "pbr_opaque", "ambient_occlusion", "bloom",
+                   "tonemap", "color_grading",
                    "fxaa",
                    "present"});
   engine_native_renderer_frame_stats_t renderer_stats{};
@@ -103,7 +104,7 @@ void TestEngineAndSubsystemFlow() {
          ENGINE_NATIVE_STATUS_OK);
   assert(renderer_stats.draw_item_count == 2u);
   assert(renderer_stats.ui_item_count == 0u);
-  assert(renderer_stats.executed_pass_count == 7u);
+  assert(renderer_stats.executed_pass_count == 8u);
   assert(renderer_stats.present_count == 1u);
   assert(renderer_stats.pipeline_cache_hits == 0u);
   assert(renderer_stats.pipeline_cache_misses == 2u);
@@ -111,6 +112,8 @@ void TestEngineAndSubsystemFlow() {
           (static_cast<uint64_t>(1u) << 3u)) != 0u);  // shadow
   assert((renderer_stats.pass_mask &
           (static_cast<uint64_t>(1u) << 6u)) != 0u);  // bloom
+  assert((renderer_stats.pass_mask &
+          (static_cast<uint64_t>(1u) << 14u)) != 0u);  // ambient occlusion
   assert((renderer_stats.pass_mask &
           (static_cast<uint64_t>(1u) << 7u)) != 0u);  // color grading
   assert((renderer_stats.pass_mask &
@@ -312,7 +315,8 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_packet_b) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                  {"shadow", "pbr_opaque", "ambient_occlusion", "bloom",
+                   "tonemap", "color_grading",
                    "fxaa",
                    "present"});
 
@@ -358,7 +362,8 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_submit(renderer, &draw_and_ui_packet) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
-                  {"shadow", "pbr_opaque", "bloom", "tonemap", "color_grading",
+                  {"shadow", "pbr_opaque", "ambient_occlusion", "bloom",
+                   "tonemap", "color_grading",
                    "fxaa",
                    "ui", "present"});
 
@@ -396,6 +401,25 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "debug_roughness", "present"});
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_render_packet_t ambient_occlusion_debug_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u,
+      .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION};
+
+  assert(renderer_submit(renderer, &ambient_occlusion_debug_packet) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"shadow", "pbr_opaque", "ambient_occlusion",
+                   "debug_ambient_occlusion", "present"});
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }

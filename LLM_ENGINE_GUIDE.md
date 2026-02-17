@@ -135,7 +135,7 @@ Do not reorder this without explicit architecture change and tests.
 
 Current canonical post chain:
 
-`shadow -> pbr_opaque -> bloom -> tonemap -> color_grading -> (ui) -> present`
+`shadow -> pbr_opaque -> ambient_occlusion -> bloom -> tonemap -> color_grading -> (ui) -> present`
 
 Rules:
 

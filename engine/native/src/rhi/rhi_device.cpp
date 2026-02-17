@@ -53,6 +53,7 @@ engine_native_status_t RhiDevice::ExecutePass(PassKind pass_kind) {
     case PassKind::kDebugAlbedo:
     case PassKind::kDebugRoughness:
     case PassKind::kDebugAmbientOcclusion:
+    case PassKind::kAmbientOcclusion:
     case PassKind::kUiOverlay:
       executed_passes_.push_back(pass_kind);
       return ENGINE_NATIVE_STATUS_OK;

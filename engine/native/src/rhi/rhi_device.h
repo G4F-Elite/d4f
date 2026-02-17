@@ -26,6 +26,7 @@ class RhiDevice {
     kDebugAlbedo = 11u,
     kDebugRoughness = 12u,
     kDebugAmbientOcclusion = 13u,
+    kAmbientOcclusion = 14u,
   };
 
   engine_native_status_t BeginFrame();

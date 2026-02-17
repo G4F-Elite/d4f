@@ -36,9 +36,9 @@ void TestBuildCanonicalFrameGraphCombinations() {
   assert(error.empty());
   AssertKindsOrder(
       output,
-      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom,
-       PassKind::kTonemap, PassKind::kColorGrading, PassKind::kFxaa,
-       PassKind::kPresent});
+      {PassKind::kShadowMap, PassKind::kPbrOpaque,
+       PassKind::kAmbientOcclusion, PassKind::kBloom, PassKind::kTonemap,
+       PassKind::kColorGrading, PassKind::kFxaa, PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{.has_draws = false, .has_ui = true}, &graph,
@@ -52,9 +52,10 @@ void TestBuildCanonicalFrameGraphCombinations() {
   assert(error.empty());
   AssertKindsOrder(
       output,
-      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kBloom,
-       PassKind::kTonemap, PassKind::kColorGrading, PassKind::kFxaa,
-       PassKind::kUiOverlay, PassKind::kPresent});
+      {PassKind::kShadowMap, PassKind::kPbrOpaque,
+       PassKind::kAmbientOcclusion, PassKind::kBloom, PassKind::kTonemap,
+       PassKind::kColorGrading, PassKind::kFxaa, PassKind::kUiOverlay,
+       PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{
@@ -103,7 +104,8 @@ void TestBuildCanonicalFrameGraphCombinations() {
   AssertKindsOrder(
       output,
       {PassKind::kShadowMap, PassKind::kPbrOpaque,
-       PassKind::kDebugAmbientOcclusion, PassKind::kPresent});
+       PassKind::kAmbientOcclusion, PassKind::kDebugAmbientOcclusion,
+       PassKind::kPresent});
 
   assert(dff::native::render::BuildCanonicalFrameGraph(
              FrameGraphBuildConfig{.has_draws = false, .has_ui = false}, &graph,

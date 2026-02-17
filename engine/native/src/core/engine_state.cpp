@@ -45,6 +45,8 @@ const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
       return "debug_roughness";
     case rhi::RhiDevice::PassKind::kDebugAmbientOcclusion:
       return "debug_ambient_occlusion";
+    case rhi::RhiDevice::PassKind::kAmbientOcclusion:
+      return "ambient_occlusion";
     case rhi::RhiDevice::PassKind::kSceneOpaque:
       return "scene";
     case rhi::RhiDevice::PassKind::kUiOverlay:
