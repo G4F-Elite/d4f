@@ -252,6 +252,16 @@ public sealed class InMemoryNetSession
 
     private void ValidateEntity(NetEntityState entity)
     {
+        if (entity.ProceduralRecipe is not null)
+        {
+            int metadataSize = EstimateProceduralRecipeSizeBytes(entity.ProceduralRecipe);
+            if (metadataSize > _config.MaxPayloadBytes)
+            {
+                throw new InvalidDataException(
+                    $"Procedural recipe metadata for entity '{entity.EntityId}' exceeds max payload size {_config.MaxPayloadBytes} bytes.");
+            }
+        }
+
         foreach (NetComponentState component in entity.Components)
         {
             if (!_replicatedComponentIds.Contains(component.ComponentId))
@@ -314,12 +324,32 @@ public sealed class InMemoryNetSession
             size = checked(size + sizeof(uint));
             size = checked(size + sizeof(ulong));
             size = checked(size + entity.AssetKey.Length);
+            if (entity.ProceduralRecipe is not null)
+            {
+                size = checked(size + EstimateProceduralRecipeSizeBytes(entity.ProceduralRecipe));
+            }
 
             foreach (NetComponentState component in entity.Components)
             {
                 size = checked(size + component.ComponentId.Length);
                 size = checked(size + component.Payload.Length);
             }
+        }
+
+        return size;
+    }
+
+    private static int EstimateProceduralRecipeSizeBytes(NetProceduralRecipeRef recipe)
+    {
+        int size = 0;
+        size = checked(size + recipe.GeneratorId.Length);
+        size = checked(size + sizeof(int));
+        size = checked(size + sizeof(int));
+        size = checked(size + recipe.RecipeHash.Length);
+        foreach ((string key, string value) in recipe.Parameters)
+        {
+            size = checked(size + key.Length);
+            size = checked(size + value.Length);
         }
 
         return size;

@@ -1,5 +1,74 @@
 namespace Engine.Net;
 
+public sealed class NetProceduralRecipeRef
+{
+    public NetProceduralRecipeRef(
+        string generatorId,
+        int generatorVersion,
+        int recipeVersion,
+        string recipeHash,
+        IReadOnlyDictionary<string, string>? parameters = null)
+    {
+        if (string.IsNullOrWhiteSpace(generatorId))
+        {
+            throw new ArgumentException("Generator id cannot be empty.", nameof(generatorId));
+        }
+
+        if (generatorVersion <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(generatorVersion), "Generator version must be greater than zero.");
+        }
+
+        if (recipeVersion <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(recipeVersion), "Recipe version must be greater than zero.");
+        }
+
+        if (string.IsNullOrWhiteSpace(recipeHash))
+        {
+            throw new ArgumentException("Recipe hash cannot be empty.", nameof(recipeHash));
+        }
+
+        GeneratorId = generatorId.Trim();
+        GeneratorVersion = generatorVersion;
+        RecipeVersion = recipeVersion;
+        RecipeHash = recipeHash.Trim();
+        Parameters = NormalizeParameters(parameters);
+    }
+
+    public string GeneratorId { get; }
+
+    public int GeneratorVersion { get; }
+
+    public int RecipeVersion { get; }
+
+    public string RecipeHash { get; }
+
+    public IReadOnlyDictionary<string, string> Parameters { get; }
+
+    private static IReadOnlyDictionary<string, string> NormalizeParameters(IReadOnlyDictionary<string, string>? parameters)
+    {
+        if (parameters is null || parameters.Count == 0)
+        {
+            return new Dictionary<string, string>(0, StringComparer.Ordinal);
+        }
+
+        var normalized = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        foreach ((string key, string value) in parameters)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new ArgumentException("Recipe parameter key cannot be empty.", nameof(parameters));
+            }
+
+            ArgumentNullException.ThrowIfNull(value);
+            normalized[key.Trim()] = value.Trim();
+        }
+
+        return normalized;
+    }
+}
+
 public sealed class NetComponentState
 {
     public NetComponentState(string componentId, byte[] payload)
@@ -27,7 +96,8 @@ public sealed class NetEntityState
         uint? ownerClientId,
         ulong proceduralSeed,
         string assetKey,
-        IReadOnlyList<NetComponentState> components)
+        IReadOnlyList<NetComponentState> components,
+        NetProceduralRecipeRef? proceduralRecipe = null)
     {
         if (entityId == 0u)
         {
@@ -61,6 +131,7 @@ public sealed class NetEntityState
             .OrderBy(static pair => pair.Key, StringComparer.Ordinal)
             .Select(static pair => pair.Value)
             .ToArray();
+        ProceduralRecipe = proceduralRecipe;
     }
 
     public uint EntityId { get; }
@@ -72,6 +143,8 @@ public sealed class NetEntityState
     public string AssetKey { get; }
 
     public IReadOnlyList<NetComponentState> Components { get; }
+
+    public NetProceduralRecipeRef? ProceduralRecipe { get; }
 }
 
 public sealed class NetSnapshot
