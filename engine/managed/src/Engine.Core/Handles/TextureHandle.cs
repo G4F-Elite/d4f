@@ -4,13 +4,13 @@ public readonly record struct TextureHandle
 {
     public static TextureHandle Invalid => default;
 
-    public TextureHandle(uint value)
+    public TextureHandle(ulong value)
     {
         HandleGuards.RequireNonZero(nameof(value), value);
         Value = value;
     }
 
-    public uint Value { get; }
+    public ulong Value { get; }
 
     public bool IsValid => Value != 0;
 

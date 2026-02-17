@@ -57,6 +57,22 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus RendererPresentStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus RendererCreateMeshFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererCreateTextureFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererCreateMaterialFromBlobStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererDestroyResourceStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public ulong RendererMeshHandleToReturn { get; set; } = 0x1_0000_0001UL;
+
+    public ulong RendererTextureHandleToReturn { get; set; } = 0x1_0000_0002UL;
+
+    public ulong RendererMaterialHandleToReturn { get; set; } = 0x1_0000_0003UL;
+
+    public ulong LastDestroyedRendererResource { get; private set; }
+
     public EngineNativeStatus RendererGetLastFrameStatsStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeRendererFrameStats RendererFrameStatsToReturn { get; set; }
@@ -185,6 +201,46 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     {
         Calls.Add("renderer_present");
         return RendererPresentStatus;
+    }
+
+    public EngineNativeStatus RendererCreateMeshFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong mesh)
+    {
+        Calls.Add("renderer_create_mesh_from_blob");
+        mesh = RendererCreateMeshFromBlobStatus == EngineNativeStatus.Ok ? RendererMeshHandleToReturn : 0u;
+        return RendererCreateMeshFromBlobStatus;
+    }
+
+    public EngineNativeStatus RendererCreateTextureFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong texture)
+    {
+        Calls.Add("renderer_create_texture_from_blob");
+        texture = RendererCreateTextureFromBlobStatus == EngineNativeStatus.Ok ? RendererTextureHandleToReturn : 0u;
+        return RendererCreateTextureFromBlobStatus;
+    }
+
+    public EngineNativeStatus RendererCreateMaterialFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong material)
+    {
+        Calls.Add("renderer_create_material_from_blob");
+        material = RendererCreateMaterialFromBlobStatus == EngineNativeStatus.Ok ? RendererMaterialHandleToReturn : 0u;
+        return RendererCreateMaterialFromBlobStatus;
+    }
+
+    public EngineNativeStatus RendererDestroyResource(IntPtr renderer, ulong handle)
+    {
+        Calls.Add("renderer_destroy_resource");
+        LastDestroyedRendererResource = handle;
+        return RendererDestroyResourceStatus;
     }
 
     public EngineNativeStatus RendererGetLastFrameStats(

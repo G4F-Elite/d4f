@@ -7,7 +7,13 @@ namespace Engine.Rendering;
 public readonly struct RenderMeshInstance
 {
     public RenderMeshInstance(MeshHandle mesh, MaterialHandle material, TextureHandle texture)
-        : this(mesh, material, texture, Matrix4x4.Identity, material.Value, mesh.Value)
+        : this(
+            mesh,
+            material,
+            texture,
+            Matrix4x4.Identity,
+            SortKeyFromHandle(material.Value),
+            SortKeyFromHandle(mesh.Value))
     {
     }
 
@@ -53,4 +59,9 @@ public readonly struct RenderMeshInstance
     public uint SortKeyHigh { get; }
 
     public uint SortKeyLow { get; }
+
+    private static uint SortKeyFromHandle(ulong handle)
+    {
+        return (uint)(handle & uint.MaxValue);
+    }
 }

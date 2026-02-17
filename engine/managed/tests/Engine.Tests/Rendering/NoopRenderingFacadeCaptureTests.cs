@@ -1,9 +1,39 @@
+using Engine.Core.Handles;
 using Engine.Rendering;
 
 namespace Engine.Tests.Rendering;
 
 public sealed class NoopRenderingFacadeCaptureTests
 {
+    [Fact]
+    public void ResourceBlobApi_ShouldCreateAndDestroyHandles()
+    {
+        MeshHandle mesh = NoopRenderingFacade.Instance.CreateMeshFromBlob([1, 2, 3]);
+        TextureHandle texture = NoopRenderingFacade.Instance.CreateTextureFromBlob([4, 5, 6]);
+        MaterialHandle material = NoopRenderingFacade.Instance.CreateMaterialFromBlob([7, 8, 9]);
+
+        Assert.True(mesh.IsValid);
+        Assert.True(texture.IsValid);
+        Assert.True(material.IsValid);
+        Assert.NotEqual(mesh.Value, texture.Value);
+        Assert.NotEqual(mesh.Value, material.Value);
+        Assert.NotEqual(texture.Value, material.Value);
+
+        NoopRenderingFacade.Instance.DestroyResource(mesh.Value);
+        NoopRenderingFacade.Instance.DestroyResource(texture.Value);
+        NoopRenderingFacade.Instance.DestroyResource(material.Value);
+
+        Assert.Throws<InvalidOperationException>(() => NoopRenderingFacade.Instance.DestroyResource(mesh.Value));
+    }
+
+    [Fact]
+    public void ResourceBlobApi_ShouldRejectEmptyPayload()
+    {
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateMeshFromBlob([]));
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateTextureFromBlob([]));
+        Assert.Throws<ArgumentException>(() => NoopRenderingFacade.Instance.CreateMaterialFromBlob([]));
+    }
+
     [Fact]
     public void CaptureFrameRgba8_ReturnsDeterministicRgbaPayload()
     {

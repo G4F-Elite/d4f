@@ -1,10 +1,15 @@
 using System;
+using System.Collections.Generic;
+using Engine.Core.Handles;
 
 namespace Engine.Rendering;
 
 public sealed class NoopRenderingFacade : IRenderingFacade
 {
     public static NoopRenderingFacade Instance { get; } = new();
+    private readonly object _resourceSync = new();
+    private readonly HashSet<ulong> _resourceHandles = [];
+    private ulong _nextResourceHandle = 1u;
 
     private NoopRenderingFacade()
     {
@@ -25,6 +30,37 @@ public sealed class NoopRenderingFacade : IRenderingFacade
     }
 
     public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
+
+    public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
+    {
+        return new MeshHandle(AllocateResource(blob));
+    }
+
+    public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
+    {
+        return new TextureHandle(AllocateResource(blob));
+    }
+
+    public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
+    {
+        return new MaterialHandle(AllocateResource(blob));
+    }
+
+    public void DestroyResource(ulong handle)
+    {
+        if (handle == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "Handle value must be non-zero.");
+        }
+
+        lock (_resourceSync)
+        {
+            if (!_resourceHandles.Remove(handle))
+            {
+                throw new InvalidOperationException($"Resource handle '{handle}' does not exist.");
+            }
+        }
+    }
 
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
     {
@@ -61,5 +97,25 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         }
 
         return rgba;
+    }
+
+    private ulong AllocateResource(ReadOnlySpan<byte> blob)
+    {
+        if (blob.Length == 0)
+        {
+            throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+        }
+
+        lock (_resourceSync)
+        {
+            ulong handle = _nextResourceHandle++;
+            if (handle == 0u)
+            {
+                throw new InvalidOperationException("Resource handle counter overflow.");
+            }
+
+            _resourceHandles.Add(handle);
+            return handle;
+        }
     }
 }

@@ -46,6 +46,30 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus RendererPresent(IntPtr renderer)
         => NativeMethods.RendererPresent(renderer);
 
+    public EngineNativeStatus RendererCreateMeshFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong mesh)
+        => NativeMethods.RendererCreateMeshFromBlob(renderer, data, size, out mesh);
+
+    public EngineNativeStatus RendererCreateTextureFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong texture)
+        => NativeMethods.RendererCreateTextureFromBlob(renderer, data, size, out texture);
+
+    public EngineNativeStatus RendererCreateMaterialFromBlob(
+        IntPtr renderer,
+        IntPtr data,
+        nuint size,
+        out ulong material)
+        => NativeMethods.RendererCreateMaterialFromBlob(renderer, data, size, out material);
+
+    public EngineNativeStatus RendererDestroyResource(IntPtr renderer, ulong handle)
+        => NativeMethods.RendererDestroyResource(renderer, handle);
+
     public EngineNativeStatus RendererGetLastFrameStats(
         IntPtr renderer,
         out EngineNativeRendererFrameStats stats)
@@ -151,6 +175,36 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus RendererPresent(IntPtr renderer);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_blob")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererCreateMeshFromBlob(
+            IntPtr renderer,
+            IntPtr data,
+            nuint size,
+            out ulong outMesh);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_blob")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererCreateTextureFromBlob(
+            IntPtr renderer,
+            IntPtr data,
+            nuint size,
+            out ulong outTexture);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_material_from_blob")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererCreateMaterialFromBlob(
+            IntPtr renderer,
+            IntPtr data,
+            nuint size,
+            out ulong outMaterial);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_destroy_resource")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererDestroyResource(
+            IntPtr renderer,
+            ulong handle);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_get_last_frame_stats")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

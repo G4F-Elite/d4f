@@ -4,13 +4,13 @@ public readonly record struct MaterialHandle
 {
     public static MaterialHandle Invalid => default;
 
-    public MaterialHandle(uint value)
+    public MaterialHandle(ulong value)
     {
         HandleGuards.RequireNonZero(nameof(value), value);
         Value = value;
     }
 
-    public uint Value { get; }
+    public ulong Value { get; }
 
     public bool IsValid => Value != 0;
 

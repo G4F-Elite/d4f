@@ -1,4 +1,5 @@
 using System;
+using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.Physics;
@@ -45,6 +46,14 @@ internal interface INativeRenderingApi
     void Present();
 
     RenderingFrameStats GetLastFrameStats();
+
+    MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob);
+
+    TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob);
+
+    MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob);
+
+    void DestroyResource(ulong handle);
 
     byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true);
 }

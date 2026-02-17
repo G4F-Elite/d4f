@@ -7,7 +7,14 @@ namespace Engine.Rendering;
 public readonly record struct DrawCommand
 {
     public DrawCommand(EntityId entityId, MeshHandle mesh, MaterialHandle material, TextureHandle texture)
-        : this(entityId, mesh, material, texture, Matrix4x4.Identity, material.Value, mesh.Value)
+        : this(
+            entityId,
+            mesh,
+            material,
+            texture,
+            Matrix4x4.Identity,
+            SortKeyFromHandle(material.Value),
+            SortKeyFromHandle(mesh.Value))
     {
     }
 
@@ -62,4 +69,9 @@ public readonly record struct DrawCommand
     public uint SortKeyHigh { get; }
 
     public uint SortKeyLow { get; }
+
+    private static uint SortKeyFromHandle(ulong handle)
+    {
+        return (uint)(handle & uint.MaxValue);
+    }
 }

@@ -11,4 +11,12 @@ internal static class HandleGuards
             throw new ArgumentOutOfRangeException(parameterName, "Handle value must be non-zero.");
         }
     }
+
+    public static void RequireNonZero(string parameterName, ulong value)
+    {
+        if (value == 0u)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Handle value must be non-zero.");
+        }
+    }
 }

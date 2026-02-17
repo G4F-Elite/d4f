@@ -4,13 +4,13 @@ public readonly record struct MeshHandle
 {
     public static MeshHandle Invalid => default;
 
-    public MeshHandle(uint value)
+    public MeshHandle(ulong value)
     {
         HandleGuards.RequireNonZero(nameof(value), value);
         Value = value;
     }
 
-    public uint Value { get; }
+    public ulong Value { get; }
 
     public bool IsValid => Value != 0;
 

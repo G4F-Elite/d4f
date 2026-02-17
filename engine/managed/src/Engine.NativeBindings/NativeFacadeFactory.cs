@@ -1,4 +1,5 @@
 using System;
+using Engine.Core.Handles;
 using Engine.Core.Abstractions;
 using Engine.Core.Timing;
 using Engine.ECS;
@@ -116,6 +117,17 @@ public static class NativeFacadeFactory
         public void Present() => _nativeApi.Present();
 
         public RenderingFrameStats GetLastFrameStats() => _nativeApi.GetLastFrameStats();
+
+        public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
+            => _nativeApi.CreateMeshFromBlob(blob);
+
+        public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
+            => _nativeApi.CreateTextureFromBlob(blob);
+
+        public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
+            => _nativeApi.CreateMaterialFromBlob(blob);
+
+        public void DestroyResource(ulong handle) => _nativeApi.DestroyResource(handle);
 
         public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
             => _nativeApi.CaptureFrameRgba8(width, height, includeAlpha);

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.Physics;
@@ -92,6 +93,18 @@ internal sealed class NativeRenderingApiStub : INativeRenderingApi
     }
 
     public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
+
+    public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
+        => NoopRenderingFacade.Instance.CreateMeshFromBlob(blob);
+
+    public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
+        => NoopRenderingFacade.Instance.CreateTextureFromBlob(blob);
+
+    public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
+        => NoopRenderingFacade.Instance.CreateMaterialFromBlob(blob);
+
+    public void DestroyResource(ulong handle)
+        => NoopRenderingFacade.Instance.DestroyResource(handle);
 
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
         => NoopRenderingFacade.Instance.CaptureFrameRgba8(width, height, includeAlpha);

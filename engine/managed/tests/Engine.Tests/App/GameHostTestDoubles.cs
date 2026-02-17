@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Engine.App;
 using Engine.Core.Abstractions;
+using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.Physics;
@@ -209,6 +210,7 @@ internal sealed class RecordingPacketBuilder : IRenderPacketBuilder
 internal sealed class RecordingRenderingFacade : IRenderingFacade
 {
     private readonly IList<string> _execution;
+    private ulong _nextResourceHandle = 1u;
 
     public RecordingRenderingFacade(IList<string> execution)
     {
@@ -245,6 +247,44 @@ internal sealed class RecordingRenderingFacade : IRenderingFacade
     {
         GetLastFrameStatsCallCount++;
         return LastFrameStats;
+    }
+
+    public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
+    {
+        if (blob.Length == 0)
+        {
+            throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+        }
+
+        return new MeshHandle(_nextResourceHandle++);
+    }
+
+    public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
+    {
+        if (blob.Length == 0)
+        {
+            throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+        }
+
+        return new TextureHandle(_nextResourceHandle++);
+    }
+
+    public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
+    {
+        if (blob.Length == 0)
+        {
+            throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+        }
+
+        return new MaterialHandle(_nextResourceHandle++);
+    }
+
+    public void DestroyResource(ulong handle)
+    {
+        if (handle == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(handle), "Handle must be non-zero.");
+        }
     }
 
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
