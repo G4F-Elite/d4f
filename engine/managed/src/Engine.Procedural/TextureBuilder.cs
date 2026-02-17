@@ -46,7 +46,7 @@ public sealed record ProceduralTextureRecipe(
     }
 }
 
-public static class TextureBuilder
+public static partial class TextureBuilder
 {
     public static float[] GenerateHeight(ProceduralTextureRecipe recipe)
     {
