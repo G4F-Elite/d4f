@@ -11,6 +11,7 @@
 
 #include "content/content_runtime.h"
 #include "engine_native.h"
+#include "core/resource_table.h"
 #include "render/material_system.h"
 #include "platform/platform_state.h"
 #include "render/render_graph.h"
@@ -21,6 +22,17 @@ namespace dff::native {
 
 class RendererState {
  public:
+  enum class ResourceKind : uint8_t {
+    kMesh = 1u,
+    kTexture = 2u,
+    kMaterial = 3u,
+  };
+
+  struct ResourceBlob {
+    ResourceKind kind = ResourceKind::kMesh;
+    std::vector<uint8_t> bytes;
+  };
+
   void AttachDevice(rhi::RhiDevice* device) { rhi_device_ = device; }
 
   engine_native_status_t BeginFrame(size_t requested_bytes,
@@ -28,6 +40,19 @@ class RendererState {
                                     void** out_frame_memory);
   engine_native_status_t Submit(const engine_native_render_packet_t& packet);
   engine_native_status_t Present();
+  engine_native_status_t CreateMeshFromBlob(
+      const void* data,
+      size_t size,
+      engine_native_resource_handle_t* out_mesh);
+  engine_native_status_t CreateTextureFromBlob(
+      const void* data,
+      size_t size,
+      engine_native_resource_handle_t* out_texture);
+  engine_native_status_t CreateMaterialFromBlob(
+      const void* data,
+      size_t size,
+      engine_native_resource_handle_t* out_material);
+  engine_native_status_t DestroyResource(engine_native_resource_handle_t handle);
   engine_native_status_t GetLastFrameStats(
       engine_native_renderer_frame_stats_t* out_stats) const;
 
@@ -44,9 +69,15 @@ class RendererState {
   uint64_t pipeline_cache_hits() const { return pipeline_cache_.hit_count(); }
   uint64_t pipeline_cache_misses() const { return pipeline_cache_.miss_count(); }
   size_t cached_pipeline_count() const { return pipeline_cache_.size(); }
+  size_t resource_count() const { return resources_.Size(); }
 
  private:
   static bool IsPowerOfTwo(size_t value);
+  engine_native_status_t CreateResourceFromBlob(
+      ResourceKind kind,
+      const void* data,
+      size_t size,
+      engine_native_resource_handle_t* out_handle);
   engine_native_status_t BuildFrameGraph();
   engine_native_status_t ExecuteCompiledFrameGraph();
   void ResetFrameState();
@@ -68,6 +99,7 @@ class RendererState {
       ENGINE_NATIVE_DEBUG_VIEW_NONE;
   render::MaterialSystem material_system_;
   rhi::PipelineStateCache pipeline_cache_;
+  ResourceTable<ResourceBlob> resources_;
   uint64_t last_pass_mask_ = 0u;
   engine_native_renderer_frame_stats_t last_frame_stats_{};
 };

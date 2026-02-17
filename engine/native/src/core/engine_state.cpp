@@ -294,6 +294,83 @@ engine_native_status_t RendererState::Present() {
   return ENGINE_NATIVE_STATUS_OK;
 }
 
+engine_native_status_t RendererState::CreateMeshFromBlob(
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_mesh) {
+  return CreateResourceFromBlob(ResourceKind::kMesh, data, size, out_mesh);
+}
+
+engine_native_status_t RendererState::CreateTextureFromBlob(
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_texture) {
+  return CreateResourceFromBlob(ResourceKind::kTexture, data, size, out_texture);
+}
+
+engine_native_status_t RendererState::CreateMaterialFromBlob(
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_material) {
+  return CreateResourceFromBlob(ResourceKind::kMaterial, data, size, out_material);
+}
+
+engine_native_status_t RendererState::DestroyResource(
+    engine_native_resource_handle_t handle) {
+  if (handle == kInvalidResourceHandle) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const ResourceHandle resource_handle = DecodeResourceHandle(handle);
+  ResourceBlob* blob = resources_.Get(resource_handle);
+  if (blob == nullptr) {
+    return ENGINE_NATIVE_STATUS_NOT_FOUND;
+  }
+
+  if (blob->kind == ResourceKind::kMaterial) {
+    material_system_.RemoveMaterial(handle);
+  }
+
+  return resources_.Remove(resource_handle) ? ENGINE_NATIVE_STATUS_OK
+                                            : ENGINE_NATIVE_STATUS_NOT_FOUND;
+}
+
+engine_native_status_t RendererState::CreateResourceFromBlob(
+    ResourceKind kind,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_handle) {
+  if (out_handle == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_handle = kInvalidResourceHandle;
+
+  if (data == nullptr || size == 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  ResourceBlob blob;
+  blob.kind = kind;
+  const uint8_t* bytes = static_cast<const uint8_t*>(data);
+
+  try {
+    blob.bytes.assign(bytes, bytes + size);
+  } catch (const std::bad_alloc&) {
+    return ENGINE_NATIVE_STATUS_OUT_OF_MEMORY;
+  }
+
+  ResourceHandle resource_handle{};
+  const engine_native_status_t insert_status =
+      resources_.Insert(std::move(blob), &resource_handle);
+  if (insert_status != ENGINE_NATIVE_STATUS_OK) {
+    return insert_status;
+  }
+
+  *out_handle = EncodeResourceHandle(resource_handle);
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
 engine_native_status_t RendererState::BuildFrameGraph() {
   render::FrameGraphBuildConfig build_config{
       .has_draws = submitted_draw_count_ > 0u,

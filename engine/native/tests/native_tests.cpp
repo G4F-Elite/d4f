@@ -400,6 +400,71 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
 
+void TestRendererResourceBlobLifecycle() {
+  engine_native_create_desc_t create_desc{
+      .api_version = ENGINE_NATIVE_API_VERSION,
+      .user_data = nullptr};
+
+  engine_native_engine_t* engine = nullptr;
+  assert(engine_create(&create_desc, &engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(engine != nullptr);
+
+  engine_native_renderer_t* renderer = nullptr;
+  assert(engine_get_renderer(engine, &renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer != nullptr);
+
+  engine_native_resource_handle_t mesh = 0u;
+  engine_native_resource_handle_t texture = 0u;
+  engine_native_resource_handle_t material = 0u;
+  uint8_t mesh_blob[6]{1u, 2u, 3u, 4u, 5u, 6u};
+  uint8_t texture_blob[5]{6u, 5u, 4u, 3u, 2u};
+  uint8_t material_blob[4]{9u, 8u, 7u, 6u};
+
+  assert(renderer_create_mesh_from_blob(nullptr, mesh_blob, sizeof(mesh_blob), &mesh) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_blob(renderer, nullptr, sizeof(mesh_blob), &mesh) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, 0u, &mesh) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, sizeof(mesh_blob), nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, sizeof(mesh_blob), &mesh) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(mesh != 0u);
+
+  assert(renderer_create_texture_from_blob(renderer,
+                                           texture_blob,
+                                           sizeof(texture_blob),
+                                           &texture) == ENGINE_NATIVE_STATUS_OK);
+  assert(texture != 0u);
+  assert(texture != mesh);
+
+  assert(renderer_create_material_from_blob(renderer,
+                                            material_blob,
+                                            sizeof(material_blob),
+                                            &material) == ENGINE_NATIVE_STATUS_OK);
+  assert(material != 0u);
+  assert(material != mesh);
+  assert(material != texture);
+
+  auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
+  assert(internal_engine->state.renderer.resource_count() == 3u);
+
+  assert(renderer_destroy_resource(renderer, 0u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_destroy_resource(renderer, mesh) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_destroy_resource(renderer, mesh) ==
+         ENGINE_NATIVE_STATUS_NOT_FOUND);
+  assert(internal_engine->state.renderer.resource_count() == 2u);
+  assert(renderer_destroy_resource(renderer, texture) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_destroy_resource(renderer, material) == ENGINE_NATIVE_STATUS_OK);
+  assert(internal_engine->state.renderer.resource_count() == 0u);
+  assert(renderer_destroy_resource(renderer, material) ==
+         ENGINE_NATIVE_STATUS_NOT_FOUND);
+
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+}
+
 void TestResourceTableGeneration() {
   dff::native::ResourceTable<int> table;
 
@@ -439,6 +504,7 @@ int main() {
   TestEngineCreateValidation();
   TestEngineAndSubsystemFlow();
   TestRendererPassOrderForDrawAndUiScenarios();
+  TestRendererResourceBlobLifecycle();
   dff::native::tests::RunContentRuntimeTests();
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();

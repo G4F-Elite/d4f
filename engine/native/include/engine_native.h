@@ -261,6 +261,28 @@ ENGINE_NATIVE_API engine_native_status_t renderer_submit(
 ENGINE_NATIVE_API engine_native_status_t renderer_present(
     engine_native_renderer_t* renderer);
 
+ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_blob(
+    engine_native_renderer_t* renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_mesh);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_texture_from_blob(
+    engine_native_renderer_t* renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_texture);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_material_from_blob(
+    engine_native_renderer_t* renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_material);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_destroy_resource(
+    engine_native_renderer_t* renderer,
+    engine_native_resource_handle_t handle);
+
 ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats(
     engine_native_renderer_t* renderer,
     engine_native_renderer_frame_stats_t* out_stats);

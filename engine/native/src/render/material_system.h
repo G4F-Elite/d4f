@@ -22,6 +22,8 @@ class MaterialSystem {
                                         bool shadows_enabled,
                                         ShaderVariantKey* out_variant) const;
 
+  void RemoveMaterial(engine_native_resource_handle_t material);
+
   void Clear() { feature_flags_by_material_.clear(); }
 
   size_t material_count() const { return feature_flags_by_material_.size(); }

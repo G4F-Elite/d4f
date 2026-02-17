@@ -51,4 +51,12 @@ engine_native_status_t MaterialSystem::ResolveVariant(
   return ENGINE_NATIVE_STATUS_OK;
 }
 
+void MaterialSystem::RemoveMaterial(engine_native_resource_handle_t material) {
+  if (material == 0u) {
+    return;
+  }
+
+  feature_flags_by_material_.erase(material);
+}
+
 }  // namespace dff::native::render
