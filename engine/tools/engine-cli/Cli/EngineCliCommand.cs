@@ -25,7 +25,10 @@ public sealed record TestCommand(
     string ArtifactsDirectory,
     string Configuration,
     string? GoldenDirectory,
-    bool PixelPerfectGolden) : EngineCliCommand;
+    bool PixelPerfectGolden,
+    int CaptureFrame,
+    ulong ReplaySeed,
+    double FixedDeltaSeconds) : EngineCliCommand;
 
 public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
 

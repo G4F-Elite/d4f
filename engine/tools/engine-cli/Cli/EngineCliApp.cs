@@ -199,7 +199,11 @@ public sealed partial class EngineCliApp
         }
 
         string artifactsDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ArtifactsDirectory);
-        TestArtifactsOutput artifactsOutput = TestArtifactGenerator.Generate(artifactsDirectory);
+        var generationOptions = new TestArtifactGenerationOptions(
+            command.CaptureFrame,
+            command.ReplaySeed,
+            command.FixedDeltaSeconds);
+        TestArtifactsOutput artifactsOutput = TestArtifactGenerator.Generate(artifactsDirectory, generationOptions);
 
         if (!string.IsNullOrWhiteSpace(command.GoldenDirectory))
         {

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Engine.Cli;
 
 public static partial class EngineCliParser
@@ -236,7 +238,46 @@ public static partial class EngineCliParser
             }
         }
 
-        return EngineCliParseResult.Success(new TestCommand(project, artifacts, configuration, goldenDirectory, pixelPerfect));
+        int captureFrame = 1;
+        if (options.TryGetValue("capture-frame", out string? captureFrameValue))
+        {
+            if (!int.TryParse(captureFrameValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out captureFrame) ||
+                captureFrame <= 0 ||
+                captureFrame > 100_000)
+            {
+                return EngineCliParseResult.Failure("Option '--capture-frame' must be an integer in range [1..100000].");
+            }
+        }
+
+        ulong replaySeed = 1337UL;
+        if (options.TryGetValue("seed", out string? seedValue))
+        {
+            if (!ulong.TryParse(seedValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out replaySeed))
+            {
+                return EngineCliParseResult.Failure("Option '--seed' must be an unsigned integer.");
+            }
+        }
+
+        double fixedDeltaSeconds = 1.0 / 60.0;
+        if (options.TryGetValue("fixed-dt", out string? fixedDtValue))
+        {
+            if (!double.TryParse(fixedDtValue, NumberStyles.Float, CultureInfo.InvariantCulture, out fixedDeltaSeconds) ||
+                fixedDeltaSeconds <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--fixed-dt' must be a positive number.");
+            }
+        }
+
+        return EngineCliParseResult.Success(
+            new TestCommand(
+                project,
+                artifacts,
+                configuration,
+                goldenDirectory,
+                pixelPerfect,
+                captureFrame,
+                replaySeed,
+                fixedDeltaSeconds));
     }
 
     private static EngineCliParseResult ParsePack(IReadOnlyDictionary<string, string> options)

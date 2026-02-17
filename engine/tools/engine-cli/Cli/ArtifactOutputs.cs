@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Engine.AssetPipeline;
 using Engine.Rendering;
@@ -166,6 +167,29 @@ internal sealed record TestCaptureArtifact(string RelativeCapturePath, string Re
 
 internal sealed record TestArtifactsOutput(string ManifestPath, IReadOnlyList<TestCaptureArtifact> Captures);
 
+internal sealed record TestArtifactGenerationOptions(
+    int CaptureFrame,
+    ulong ReplaySeed,
+    double FixedDeltaSeconds)
+{
+    public static TestArtifactGenerationOptions Default { get; } = new(1, 1337UL, 1.0 / 60.0);
+
+    public TestArtifactGenerationOptions Validate()
+    {
+        if (CaptureFrame <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(CaptureFrame), "Capture frame must be greater than zero.");
+        }
+
+        if (FixedDeltaSeconds <= 0.0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(FixedDeltaSeconds), "Fixed delta must be greater than zero.");
+        }
+
+        return this;
+    }
+}
+
 internal static class TestArtifactGenerator
 {
     private sealed record CaptureDefinition(string Kind, string RelativeCapturePath, byte PatternSeed);
@@ -173,24 +197,25 @@ internal static class TestArtifactGenerator
     private const uint CaptureWidth = 64u;
     private const uint CaptureHeight = 64u;
 
-    private static readonly CaptureDefinition[] CaptureDefinitions =
-    [
-        new("screenshot", Path.Combine("screenshots", "frame-0001.png"), 11),
-        new("albedo", Path.Combine("dumps", "albedo-0001.png"), 37),
-        new("normals", Path.Combine("dumps", "normals-0001.png"), 73),
-        new("depth", Path.Combine("dumps", "depth-0001.png"), 101),
-        new("shadow", Path.Combine("dumps", "shadow-0001.png"), 151)
-    ];
-
     public static TestArtifactsOutput Generate(string outputDirectory)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        return Generate(outputDirectory, TestArtifactGenerationOptions.Default);
+    }
 
-        var manifestEntries = new List<TestingArtifactEntry>(CaptureDefinitions.Length * 2 + 1);
-        var captures = new List<TestCaptureArtifact>(CaptureDefinitions.Length);
+    public static TestArtifactsOutput Generate(
+        string outputDirectory,
+        TestArtifactGenerationOptions options)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(options);
+        _ = options.Validate();
+
+        CaptureDefinition[] captureDefinitions = BuildCaptureDefinitions(options.CaptureFrame);
+        var manifestEntries = new List<TestingArtifactEntry>(captureDefinitions.Length * 2 + 1);
+        var captures = new List<TestCaptureArtifact>(captureDefinitions.Length);
         IRenderingFacade captureFacade = NoopRenderingFacade.Instance;
 
-        foreach (CaptureDefinition definition in CaptureDefinitions)
+        foreach (CaptureDefinition definition in captureDefinitions)
         {
             GoldenImageBuffer image = CaptureBuffer(captureFacade, definition);
             string captureFullPath = Path.Combine(outputDirectory, definition.RelativeCapturePath);
@@ -218,13 +243,12 @@ internal static class TestArtifactGenerator
         ReplayRecordingCodec.Write(
             replayFullPath,
             new ReplayRecording(
-                Seed: 1337,
-                FixedDeltaSeconds: 1.0 / 60.0,
-                Frames:
+                Seed: options.ReplaySeed,
+                FixedDeltaSeconds: options.FixedDeltaSeconds,
+                Frames: BuildReplayFrames(options.CaptureFrame),
+                NetworkEvents:
                 [
-                    new ReplayFrameInput(0, 0, 0.0f, 0.0f),
-                    new ReplayFrameInput(1, 1, 0.2f, 0.1f),
-                    new ReplayFrameInput(2, 1, 0.3f, 0.2f)
+                    $"capture.frame={options.CaptureFrame}"
                 ]));
         manifestEntries.Add(
             new TestingArtifactEntry(
@@ -255,5 +279,32 @@ internal static class TestArtifactGenerator
     private static string NormalizePath(string path)
     {
         return path.Replace('\\', '/');
+    }
+
+    private static CaptureDefinition[] BuildCaptureDefinitions(int captureFrame)
+    {
+        string frameToken = captureFrame.ToString("D4", CultureInfo.InvariantCulture);
+        return
+        [
+            new("screenshot", Path.Combine("screenshots", $"frame-{frameToken}.png"), 11),
+            new("albedo", Path.Combine("dumps", $"albedo-{frameToken}.png"), 37),
+            new("normals", Path.Combine("dumps", $"normals-{frameToken}.png"), 73),
+            new("depth", Path.Combine("dumps", $"depth-{frameToken}.png"), 101),
+            new("shadow", Path.Combine("dumps", $"shadow-{frameToken}.png"), 151)
+        ];
+    }
+
+    private static ReplayFrameInput[] BuildReplayFrames(int captureFrame)
+    {
+        var frames = new ReplayFrameInput[captureFrame + 1];
+        for (int tick = 0; tick <= captureFrame; tick++)
+        {
+            uint buttons = tick == 0 ? 0u : 1u;
+            float mouseX = tick * 0.2f;
+            float mouseY = tick * 0.1f;
+            frames[tick] = new ReplayFrameInput(tick, buttons, mouseX, mouseY);
+        }
+
+        return frames;
     }
 }

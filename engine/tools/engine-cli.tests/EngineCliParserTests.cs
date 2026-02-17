@@ -102,6 +102,9 @@ public sealed class EngineCliParserTests
         Assert.Equal("Debug", command.Configuration);
         Assert.Null(command.GoldenDirectory);
         Assert.False(command.PixelPerfectGolden);
+        Assert.Equal(1, command.CaptureFrame);
+        Assert.Equal(1337UL, command.ReplaySeed);
+        Assert.Equal(1.0 / 60.0, command.FixedDeltaSeconds, 6);
     }
 
     [Fact]
@@ -118,6 +121,55 @@ public sealed class EngineCliParserTests
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
         Assert.Equal("goldens", command.GoldenDirectory);
         Assert.True(command.PixelPerfectGolden);
+    }
+
+    [Fact]
+    public void Parse_ShouldReadReplayAndCaptureOptions_ForTestCommand()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--capture-frame", "12",
+            "--seed", "9001",
+            "--fixed-dt", "0.0333333"
+        ]);
+
+        TestCommand command = Assert.IsType<TestCommand>(result.Command);
+        Assert.Equal(12, command.CaptureFrame);
+        Assert.Equal(9001UL, command.ReplaySeed);
+        Assert.Equal(0.0333333, command.FixedDeltaSeconds, 6);
+    }
+
+    [Fact]
+    public void Parse_ShouldFail_WhenReplayOrCaptureOptionsInvalid()
+    {
+        EngineCliParseResult invalidCapture = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--capture-frame", "0"
+        ]);
+        Assert.False(invalidCapture.IsSuccess);
+        Assert.Equal("Option '--capture-frame' must be an integer in range [1..100000].", invalidCapture.Error);
+
+        EngineCliParseResult invalidSeed = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--seed", "not-a-number"
+        ]);
+        Assert.False(invalidSeed.IsSuccess);
+        Assert.Equal("Option '--seed' must be an unsigned integer.", invalidSeed.Error);
+
+        EngineCliParseResult invalidFixedDt = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--fixed-dt", "-1"
+        ]);
+        Assert.False(invalidFixedDt.IsSuccess);
+        Assert.Equal("Option '--fixed-dt' must be a positive number.", invalidFixedDt.Error);
     }
 
     [Fact]
