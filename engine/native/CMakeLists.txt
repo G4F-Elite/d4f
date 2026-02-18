@@ -40,6 +40,11 @@ target_include_directories(dff_native
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
+if(MSVC)
+  set_target_properties(dff_native PROPERTIES
+    MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
+
 include(CTest)
 
 if(BUILD_TESTING)
@@ -71,6 +76,11 @@ if(BUILD_TESTING)
 
   target_link_libraries(dff_native_tests PRIVATE dff_native)
 
+  if(MSVC)
+    set_target_properties(dff_native_tests PROPERTIES
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+
   add_test(NAME dff_native_tests COMMAND dff_native_tests)
 
   add_executable(dff_native_capture_tests
@@ -86,6 +96,11 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(dff_native_capture_tests PRIVATE dff_native)
+
+  if(MSVC)
+    set_target_properties(dff_native_capture_tests PROPERTIES
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
 
   add_test(NAME dff_native_capture_tests COMMAND dff_native_capture_tests)
 
@@ -103,6 +118,11 @@ if(BUILD_TESTING)
 
   target_link_libraries(dff_native_audio_tests PRIVATE dff_native)
 
+  if(MSVC)
+    set_target_properties(dff_native_audio_tests PROPERTIES
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+
   add_test(NAME dff_native_audio_tests COMMAND dff_native_audio_tests)
 
   add_executable(dff_native_net_tests
@@ -118,6 +138,11 @@ if(BUILD_TESTING)
   )
 
   target_link_libraries(dff_native_net_tests PRIVATE dff_native)
+
+  if(MSVC)
+    set_target_properties(dff_native_net_tests PROPERTIES
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
 
   add_test(NAME dff_native_net_tests COMMAND dff_native_net_tests)
 endif()

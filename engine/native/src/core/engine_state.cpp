@@ -11,6 +11,13 @@
 #include <utility>
 #include <vector>
 
+#if defined(_WIN32)
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
+
 #include "render/frame_graph_builder.h"
 
 namespace dff::native {
@@ -100,13 +107,31 @@ bool HasValidUiScissor(const engine_native_ui_draw_item_t& item) {
          IsFiniteNonNegative(item.scissor_height);
 }
 
-const char* ResolvePipelineCachePath() {
+std::string ResolvePipelineCachePath() {
+#if defined(_WIN32)
+  const DWORD required_size =
+      ::GetEnvironmentVariableA(kPipelineCachePathEnv, nullptr, 0u);
+  if (required_size == 0u) {
+    return {};
+  }
+
+  std::string value(static_cast<size_t>(required_size), '\0');
+  const DWORD written =
+      ::GetEnvironmentVariableA(kPipelineCachePathEnv, value.data(), required_size);
+  if (written == 0u || written >= required_size) {
+    return {};
+  }
+
+  value.resize(static_cast<size_t>(written));
+  return value;
+#else
   const char* path = std::getenv(kPipelineCachePathEnv);
   if (path == nullptr || path[0] == '\0') {
-    return nullptr;
+    return {};
   }
 
   return path;
+#endif
 }
 
 bool IsSupportedDebugViewMode(uint8_t mode) {
@@ -283,8 +308,8 @@ bool IsValidResourceBlob(RendererState::ResourceKind kind,
 
 EngineState::EngineState() {
   renderer.AttachDevice(&rhi_device);
-  if (const char* cache_path = ResolvePipelineCachePath();
-      cache_path != nullptr) {
+  const std::string cache_path = ResolvePipelineCachePath();
+  if (!cache_path.empty()) {
     pipeline_cache_path = cache_path;
     renderer.LoadPipelineCacheFromDisk(pipeline_cache_path.c_str());
   }
