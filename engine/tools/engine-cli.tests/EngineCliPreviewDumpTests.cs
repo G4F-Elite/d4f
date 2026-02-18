@@ -71,6 +71,65 @@ public sealed class EngineCliPreviewDumpTests
     }
 
     [Fact]
+    public void Run_PreviewDump_ShouldPrintGalleryEntries_WhenGalleryArtifactPresent()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string previewDirectory = Path.Combine(tempRoot, "artifacts", "preview");
+            string galleryDirectory = Path.Combine(previewDirectory, "gallery");
+            Directory.CreateDirectory(galleryDirectory);
+            File.WriteAllText(
+                Path.Combine(previewDirectory, "manifest.json"),
+                """
+                {
+                  "generatedAtUtc": "2026-02-16T12:34:56.0000000Z",
+                  "artifacts": [
+                    {
+                      "kind": "preview-gallery",
+                      "relativePath": "gallery/gallery.json",
+                      "description": "Preview gallery metadata."
+                    }
+                  ]
+                }
+                """);
+
+            File.WriteAllText(
+                Path.Combine(galleryDirectory, "gallery.json"),
+                """
+                [
+                  {
+                    "path": "Gameplay/Rock",
+                    "kind": "texture-preview",
+                    "category": "environment",
+                    "tags": ["procedural", "rock"],
+                    "previewPath": "textures/rock.png"
+                  }
+                ]
+                """);
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(["preview", "dump", "--project", tempRoot]);
+
+            Assert.Equal(0, code);
+            string text = output.ToString();
+            Assert.Contains("Preview gallery entries:", text, StringComparison.Ordinal);
+            Assert.Contains(
+                "gallery\tGameplay/Rock\ttexture-preview\tenvironment\tprocedural,rock\ttextures/rock.png",
+                text,
+                StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_PreviewDump_ShouldFail_WhenManifestMissing()
     {
         string tempRoot = CreateTempDirectory();

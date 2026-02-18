@@ -210,28 +210,6 @@ public sealed partial class EngineCliApp
         return 0;
     }
 
-    private int HandlePreviewDump(PreviewDumpCommand command)
-    {
-        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
-        if (!Directory.Exists(projectDirectory))
-        {
-            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
-            return 1;
-        }
-
-        string manifestPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ManifestPath);
-        TestingArtifactManifest manifest = TestingArtifactManifestCodec.Read(manifestPath);
-
-        _stdout.WriteLine($"Preview artifact manifest: {manifestPath}");
-        _stdout.WriteLine($"Generated at: {manifest.GeneratedAtUtc:O}");
-        foreach (TestingArtifactEntry artifact in manifest.Artifacts)
-        {
-            _stdout.WriteLine($"{artifact.Kind}\t{artifact.RelativePath}\t{artifact.Description}");
-        }
-
-        return 0;
-    }
-
     private int HandleTest(TestCommand command)
     {
         string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
@@ -360,4 +338,5 @@ public sealed partial class EngineCliApp
         ulong TriangleCount,
         ulong UploadBytes,
         ulong GpuMemoryBytes);
+
 }
