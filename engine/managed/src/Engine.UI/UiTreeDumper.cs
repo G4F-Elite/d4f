@@ -67,6 +67,12 @@ public static class UiTreeDumper
             case UiText text:
                 AppendStringField(builder, "text", text.Content);
                 break;
+            case UiImage image:
+                builder.Append(" texture=");
+                builder.Append(image.Texture.Value.ToString(CultureInfo.InvariantCulture));
+                builder.Append(" preserveAspect=");
+                builder.Append(image.PreserveAspectRatio ? "true" : "false");
+                break;
             case UiButton button:
                 AppendStringField(builder, "text", button.Text);
                 break;
@@ -102,6 +108,19 @@ public static class UiTreeDumper
                 builder.Append(startIndex);
                 builder.Append(" visibleCount=");
                 builder.Append(visibleCount);
+                break;
+            case UiList list:
+                (int listStartIndex, int listVisibleCount) = list.GetVisibleRange();
+                builder.Append(" items=");
+                builder.Append(list.Items.Count);
+                builder.Append(" itemHeight=");
+                AppendFloat(builder, list.ItemHeight);
+                builder.Append(" scrollY=");
+                AppendFloat(builder, list.ScrollOffsetY);
+                builder.Append(" visibleStart=");
+                builder.Append(listStartIndex);
+                builder.Append(" visibleCount=");
+                builder.Append(listVisibleCount);
                 break;
         }
 

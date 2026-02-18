@@ -196,8 +196,8 @@ public sealed partial class RetainedUiFacade
             case UiInputField inputField:
                 clickedInput = inputField;
                 return true;
-            case UiVirtualizedList list:
-                if (!TryGetVirtualizedItemIndex(list, elementBounds, pointerX, pointerY, out int index))
+            case UiListBase list:
+                if (!TryGetListItemIndex(list, elementBounds, pointerX, pointerY, out int index))
                 {
                     return false;
                 }
@@ -250,7 +250,7 @@ public sealed partial class RetainedUiFacade
 
         switch (element)
         {
-            case UiVirtualizedList list:
+            case UiListBase list:
                 list.ScrollBy(wheelDelta);
                 return true;
             case UiScrollView view:
@@ -269,28 +269,14 @@ public sealed partial class RetainedUiFacade
         slider.Value = normalized;
     }
 
-    private static bool TryGetVirtualizedItemIndex(
-        UiVirtualizedList list,
+    private static bool TryGetListItemIndex(
+        UiListBase list,
         RectF listBounds,
         float pointerX,
         float pointerY,
         out int index)
     {
-        index = -1;
-        if (!listBounds.Contains(pointerX, pointerY) || list.Items.Count == 0)
-        {
-            return false;
-        }
-
-        float localY = pointerY - listBounds.Y + list.ScrollOffsetY;
-        int resolved = (int)MathF.Floor(localY / list.ItemHeight);
-        if (resolved < 0 || resolved >= list.Items.Count)
-        {
-            return false;
-        }
-
-        index = resolved;
-        return true;
+        return list.TryGetItemIndexAt(listBounds, pointerX, pointerY, out index);
     }
 
     private void FocusInput(UiInputField inputField)
@@ -363,40 +349,4 @@ public sealed partial class RetainedUiFacade
         return false;
     }
 
-    private enum UiInteractionKind
-    {
-        ElementClick = 0,
-        PointerClick = 1,
-        PointerMove = 2,
-        PointerScroll = 3,
-        TextInput = 4,
-        Backspace = 5
-    }
-
-    private readonly record struct UiQueuedInteraction(
-        UiInteractionKind Kind,
-        string ElementId,
-        float PointerX,
-        float PointerY,
-        float WheelDelta,
-        string Text)
-    {
-        public static UiQueuedInteraction CreateElementClick(string elementId) =>
-            new(UiInteractionKind.ElementClick, elementId, 0.0f, 0.0f, 0.0f, string.Empty);
-
-        public static UiQueuedInteraction CreatePointerClick(float x, float y) =>
-            new(UiInteractionKind.PointerClick, string.Empty, x, y, 0.0f, string.Empty);
-
-        public static UiQueuedInteraction CreatePointerMove(float x, float y) =>
-            new(UiInteractionKind.PointerMove, string.Empty, x, y, 0.0f, string.Empty);
-
-        public static UiQueuedInteraction CreatePointerScroll(float x, float y, float wheelDelta) =>
-            new(UiInteractionKind.PointerScroll, string.Empty, x, y, wheelDelta, string.Empty);
-
-        public static UiQueuedInteraction CreateTextInput(string text) =>
-            new(UiInteractionKind.TextInput, string.Empty, 0.0f, 0.0f, 0.0f, text);
-
-        public static UiQueuedInteraction CreateBackspace() =>
-            new(UiInteractionKind.Backspace, string.Empty, 0.0f, 0.0f, 0.0f, string.Empty);
-    }
 }

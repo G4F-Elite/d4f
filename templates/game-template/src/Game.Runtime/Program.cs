@@ -100,6 +100,8 @@ static UiSummary BuildUiPreviewSummary(LevelGenResult level)
     TextureHandle buttonTexture = new(2u);
     TextureHandle fontTexture = new(3u);
     TextureHandle listItemTexture = new(4u);
+    TextureHandle imageTexture = new(5u);
+    TextureHandle compactListItemTexture = new(6u);
 
     UiDocument document = new();
     UiPanel root = new("root", panelTexture)
@@ -112,7 +114,22 @@ static UiSummary BuildUiPreviewSummary(LevelGenResult level)
     };
 
     root.AddChild(new UiText("title", fontTexture, "__GAME_NAME__ procedural runtime"));
+    root.AddChild(new UiImage("logo", imageTexture)
+    {
+        Width = 180f,
+        Height = 48f,
+        PreserveAspectRatio = true
+    });
     root.AddChild(new UiButton("play", buttonTexture, "Start"));
+
+    UiList compactList = new("spawn-categories", compactListItemTexture, fontTexture)
+    {
+        Width = 420f,
+        Height = 72f,
+        ItemHeight = 24f
+    };
+    compactList.SetItems(level.SpawnPoints.Select(static x => $"{x.Category} / node {x.NodeId}").ToArray());
+    root.AddChild(compactList);
 
     UiVirtualizedList list = new("spawn-list", listItemTexture, fontTexture)
     {

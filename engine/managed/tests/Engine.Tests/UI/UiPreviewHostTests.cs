@@ -86,4 +86,44 @@ public sealed class UiPreviewHostTests
         Assert.Empty(commands);
         Assert.Equal(string.Empty, host.DumpTree());
     }
+
+    [Fact]
+    public void BuildDrawData_SupportsImageAndListComponents()
+    {
+        var clickedItems = new List<(int Index, string Value)>();
+        var document = new UiDocument();
+        var root = new UiPanel("root", new TextureHandle(40))
+        {
+            Width = 220,
+            Height = 160
+        };
+        root.AddChild(new UiImage("logo", new TextureHandle(41))
+        {
+            X = 10,
+            Y = 10,
+            Width = 60,
+            Height = 24
+        });
+        var list = new UiList("list", new TextureHandle(42), new TextureHandle(43))
+        {
+            X = 10,
+            Y = 50,
+            Width = 120,
+            Height = 40
+        };
+        list.SetItems(["first", "second", "third"]);
+        list.OnItemClick = (index, value) => clickedItems.Add((index, value));
+        root.AddChild(list);
+        document.AddRoot(root);
+
+        var host = new UiPreviewHost(document);
+        host.QueuePointerClick(20, 75);
+        var commands = host.BuildDrawData(new FrameTiming(0, TimeSpan.Zero, TimeSpan.Zero));
+        string dump = host.DumpTree();
+
+        Assert.NotEmpty(commands);
+        Assert.Equal([(1, "second")], clickedItems);
+        Assert.Contains("UiImage id=\"logo\"", dump);
+        Assert.Contains("UiList id=\"list\"", dump);
+    }
 }

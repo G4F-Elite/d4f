@@ -50,6 +50,13 @@ public sealed partial class RetainedUiFacade
                 }
 
                 break;
+            case UiImage image:
+                if (canDrawSelf)
+                {
+                    AppendCommand(image.Texture, 1u, selfBounds, commands, ref vertexOffset, ref indexOffset);
+                }
+
+                break;
             case UiButton button:
                 if (canDrawSelf)
                 {
@@ -117,6 +124,9 @@ public sealed partial class RetainedUiFacade
             case UiVirtualizedList list:
                 AppendVirtualizedListCommands(list, elementBounds, clipBounds, commands, ref vertexOffset, ref indexOffset);
                 break;
+            case UiList uiList:
+                AppendListCommands(uiList, elementBounds, clipBounds, commands, ref vertexOffset, ref indexOffset);
+                break;
         }
 
         float childInheritedScrollY = inheritedScrollY;
@@ -142,7 +152,39 @@ public sealed partial class RetainedUiFacade
         ref uint indexOffset)
     {
         (int startIndex, int count) = list.GetVisibleRange();
-        if (count == 0)
+        AppendListItemCommands(list, listBounds, clipBounds, startIndex, count, commands, ref vertexOffset, ref indexOffset);
+    }
+
+    private static void AppendListCommands(
+        UiList list,
+        RectF listBounds,
+        RectF? clipBounds,
+        List<UiDrawCommand> commands,
+        ref uint vertexOffset,
+        ref uint indexOffset)
+    {
+        AppendListItemCommands(
+            list,
+            listBounds,
+            clipBounds,
+            startIndex: 0,
+            count: list.Items.Count,
+            commands,
+            ref vertexOffset,
+            ref indexOffset);
+    }
+
+    private static void AppendListItemCommands(
+        UiListBase list,
+        RectF listBounds,
+        RectF? clipBounds,
+        int startIndex,
+        int count,
+        List<UiDrawCommand> commands,
+        ref uint vertexOffset,
+        ref uint indexOffset)
+    {
+        if (count <= 0)
         {
             return;
         }

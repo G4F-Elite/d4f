@@ -120,6 +120,46 @@ public sealed class UiTreeDumperTests
     }
 
     [Fact]
+    public void DumpTree_IncludesImageAndListMetadata()
+    {
+        var document = new UiDocument();
+        var root = new UiPanel("root", new TextureHandle(30))
+        {
+            Width = 220,
+            Height = 150
+        };
+        root.AddChild(new UiImage("banner", new TextureHandle(31))
+        {
+            X = 8,
+            Y = 6,
+            Width = 50,
+            Height = 20,
+            PreserveAspectRatio = false
+        });
+        var list = new UiList("list", new TextureHandle(32), new TextureHandle(33))
+        {
+            X = 10,
+            Y = 40,
+            Width = 120,
+            Height = 40,
+            ItemHeight = 20,
+            ScrollStep = 10
+        };
+        list.SetItems(["one", "two", "three"]);
+        root.AddChild(list);
+        document.AddRoot(root);
+
+        var facade = new RetainedUiFacade(document);
+        var world = new World();
+        facade.QueueScroll(20, 50, -1.0f);
+        facade.Update(world, new FrameTiming(0, TimeSpan.Zero, TimeSpan.Zero));
+
+        string dump = facade.DumpTree();
+        Assert.Contains("UiImage id=\"banner\" visible=true bounds=(8,6,50,20) layout=Absolute texture=31 preserveAspect=false", dump);
+        Assert.Contains("UiList id=\"list\" visible=true bounds=(10,40,120,40) layout=Absolute items=3 itemHeight=20 scrollY=10 visibleStart=0 visibleCount=3", dump);
+    }
+
+    [Fact]
     public void DumpTree_IncludesInvisibleParentsAndChildren()
     {
         var document = new UiDocument();

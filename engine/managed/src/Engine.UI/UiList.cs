@@ -2,9 +2,9 @@ using Engine.Core.Handles;
 
 namespace Engine.UI;
 
-public sealed class UiVirtualizedList : UiListBase
+public sealed class UiList : UiListBase
 {
-    public UiVirtualizedList(string id, TextureHandle itemTexture, TextureHandle fontTexture)
+    public UiList(string id, TextureHandle itemTexture, TextureHandle fontTexture)
         : base(id, itemTexture, fontTexture)
     {
     }
