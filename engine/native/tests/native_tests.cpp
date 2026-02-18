@@ -195,6 +195,9 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_stats.present_count == 1u);
   assert(renderer_stats.pipeline_cache_hits == 0u);
   assert(renderer_stats.pipeline_cache_misses == 2u);
+  assert(renderer_stats.triangle_count == 0u);
+  assert(renderer_stats.upload_bytes == 0u);
+  assert(renderer_stats.gpu_memory_bytes == 0u);
   assert((renderer_stats.pass_mask &
           (static_cast<uint64_t>(1u) << 3u)) != 0u);  // shadow
   assert((renderer_stats.pass_mask &
@@ -554,10 +557,12 @@ void TestRendererResourceBlobLifecycle() {
                                            &texture) == ENGINE_NATIVE_STATUS_OK);
   assert(texture != 0u);
   assert(texture != mesh);
+  engine_native_resource_handle_t ignored_invalid_texture = 0u;
   assert(renderer_create_texture_from_blob(renderer,
                                            invalid_blob,
                                            sizeof(invalid_blob),
-                                           &texture) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+                                           &ignored_invalid_texture) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   float positions[9]{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
   uint32_t indices[3]{0u, 1u, 2u};
@@ -596,13 +601,59 @@ void TestRendererResourceBlobLifecycle() {
   assert(material != 0u);
   assert(material != mesh);
   assert(material != texture);
+  engine_native_resource_handle_t ignored_invalid_material = 0u;
   assert(renderer_create_material_from_blob(renderer,
                                             invalid_blob,
                                             sizeof(invalid_blob),
-                                            &material) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+                                            &ignored_invalid_material) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
   assert(internal_engine->state.renderer.resource_count() == 5u);
+
+  const uint64_t expected_upload_bytes =
+      static_cast<uint64_t>(mesh_blob.size() + texture_blob.size() +
+                            material_blob.size() + 60u + 32u);
+  void* frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_draw_item_t draw_items[1]{};
+  draw_items[0].mesh = mesh_from_cpu;
+  draw_items[0].material = material;
+  draw_items[0].sort_key_high = 1u;
+  draw_items[0].sort_key_low = 1u;
+  engine_native_render_packet_t frame_packet{
+      .draw_items = draw_items,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u};
+  assert(renderer_submit(renderer, &frame_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_renderer_frame_stats_t renderer_stats{};
+  assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_stats.triangle_count == 1u);
+  assert(renderer_stats.upload_bytes == expected_upload_bytes);
+  assert(renderer_stats.gpu_memory_bytes == expected_upload_bytes);
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+  engine_native_render_packet_t empty_packet{
+      .draw_items = nullptr,
+      .draw_item_count = 0u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u};
+  assert(renderer_submit(renderer, &empty_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_stats.upload_bytes == 0u);
+  assert(renderer_stats.gpu_memory_bytes == expected_upload_bytes);
 
   assert(renderer_destroy_resource(renderer, 0u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
@@ -619,6 +670,17 @@ void TestRendererResourceBlobLifecycle() {
   assert(internal_engine->state.renderer.resource_count() == 0u);
   assert(renderer_destroy_resource(renderer, material) ==
          ENGINE_NATIVE_STATUS_NOT_FOUND);
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+  assert(renderer_submit(renderer, &empty_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_stats.upload_bytes == 0u);
+  assert(renderer_stats.gpu_memory_bytes == 0u);
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }

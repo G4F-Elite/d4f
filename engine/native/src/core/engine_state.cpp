@@ -27,6 +27,11 @@ constexpr uint32_t kTextureBlobMagic = 0x42544644u;   // DFTB
 constexpr uint32_t kMaterialBlobMagic = 0x424D4144u;  // DAMB
 constexpr uint32_t kMeshCpuMagic = 0x4D435031u;       // MCP1
 constexpr uint32_t kTextureCpuMagic = 0x54435031u;    // TCP1
+constexpr uint32_t kMeshIndexFormatU16 = 1u;
+constexpr uint32_t kMeshIndexFormatU32 = 2u;
+constexpr size_t kMeshBlobIndexFormatOffset = sizeof(uint32_t) * 4u;
+constexpr size_t kMeshBlobIndexDataSizeOffset = sizeof(uint32_t) * 5u;
+constexpr size_t kMeshCpuIndexCountOffset = sizeof(uint32_t) * 2u;
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
@@ -114,6 +119,89 @@ bool TryReadU32(const void* data,
   std::memcpy(&value, static_cast<const uint8_t*>(data) + offset,
               sizeof(uint32_t));
   *out_value = value;
+  return true;
+}
+
+bool TryReadI32(const void* data,
+                size_t size,
+                size_t offset,
+                int32_t* out_value) {
+  if (data == nullptr || out_value == nullptr ||
+      offset > size ||
+      size - offset < sizeof(int32_t)) {
+    return false;
+  }
+
+  int32_t value = 0;
+  std::memcpy(&value, static_cast<const uint8_t*>(data) + offset,
+              sizeof(int32_t));
+  *out_value = value;
+  return true;
+}
+
+bool TryResolveIndexStride(uint32_t index_format, uint32_t* out_stride) {
+  if (out_stride == nullptr) {
+    return false;
+  }
+
+  switch (index_format) {
+    case kMeshIndexFormatU16:
+      *out_stride = sizeof(uint16_t);
+      return true;
+    case kMeshIndexFormatU32:
+      *out_stride = sizeof(uint32_t);
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool HasMagicAndVersion(const void* data,
+                        size_t size,
+                        uint32_t expected_magic,
+                        uint32_t expected_version);
+
+bool TryComputeMeshTriangleCount(const void* data,
+                                 size_t size,
+                                 uint64_t* out_triangle_count) {
+  if (data == nullptr || out_triangle_count == nullptr) {
+    return false;
+  }
+
+  if (HasMagicAndVersion(data, size, kMeshBlobMagic, kBlobVersion)) {
+    uint32_t index_format = 0u;
+    int32_t index_data_size = 0;
+    if (!TryReadU32(data, size, kMeshBlobIndexFormatOffset, &index_format) ||
+        !TryReadI32(data, size, kMeshBlobIndexDataSizeOffset, &index_data_size) ||
+        index_data_size < 0) {
+      return false;
+    }
+
+    uint32_t index_stride = 0u;
+    if (!TryResolveIndexStride(index_format, &index_stride)) {
+      return false;
+    }
+
+    const uint64_t index_bytes = static_cast<uint64_t>(index_data_size);
+    if (index_stride == 0u || (index_bytes % index_stride) != 0u) {
+      return false;
+    }
+
+    *out_triangle_count = (index_bytes / index_stride) / 3u;
+    return true;
+  }
+
+  uint32_t magic = 0u;
+  if (!TryReadU32(data, size, 0u, &magic) || magic != kMeshCpuMagic) {
+    return false;
+  }
+
+  uint32_t index_count = 0u;
+  if (!TryReadU32(data, size, kMeshCpuIndexCountOffset, &index_count)) {
+    return false;
+  }
+
+  *out_triangle_count = static_cast<uint64_t>(index_count / 3u);
   return true;
 }
 
@@ -359,6 +447,10 @@ engine_native_status_t RendererState::Present() {
   last_frame_stats_.pipeline_cache_hits = pipeline_cache_hits();
   last_frame_stats_.pipeline_cache_misses = pipeline_cache_misses();
   last_frame_stats_.pass_mask = last_pass_mask_;
+  last_frame_stats_.triangle_count = ComputeSubmittedTriangleCount();
+  last_frame_stats_.upload_bytes = resource_upload_bytes_pending_;
+  last_frame_stats_.gpu_memory_bytes = resource_gpu_memory_bytes_;
+  resource_upload_bytes_pending_ = 0u;
 
   ResetFrameState();
   return ENGINE_NATIVE_STATUS_OK;
@@ -519,6 +611,12 @@ engine_native_status_t RendererState::DestroyResource(
     material_system_.RemoveMaterial(handle);
   }
 
+  const uint64_t blob_size = static_cast<uint64_t>(blob->bytes.size());
+  if (blob_size > resource_gpu_memory_bytes_) {
+    return ENGINE_NATIVE_STATUS_INTERNAL_ERROR;
+  }
+  resource_gpu_memory_bytes_ -= blob_size;
+
   return resources_.Remove(resource_handle) ? ENGINE_NATIVE_STATUS_OK
                                             : ENGINE_NATIVE_STATUS_NOT_FOUND;
 }
@@ -551,6 +649,12 @@ engine_native_status_t RendererState::CreateResourceFromBlob(
     return ENGINE_NATIVE_STATUS_OUT_OF_MEMORY;
   }
 
+  if (kind == ResourceKind::kMesh &&
+      !TryComputeMeshTriangleCount(blob.bytes.data(), blob.bytes.size(),
+                                   &blob.triangle_count)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
   ResourceHandle resource_handle{};
   const engine_native_status_t insert_status =
       resources_.Insert(std::move(blob), &resource_handle);
@@ -558,6 +662,16 @@ engine_native_status_t RendererState::CreateResourceFromBlob(
     return insert_status;
   }
 
+  const uint64_t blob_size = static_cast<uint64_t>(size);
+  if (blob_size > std::numeric_limits<uint64_t>::max() - resource_gpu_memory_bytes_ ||
+      blob_size >
+          std::numeric_limits<uint64_t>::max() - resource_upload_bytes_pending_) {
+    static_cast<void>(resources_.Remove(resource_handle));
+    return ENGINE_NATIVE_STATUS_INTERNAL_ERROR;
+  }
+
+  resource_gpu_memory_bytes_ += blob_size;
+  resource_upload_bytes_pending_ += blob_size;
   *out_handle = EncodeResourceHandle(resource_handle);
   return ENGINE_NATIVE_STATUS_OK;
 }
@@ -608,6 +722,30 @@ engine_native_status_t RendererState::ExecuteCompiledFrameGraph() {
 
   last_pass_mask_ = pass_mask;
   return ENGINE_NATIVE_STATUS_OK;
+}
+
+uint64_t RendererState::ComputeSubmittedTriangleCount() const {
+  uint64_t total_triangles = 0u;
+
+  for (const engine_native_draw_item_t& draw_item : submitted_draw_items_) {
+    if (draw_item.mesh == kInvalidResourceHandle) {
+      continue;
+    }
+
+    const ResourceBlob* mesh_blob = resources_.Get(DecodeResourceHandle(draw_item.mesh));
+    if (mesh_blob == nullptr || mesh_blob->kind != ResourceKind::kMesh) {
+      continue;
+    }
+
+    if (mesh_blob->triangle_count >
+        std::numeric_limits<uint64_t>::max() - total_triangles) {
+      return std::numeric_limits<uint64_t>::max();
+    }
+
+    total_triangles += mesh_blob->triangle_count;
+  }
+
+  return total_triangles;
 }
 
 engine_native_status_t RendererState::GetLastFrameStats(

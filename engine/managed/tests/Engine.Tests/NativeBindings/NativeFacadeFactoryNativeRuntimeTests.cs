@@ -26,7 +26,10 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 PresentCount = 1,
                 PipelineCacheHits = 3,
                 PipelineCacheMisses = 2,
-                PassMask = 0x24
+                PassMask = 0x24,
+                TriangleCount = 144,
+                UploadBytes = 4096,
+                GpuMemoryBytes = 16384
             }
         };
         var world = new World();
@@ -52,6 +55,9 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal((ulong)3, stats.PipelineCacheHits);
         Assert.Equal((ulong)2, stats.PipelineCacheMisses);
         Assert.Equal((ulong)0x24, stats.PassMask);
+        Assert.Equal((ulong)144, stats.TriangleCount);
+        Assert.Equal((ulong)4096, stats.UploadBytes);
+        Assert.Equal((ulong)16384, stats.GpuMemoryBytes);
 
         nativeSet.Physics.SyncToPhysics(world);
         nativeSet.Physics.Step(TimeSpan.FromSeconds(1.0 / 60.0));

@@ -73,7 +73,7 @@ public sealed class EngineCliApiDumpFailureTests
             File.WriteAllText(
                 headerPath,
                 """
-                #define ENGINE_NATIVE_API_VERSION 10u
+                #define ENGINE_NATIVE_API_VERSION 11u
                 int non_exported_function(int x);
                 """);
 

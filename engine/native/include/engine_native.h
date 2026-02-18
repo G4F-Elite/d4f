@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 10u
+#define ENGINE_NATIVE_API_VERSION 11u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -115,6 +115,9 @@ typedef struct engine_native_renderer_frame_stats {
   uint64_t pipeline_cache_hits;
   uint64_t pipeline_cache_misses;
   uint64_t pass_mask;
+  uint64_t triangle_count;
+  uint64_t upload_bytes;
+  uint64_t gpu_memory_bytes;
 } engine_native_renderer_frame_stats_t;
 
 typedef enum engine_native_capture_format {

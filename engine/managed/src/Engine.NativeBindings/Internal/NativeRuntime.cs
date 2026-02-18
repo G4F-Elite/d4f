@@ -333,7 +333,10 @@ internal sealed partial class NativeRuntime
             nativeStats.PresentCount,
             nativeStats.PipelineCacheHits,
             nativeStats.PipelineCacheMisses,
-            nativeStats.PassMask);
+            nativeStats.PassMask,
+            nativeStats.TriangleCount,
+            nativeStats.UploadBytes,
+            nativeStats.GpuMemoryBytes);
     }
 
     public RenderingFrameStats GetLastFrameStats()

@@ -104,6 +104,9 @@ internal struct EngineNativeRendererFrameStats
     public ulong PipelineCacheHits;
     public ulong PipelineCacheMisses;
     public ulong PassMask;
+    public ulong TriangleCount;
+    public ulong UploadBytes;
+    public ulong GpuMemoryBytes;
 }
 
 [StructLayout(LayoutKind.Sequential)]

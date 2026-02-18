@@ -31,6 +31,7 @@ class RendererState {
 
   struct ResourceBlob {
     ResourceKind kind = ResourceKind::kMesh;
+    uint64_t triangle_count = 0u;
     std::vector<uint8_t> bytes;
   };
 
@@ -87,6 +88,7 @@ class RendererState {
       engine_native_resource_handle_t* out_handle);
   engine_native_status_t BuildFrameGraph();
   engine_native_status_t ExecuteCompiledFrameGraph();
+  uint64_t ComputeSubmittedTriangleCount() const;
   void ResetFrameState();
 
   rhi::RhiDevice* rhi_device_ = nullptr;
@@ -107,6 +109,8 @@ class RendererState {
   render::MaterialSystem material_system_;
   rhi::PipelineStateCache pipeline_cache_;
   ResourceTable<ResourceBlob> resources_;
+  uint64_t resource_upload_bytes_pending_ = 0u;
+  uint64_t resource_gpu_memory_bytes_ = 0u;
   uint64_t last_pass_mask_ = 0u;
   engine_native_renderer_frame_stats_t last_frame_stats_{};
 };
