@@ -303,69 +303,6 @@ public sealed partial class EngineCliApp
         return 0;
     }
 
-    private int HandleDoctor(DoctorCommand command)
-    {
-        string projectDirectory = Path.GetFullPath(command.ProjectDirectory);
-        if (!Directory.Exists(projectDirectory))
-        {
-            _stderr.WriteLine($"Project directory does not exist: {projectDirectory}");
-            return 1;
-        }
-
-        string[] requiredPaths =
-        [
-            Path.Combine(projectDirectory, "project.json"),
-            Path.Combine(projectDirectory, "assets", "manifest.json"),
-            Path.Combine(projectDirectory, "src")
-        ];
-
-        var failures = new List<string>();
-        foreach (string requiredPath in requiredPaths)
-        {
-            bool exists = requiredPath.EndsWith("src", StringComparison.OrdinalIgnoreCase)
-                ? Directory.Exists(requiredPath)
-                : File.Exists(requiredPath);
-            if (!exists)
-            {
-                failures.Add($"Missing required path: {requiredPath}");
-            }
-        }
-
-        if (!RunToolVersionCheck("dotnet", projectDirectory))
-        {
-            failures.Add("dotnet CLI is unavailable or returned a non-zero exit code.");
-        }
-
-        if (!RunToolVersionCheck("cmake", projectDirectory))
-        {
-            failures.Add("cmake is unavailable or returned a non-zero exit code.");
-        }
-
-        if (failures.Count > 0)
-        {
-            foreach (string failure in failures)
-            {
-                _stderr.WriteLine(failure);
-            }
-
-            return 1;
-        }
-
-        _stdout.WriteLine("Doctor checks passed.");
-        return 0;
-    }
-
-    private bool RunToolVersionCheck(string executable, string workingDirectory)
-    {
-        int exitCode = _commandRunner.Run(
-            executable,
-            ["--version"],
-            workingDirectory,
-            _stdout,
-            _stderr);
-        return exitCode == 0;
-    }
-
     private int HandleApiDump(ApiDumpCommand command)
     {
         string outputPath = NativeApiDumpService.Dump(command.HeaderPath, command.OutputPath);
