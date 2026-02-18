@@ -201,6 +201,25 @@ public sealed class InMemoryNetSessionTests
     }
 
     [Fact]
+    public void QueueRpc_ShouldFail_WhenChannelIsDisabledByConfig()
+    {
+        InMemoryNetSession session = CreateSession(new NetworkConfig(
+            TickRateHz: 20,
+            MaxPayloadBytes: 64,
+            MaxRpcPerTickPerClient: 8,
+            MaxEntitiesPerSnapshot: 64,
+            AllowedRpcChannels: NetworkChannelMask.ReliableOrdered));
+        uint clientId = session.ConnectClient();
+
+        NetRpcMessage reliable = new(0u, "ok", [1], NetworkChannel.ReliableOrdered);
+        NetRpcMessage unreliable = new(0u, "drop", [2], NetworkChannel.Unreliable);
+
+        session.QueueClientRpc(clientId, reliable);
+        Assert.Throws<InvalidDataException>(() => session.QueueClientRpc(clientId, unreliable));
+        Assert.Throws<InvalidDataException>(() => session.QueueServerRpc(unreliable));
+    }
+
+    [Fact]
     public void QueueServerRpc_ShouldSupportTargetAndBroadcast()
     {
         InMemoryNetSession session = CreateSession();

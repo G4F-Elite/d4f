@@ -6,7 +6,8 @@ public sealed record NetworkConfig(
     int MaxRpcPerTickPerClient = 32,
     int MaxEntitiesPerSnapshot = 8192,
     double SimulatedRttMs = 0.0,
-    double SimulatedPacketLossPercent = 0.0)
+    double SimulatedPacketLossPercent = 0.0,
+    NetworkChannelMask AllowedRpcChannels = NetworkChannelMask.All)
 {
     public NetworkConfig Validate()
     {
@@ -40,6 +41,36 @@ public sealed record NetworkConfig(
             throw new ArgumentOutOfRangeException(nameof(SimulatedPacketLossPercent), "Simulated packet loss must be within [0..100].");
         }
 
+        if (AllowedRpcChannels == NetworkChannelMask.None)
+        {
+            throw new ArgumentOutOfRangeException(nameof(AllowedRpcChannels), "Allowed RPC channels cannot be empty.");
+        }
+
+        NetworkChannelMask unsupported = AllowedRpcChannels & ~NetworkChannelMask.All;
+        if (unsupported != NetworkChannelMask.None)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(AllowedRpcChannels),
+                $"Allowed RPC channels contain unsupported flags: {unsupported}.");
+        }
+
         return this;
+    }
+
+    public bool IsRpcChannelAllowed(NetworkChannel channel)
+    {
+        if (!Enum.IsDefined(channel))
+        {
+            return false;
+        }
+
+        NetworkChannelMask channelMask = channel switch
+        {
+            NetworkChannel.ReliableOrdered => NetworkChannelMask.ReliableOrdered,
+            NetworkChannel.Unreliable => NetworkChannelMask.Unreliable,
+            _ => NetworkChannelMask.None
+        };
+
+        return channelMask != NetworkChannelMask.None && (AllowedRpcChannels & channelMask) == channelMask;
     }
 }

@@ -311,6 +311,12 @@ public sealed partial class InMemoryNetSession
             throw new InvalidDataException($"Unsupported network channel value: {message.Channel}.");
         }
 
+        if (!_config.IsRpcChannelAllowed(message.Channel))
+        {
+            throw new InvalidDataException(
+                $"RPC channel '{message.Channel}' is disabled by network config mask '{_config.AllowedRpcChannels}'.");
+        }
+
         if (message.Payload.Length > _config.MaxPayloadBytes)
         {
             throw new InvalidDataException(
