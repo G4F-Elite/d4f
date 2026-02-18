@@ -70,6 +70,24 @@ public static class UiTreeDumper
         {
             case UiText text:
                 AppendStringField(builder, "text", text.Content);
+                if (text.WrapMode != UiTextWrapMode.NoWrap)
+                {
+                    builder.Append(" wrap=");
+                    builder.Append(text.WrapMode);
+                }
+
+                if (text.HorizontalAlignment != UiTextHorizontalAlignment.Left)
+                {
+                    builder.Append(" hAlign=");
+                    builder.Append(text.HorizontalAlignment);
+                }
+
+                if (text.VerticalAlignment != UiTextVerticalAlignment.Top)
+                {
+                    builder.Append(" vAlign=");
+                    builder.Append(text.VerticalAlignment);
+                }
+
                 break;
             case UiImage image:
                 builder.Append(" texture=");

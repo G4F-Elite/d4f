@@ -209,4 +209,25 @@ public sealed class UiTreeDumperTests
         Assert.Contains("UiButton id=\"anchored\"", dump);
         Assert.Contains("anchors=Right|Bottom", dump);
     }
+
+    [Fact]
+    public void DumpTree_IncludesTextLayoutMetadata_WhenNonDefaultTextLayoutIsUsed()
+    {
+        var document = new UiDocument();
+        document.AddRoot(new UiText("caption", new TextureHandle(50), "Hello world")
+        {
+            Width = 100,
+            Height = 40,
+            WrapMode = UiTextWrapMode.WordWrap,
+            HorizontalAlignment = UiTextHorizontalAlignment.Center,
+            VerticalAlignment = UiTextVerticalAlignment.Bottom
+        });
+
+        string dump = new RetainedUiFacade(document).DumpTree();
+
+        Assert.Contains("UiText id=\"caption\"", dump);
+        Assert.Contains("wrap=WordWrap", dump);
+        Assert.Contains("hAlign=Center", dump);
+        Assert.Contains("vAlign=Bottom", dump);
+    }
 }
