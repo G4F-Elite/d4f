@@ -159,6 +159,10 @@ public static class ProceduralAnimation
 
     public static Quaternion LookAt(Vector3 from, Vector3 to, Vector3 up)
     {
+        ValidateFinite(from, nameof(from));
+        ValidateFinite(to, nameof(to));
+        ValidateFinite(up, nameof(up));
+
         Vector3 forward = to - from;
         if (forward.LengthSquared() <= 1e-8f)
         {
@@ -166,17 +170,36 @@ public static class ProceduralAnimation
         }
 
         Vector3 normalizedForward = Vector3.Normalize(forward);
-        Vector3 normalizedUp = up.LengthSquared() <= 1e-8f ? Vector3.UnitY : Vector3.Normalize(up);
+        Vector3 normalizedUp = ResolveUpVector(normalizedForward, up);
+        Vector3 right = Vector3.Cross(normalizedUp, normalizedForward);
+        if (right.LengthSquared() <= 1e-8f)
+        {
+            normalizedUp = ResolveUpVector(normalizedForward, Vector3.UnitY);
+            right = Vector3.Cross(normalizedUp, normalizedForward);
+        }
 
-        Matrix4x4 view = Matrix4x4.CreateLookAt(Vector3.Zero, normalizedForward, normalizedUp);
-        Matrix4x4 rotation = Matrix4x4.Transpose(view);
+        right = Vector3.Normalize(right);
+        Vector3 correctedUp = Vector3.Normalize(Vector3.Cross(normalizedForward, right));
+        var rotation = new Matrix4x4(
+            right.X, right.Y, right.Z, 0f,
+            correctedUp.X, correctedUp.Y, correctedUp.Z, 0f,
+            normalizedForward.X, normalizedForward.Y, normalizedForward.Z, 0f,
+            0f, 0f, 0f, 1f);
         return Quaternion.Normalize(Quaternion.CreateFromRotationMatrix(rotation));
     }
 
     public static Vector3 AimDirection(Vector3 origin, Vector3 target)
     {
+        ValidateFinite(origin, nameof(origin));
+        ValidateFinite(target, nameof(target));
+
         Vector3 dir = target - origin;
         return dir.LengthSquared() <= 1e-8f ? Vector3.UnitZ : Vector3.Normalize(dir);
+    }
+
+    public static Quaternion AimRotation(Vector3 origin, Vector3 target, Vector3 up)
+    {
+        return LookAt(origin, target, up);
     }
 
     private static void ValidateKeyframes(IReadOnlyList<TimelineKeyframe> keyframes)
@@ -233,5 +256,16 @@ public static class ProceduralAnimation
         {
             throw new ArgumentOutOfRangeException(paramName, "Vector components must be finite.");
         }
+    }
+
+    private static Vector3 ResolveUpVector(Vector3 forward, Vector3 up)
+    {
+        Vector3 normalizedUp = up.LengthSquared() <= 1e-8f ? Vector3.UnitY : Vector3.Normalize(up);
+        if (MathF.Abs(Vector3.Dot(normalizedUp, forward)) >= 0.999f)
+        {
+            normalizedUp = MathF.Abs(forward.Y) < 0.999f ? Vector3.UnitY : Vector3.UnitX;
+        }
+
+        return normalizedUp;
     }
 }
