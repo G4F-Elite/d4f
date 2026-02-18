@@ -100,11 +100,16 @@ internal static partial class ProceduralPreviewRasterizer
                 Vector3 normalSample = SampleNormal(normal, u, v);
                 float roughnessSample = SampleGray(roughness, u, v);
                 float aoSample = SampleGray(ao, u, v);
-
-                Vector3 perturbedNormal = Vector3.Normalize(new Vector3(
-                    sphereNormal.X + normalSample.X * 0.28f,
-                    sphereNormal.Y + normalSample.Y * 0.28f,
-                    MathF.Max(0.2f, sphereNormal.Z + normalSample.Z * 0.18f)));
+                Vector3 sphereTangent = ComputeSurfaceTangent(sphereNormal);
+                Vector3 sphereBitangent = NormalizeOrFallback(
+                    Vector3.Cross(sphereNormal, sphereTangent),
+                    Vector3.UnitX);
+                Vector3 perturbedNormal = ApplyNormalMap(
+                    sphereNormal,
+                    sphereTangent,
+                    sphereBitangent,
+                    normalSample,
+                    strength: 0.68f);
 
                 float ndotl = MathF.Max(0f, Vector3.Dot(perturbedNormal, lightDir));
                 Vector3 halfway = Vector3.Normalize(lightDir + viewDir);
@@ -191,8 +196,14 @@ internal static partial class ProceduralPreviewRasterizer
             float sx = (world.X * projection * 0.5f + 0.5f) * (width - 1);
             float sy = (0.5f - world.Y * projection * 0.5f) * (height - 1);
             Vector3 worldNormal = Vector3.Normalize(Vector3.TransformNormal(src.Normal, rotation));
+            Vector3 worldTangent = Vector3.TransformNormal(new Vector3(src.Tangent.X, src.Tangent.Y, src.Tangent.Z), rotation);
+            worldTangent = OrthonormalizeTangent(worldNormal, worldTangent);
+            float handedness = src.Tangent.W < 0f ? -1f : 1f;
+            Vector3 worldBitangent = NormalizeOrFallback(
+                Vector3.Cross(worldNormal, worldTangent) * handedness,
+                Vector3.UnitY);
             Vector3 vertexColor = Vector3.Clamp(new Vector3(src.Color.X, src.Color.Y, src.Color.Z), Vector3.Zero, Vector3.One);
-            transformed[i] = new MeshRasterVertex(sx, sy, world.Z, worldNormal, src.Uv, vertexColor);
+            transformed[i] = new MeshRasterVertex(sx, sy, world.Z, worldNormal, worldTangent, worldBitangent, src.Uv, vertexColor);
         }
 
         for (int tri = 0; tri < mesh.Indices.Count; tri += 3)
@@ -250,10 +261,25 @@ internal static partial class ProceduralPreviewRasterizer
                     }
 
                     depth[bufferIndex] = z;
-                    Vector3 geometricNormal = Vector3.Normalize(
+                    Vector3 geometricNormal = NormalizeOrFallback(
                         (v0.Normal * b0) +
                         (v1.Normal * b1) +
-                        (v2.Normal * b2));
+                        (v2.Normal * b2),
+                        Vector3.UnitZ);
+                    Vector3 tangent = OrthonormalizeTangent(
+                        geometricNormal,
+                        (v0.Tangent * b0) + (v1.Tangent * b1) + (v2.Tangent * b2));
+                    Vector3 bitangentCandidate = NormalizeOrFallback(
+                        (v0.Bitangent * b0) + (v1.Bitangent * b1) + (v2.Bitangent * b2),
+                        Vector3.Cross(geometricNormal, tangent));
+                    Vector3 geometricBitangent = NormalizeOrFallback(
+                        Vector3.Cross(geometricNormal, tangent),
+                        Vector3.UnitY);
+                    if (Vector3.Dot(bitangentCandidate, geometricBitangent) < 0f)
+                    {
+                        geometricBitangent = -geometricBitangent;
+                    }
+
                     Vector2 uv = (v0.Uv * b0) + (v1.Uv * b1) + (v2.Uv * b2);
                     Vector3 albedoSample = SampleRgb(albedo, uv.X, uv.Y);
                     Vector3 sampledNormal = SampleNormal(normalMap, uv.X, uv.Y);
@@ -266,10 +292,12 @@ internal static partial class ProceduralPreviewRasterizer
                         Vector3.Zero,
                         Vector3.One);
 
-                    Vector3 perturbedNormal = Vector3.Normalize(new Vector3(
-                        geometricNormal.X + sampledNormal.X * 0.22f,
-                        geometricNormal.Y + sampledNormal.Y * 0.22f,
-                        MathF.Max(0.2f, geometricNormal.Z + sampledNormal.Z * 0.16f)));
+                    Vector3 perturbedNormal = ApplyNormalMap(
+                        geometricNormal,
+                        tangent,
+                        geometricBitangent,
+                        sampledNormal,
+                        strength: 0.62f);
                     float ndotl = MathF.Max(0f, Vector3.Dot(perturbedNormal, lightDir));
                     Vector3 halfway = Vector3.Normalize(lightDir + viewDir);
                     float specPow = Lerp(72f, 10f, roughnessSample);
@@ -323,47 +351,6 @@ internal static partial class ProceduralPreviewRasterizer
         return new LevelMeshChunk(nodeId, $"chunk/{typeTag}/v{variant}");
     }
 
-    private static Vector3 SampleRgb(TexturePayload texture, float u, float v)
-    {
-        return SampleRgb(texture.Rgba8, texture.Width, texture.Height, u, v);
-    }
-
-    private static Vector3 SampleRgb(byte[] rgba, int width, int height, float u, float v)
-    {
-        (int x, int y) = WrapUvToPixel(width, height, u, v);
-        int offset = ((y * width) + x) * 4;
-        return new Vector3(
-            rgba[offset] / 255f,
-            rgba[offset + 1] / 255f,
-            rgba[offset + 2] / 255f);
-    }
-
-    private static Vector3 SampleNormal(TexturePayload texture, float u, float v)
-    {
-        Vector3 encoded = SampleRgb(texture, u, v);
-        Vector3 normal = new(
-            encoded.X * 2f - 1f,
-            encoded.Y * 2f - 1f,
-            encoded.Z * 2f - 1f);
-        return Vector3.Normalize(normal);
-    }
-
-    private static float SampleGray(TexturePayload texture, float u, float v)
-    {
-        (int x, int y) = WrapUvToPixel(texture.Width, texture.Height, u, v);
-        int offset = ((y * texture.Width) + x) * 4;
-        return texture.Rgba8[offset] / 255f;
-    }
-
-    private static (int X, int Y) WrapUvToPixel(int width, int height, float u, float v)
-    {
-        float wrappedU = u - MathF.Floor(u);
-        float wrappedV = v - MathF.Floor(v);
-        int x = Math.Clamp((int)(wrappedU * Math.Max(width - 1, 0)), 0, Math.Max(0, width - 1));
-        int y = Math.Clamp((int)((1f - wrappedV) * Math.Max(height - 1, 0)), 0, Math.Max(0, height - 1));
-        return (x, y);
-    }
-
     private static void WritePixel(byte[] rgba, int offset, Vector3 color)
     {
         Vector3 displayColor = ToneMapToDisplay(color);
@@ -393,5 +380,13 @@ internal static partial class ProceduralPreviewRasterizer
     }
 
     private readonly record struct TexturePayload(int Width, int Height, byte[] Rgba8);
-    private readonly record struct MeshRasterVertex(float X, float Y, float Z, Vector3 Normal, Vector2 Uv, Vector3 Color);
+    private readonly record struct MeshRasterVertex(
+        float X,
+        float Y,
+        float Z,
+        Vector3 Normal,
+        Vector3 Tangent,
+        Vector3 Bitangent,
+        Vector2 Uv,
+        Vector3 Color);
 }
