@@ -8,8 +8,15 @@ public sealed class NoopRenderingFacade : IRenderingFacade
 {
     public static NoopRenderingFacade Instance { get; } = new();
     private readonly object _resourceSync = new();
-    private readonly HashSet<ulong> _resourceHandles = [];
+    private readonly Dictionary<ulong, ResourceMetadata> _resourceHandles = [];
     private ulong _nextResourceHandle = 1u;
+    private uint _submittedDrawItemCount;
+    private uint _submittedUiItemCount;
+    private ulong _submittedTriangleCount;
+    private ulong _presentCount;
+    private ulong _pendingUploadBytes;
+    private ulong _gpuMemoryBytes;
+    private RenderingFrameStats _lastFrameStats = RenderingFrameStats.Empty;
 
     private NoopRenderingFacade()
     {
@@ -17,23 +24,62 @@ public sealed class NoopRenderingFacade : IRenderingFacade
 
     public FrameArena BeginFrame(int requestedBytes, int alignment)
     {
+        lock (_resourceSync)
+        {
+            _submittedDrawItemCount = 0u;
+            _submittedUiItemCount = 0u;
+            _submittedTriangleCount = 0u;
+        }
+
         return new FrameArena(requestedBytes, alignment);
     }
 
     public void Submit(RenderPacket packet)
     {
         ArgumentNullException.ThrowIfNull(packet);
+
+        lock (_resourceSync)
+        {
+            _submittedDrawItemCount = checked(_submittedDrawItemCount + ResolveSubmittedDrawItemCount(packet));
+            _submittedUiItemCount = checked(_submittedUiItemCount + ResolveSubmittedUiItemCount(packet));
+            _submittedTriangleCount = checked(_submittedTriangleCount + ResolveTriangleCount(packet.DrawCommands));
+        }
     }
 
     public void Present()
     {
+        lock (_resourceSync)
+        {
+            _presentCount = checked(_presentCount + 1u);
+            _lastFrameStats = new RenderingFrameStats(
+                _submittedDrawItemCount,
+                _submittedUiItemCount,
+                0u,
+                _presentCount,
+                0u,
+                0u,
+                0u,
+                _submittedTriangleCount,
+                _pendingUploadBytes,
+                _gpuMemoryBytes);
+            _pendingUploadBytes = 0u;
+            _submittedDrawItemCount = 0u;
+            _submittedUiItemCount = 0u;
+            _submittedTriangleCount = 0u;
+        }
     }
 
-    public RenderingFrameStats GetLastFrameStats() => RenderingFrameStats.Empty;
+    public RenderingFrameStats GetLastFrameStats()
+    {
+        lock (_resourceSync)
+        {
+            return _lastFrameStats;
+        }
+    }
 
     public MeshHandle CreateMeshFromBlob(ReadOnlySpan<byte> blob)
     {
-        return new MeshHandle(AllocateResource(blob));
+        return new MeshHandle(AllocateResource(blob.Length, triangleCount: 0u));
     }
 
     public MeshHandle CreateMeshFromCpu(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
@@ -41,13 +87,14 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         ValidateMeshCpuData(positions, indices);
         int positionBytes = checked(positions.Length * sizeof(float));
         int indexBytes = checked(indices.Length * sizeof(uint));
-        var payload = new byte[checked(positionBytes + indexBytes)];
-        return new MeshHandle(AllocateResource(payload));
+        int payloadBytes = checked(positionBytes + indexBytes);
+        ulong triangleCount = checked((ulong)(indices.Length / 3));
+        return new MeshHandle(AllocateResource(payloadBytes, triangleCount));
     }
 
     public TextureHandle CreateTextureFromBlob(ReadOnlySpan<byte> blob)
     {
-        return new TextureHandle(AllocateResource(blob));
+        return new TextureHandle(AllocateResource(blob.Length, triangleCount: 0u));
     }
 
     public TextureHandle CreateTextureFromCpu(
@@ -57,12 +104,12 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         uint strideBytes = 0)
     {
         ValidateTextureCpuData(width, height, rgba8, strideBytes);
-        return new TextureHandle(AllocateResource(rgba8));
+        return new TextureHandle(AllocateResource(rgba8.Length, triangleCount: 0u));
     }
 
     public MaterialHandle CreateMaterialFromBlob(ReadOnlySpan<byte> blob)
     {
-        return new MaterialHandle(AllocateResource(blob));
+        return new MaterialHandle(AllocateResource(blob.Length, triangleCount: 0u));
     }
 
     public void DestroyResource(ulong handle)
@@ -74,10 +121,12 @@ public sealed class NoopRenderingFacade : IRenderingFacade
 
         lock (_resourceSync)
         {
-            if (!_resourceHandles.Remove(handle))
+            if (!_resourceHandles.Remove(handle, out ResourceMetadata metadata))
             {
                 throw new InvalidOperationException($"Resource handle '{handle}' does not exist.");
             }
+
+            _gpuMemoryBytes = checked(_gpuMemoryBytes - metadata.ByteSize);
         }
     }
 
@@ -118,13 +167,14 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         return rgba;
     }
 
-    private ulong AllocateResource(ReadOnlySpan<byte> blob)
+    private ulong AllocateResource(int payloadLength, ulong triangleCount)
     {
-        if (blob.Length == 0)
+        if (payloadLength == 0)
         {
-            throw new ArgumentException("Blob payload must be non-empty.", nameof(blob));
+            throw new ArgumentException("Blob payload must be non-empty.", nameof(payloadLength));
         }
 
+        ulong byteSize = checked((ulong)payloadLength);
         lock (_resourceSync)
         {
             ulong handle = _nextResourceHandle++;
@@ -133,10 +183,41 @@ public sealed class NoopRenderingFacade : IRenderingFacade
                 throw new InvalidOperationException("Resource handle counter overflow.");
             }
 
-            _resourceHandles.Add(handle);
+            _resourceHandles.Add(handle, new ResourceMetadata(byteSize, triangleCount));
+            _pendingUploadBytes = checked(_pendingUploadBytes + byteSize);
+            _gpuMemoryBytes = checked(_gpuMemoryBytes + byteSize);
             return handle;
         }
     }
+
+    private static uint ResolveSubmittedDrawItemCount(RenderPacket packet)
+        => packet.NativeDrawItemCount > 0
+            ? checked((uint)packet.NativeDrawItemCount)
+            : checked((uint)packet.DrawCommands.Count);
+
+    private static uint ResolveSubmittedUiItemCount(RenderPacket packet)
+        => packet.NativeUiDrawItemCount > 0
+            ? checked((uint)packet.NativeUiDrawItemCount)
+            : checked((uint)packet.UiDrawCommands.Count);
+
+    private ulong ResolveTriangleCount(IReadOnlyList<DrawCommand> drawCommands)
+    {
+        ulong triangleCount = 0u;
+        for (int i = 0; i < drawCommands.Count; i++)
+        {
+            ulong meshHandle = drawCommands[i].Mesh.Value;
+            if (!_resourceHandles.TryGetValue(meshHandle, out ResourceMetadata metadata))
+            {
+                continue;
+            }
+
+            triangleCount = checked(triangleCount + metadata.TriangleCount);
+        }
+
+        return triangleCount;
+    }
+
+    private readonly record struct ResourceMetadata(ulong ByteSize, ulong TriangleCount);
 
     private static void ValidateMeshCpuData(ReadOnlySpan<float> positions, ReadOnlySpan<uint> indices)
     {

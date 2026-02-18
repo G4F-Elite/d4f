@@ -65,6 +65,80 @@ public sealed class NoopRenderingFacadeCaptureTests
     }
 
     [Fact]
+    public void FrameStats_ShouldTrackDrawTrianglesUploadsAndGpuMemory()
+    {
+        NoopRenderingFacade facade = NoopRenderingFacade.Instance;
+        MeshHandle mesh = default;
+        TextureHandle texture = default;
+        MaterialHandle material = default;
+
+        try
+        {
+            mesh = facade.CreateMeshFromCpu(
+                positions:
+                [
+                    0f, 0f, 0f,
+                    1f, 0f, 0f,
+                    0f, 1f, 0f,
+                    1f, 1f, 0f
+                ],
+                indices: [0u, 1u, 2u, 2u, 1u, 3u]);
+            texture = facade.CreateTextureFromBlob([1, 2, 3, 4]);
+            material = facade.CreateMaterialFromBlob([5, 6, 7]);
+            ulong expectedResourceBytes = checked((ulong)(12 * sizeof(float) + 6 * sizeof(uint) + 4 + 3));
+
+            using (facade.BeginFrame(1024, 64))
+            {
+                var packet = new RenderPacket(
+                    0,
+                    [new DrawCommand(new EntityId(1, 1u), mesh, material, texture)]);
+                facade.Submit(packet);
+            }
+
+            facade.Present();
+            RenderingFrameStats firstFrame = facade.GetLastFrameStats();
+            Assert.Equal((uint)1, firstFrame.DrawItemCount);
+            Assert.Equal((uint)0, firstFrame.UiItemCount);
+            Assert.Equal((ulong)2, firstFrame.TriangleCount);
+            Assert.Equal(expectedResourceBytes, firstFrame.UploadBytes);
+            Assert.Equal(expectedResourceBytes, firstFrame.GpuMemoryBytes);
+
+            using (facade.BeginFrame(512, 16))
+            {
+                facade.Submit(RenderPacket.Empty(1));
+            }
+
+            facade.Present();
+            RenderingFrameStats secondFrame = facade.GetLastFrameStats();
+            Assert.Equal((ulong)0, secondFrame.UploadBytes);
+            Assert.Equal(expectedResourceBytes, secondFrame.GpuMemoryBytes);
+
+            facade.DestroyResource(mesh.Value);
+            mesh = default;
+            facade.DestroyResource(texture.Value);
+            texture = default;
+            facade.DestroyResource(material.Value);
+            material = default;
+
+            using (facade.BeginFrame(512, 16))
+            {
+                facade.Submit(RenderPacket.Empty(2));
+            }
+
+            facade.Present();
+            RenderingFrameStats thirdFrame = facade.GetLastFrameStats();
+            Assert.Equal((ulong)0, thirdFrame.UploadBytes);
+            Assert.Equal((ulong)0, thirdFrame.GpuMemoryBytes);
+        }
+        finally
+        {
+            DestroyResourceIfValid(mesh.Value);
+            DestroyResourceIfValid(texture.Value);
+            DestroyResourceIfValid(material.Value);
+        }
+    }
+
+    [Fact]
     public void CaptureFrameRgba8_ReturnsDeterministicRgbaPayload()
     {
         byte[] first = NoopRenderingFacade.Instance.CaptureFrameRgba8(4u, 3u, includeAlpha: true);
@@ -91,5 +165,13 @@ public sealed class NoopRenderingFacadeCaptureTests
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => NoopRenderingFacade.Instance.CaptureFrameRgba8(0u, 1u));
         Assert.Throws<ArgumentOutOfRangeException>(() => NoopRenderingFacade.Instance.CaptureFrameRgba8(1u, 0u));
+    }
+
+    private static void DestroyResourceIfValid(ulong handle)
+    {
+        if (handle != 0u)
+        {
+            NoopRenderingFacade.Instance.DestroyResource(handle);
+        }
     }
 }
