@@ -334,7 +334,17 @@ internal static class TestArtifactGenerator
             return;
         }
 
-        events.Add(new ReplayTimedNetworkEvent(tick, value));
+        var insertionIndex = events.Count;
+        for (int i = 0; i < events.Count; i++)
+        {
+            if (events[i].Tick > tick)
+            {
+                insertionIndex = i;
+                break;
+            }
+        }
+
+        events.Insert(insertionIndex, new ReplayTimedNetworkEvent(tick, value));
     }
 
     private static RenderStatsArtifact CaptureRenderStats(IRenderingFacade renderingFacade)

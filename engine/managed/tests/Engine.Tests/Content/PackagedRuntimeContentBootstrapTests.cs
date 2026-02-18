@@ -4,6 +4,7 @@ using Engine.Core.Abstractions;
 
 namespace Engine.Tests.Content;
 
+[Collection("AssetsStaticState")]
 public sealed class PackagedRuntimeContentBootstrapTests
 {
     [Fact]

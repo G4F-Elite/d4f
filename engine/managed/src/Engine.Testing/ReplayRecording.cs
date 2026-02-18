@@ -31,11 +31,7 @@ public static class ReplayRecordingCodec
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
         ArgumentNullException.ThrowIfNull(recording);
-
-        if (recording.FixedDeltaSeconds <= 0.0)
-        {
-            throw new InvalidDataException("Replay fixed delta seconds must be positive.");
-        }
+        ValidateReplay(recording);
 
         string? directory = Path.GetDirectoryName(outputPath);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -64,6 +60,12 @@ public static class ReplayRecordingCodec
             throw new InvalidDataException($"Replay file '{inputPath}' is empty or invalid.");
         }
 
+        ValidateReplay(replay);
+        return replay;
+    }
+
+    private static void ValidateReplay(ReplayRecording replay)
+    {
         if (replay.FixedDeltaSeconds <= 0.0)
         {
             throw new InvalidDataException("Replay fixed delta seconds must be positive.");
@@ -74,8 +76,50 @@ public static class ReplayRecordingCodec
             throw new InvalidDataException("Replay must define frames.");
         }
 
+        if (replay.Frames.Count == 0)
+        {
+            throw new InvalidDataException("Replay must contain at least one frame.");
+        }
+
+        long previousTick = -1;
+        for (int i = 0; i < replay.Frames.Count; i++)
+        {
+            ReplayFrameInput frame = replay.Frames[i]
+                ?? throw new InvalidDataException($"Replay frame at index {i} is null.");
+            if (frame.Tick < 0)
+            {
+                throw new InvalidDataException($"Replay frame tick at index {i} must be non-negative.");
+            }
+
+            if (frame.Tick <= previousTick)
+            {
+                throw new InvalidDataException(
+                    $"Replay frames must have strictly increasing ticks. Tick {frame.Tick} at index {i} is not greater than {previousTick}.");
+            }
+
+            if (!float.IsFinite(frame.MouseX) || !float.IsFinite(frame.MouseY))
+            {
+                throw new InvalidDataException($"Replay frame mouse coordinates at index {i} must be finite.");
+            }
+
+            previousTick = frame.Tick;
+        }
+
+        if (replay.NetworkEvents is not null)
+        {
+            for (int i = 0; i < replay.NetworkEvents.Count; i++)
+            {
+                string? evt = replay.NetworkEvents[i];
+                if (string.IsNullOrWhiteSpace(evt))
+                {
+                    throw new InvalidDataException($"Replay network event at index {i} cannot be empty.");
+                }
+            }
+        }
+
         if (replay.TimedNetworkEvents is not null)
         {
+            long previousTimedTick = -1;
             for (int i = 0; i < replay.TimedNetworkEvents.Count; i++)
             {
                 ReplayTimedNetworkEvent evt = replay.TimedNetworkEvents[i]
@@ -85,13 +129,19 @@ public static class ReplayRecordingCodec
                     throw new InvalidDataException($"Replay timed network event tick at index {i} must be non-negative.");
                 }
 
+                if (evt.Tick < previousTimedTick)
+                {
+                    throw new InvalidDataException(
+                        $"Replay timed network events must be sorted by non-decreasing tick. Tick {evt.Tick} at index {i} is less than {previousTimedTick}.");
+                }
+
                 if (string.IsNullOrWhiteSpace(evt.Event))
                 {
                     throw new InvalidDataException($"Replay timed network event payload at index {i} cannot be empty.");
                 }
+
+                previousTimedTick = evt.Tick;
             }
         }
-
-        return replay;
     }
 }
