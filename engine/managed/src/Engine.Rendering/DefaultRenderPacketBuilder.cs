@@ -30,7 +30,8 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             frameArena,
             drawCommands,
             uiCommands,
-            renderSettings.DebugViewMode);
+            renderSettings.DebugViewMode,
+            renderSettings.FeatureFlags);
     }
 
     private static IReadOnlyList<DrawCommand> CollectDrawCommands(World world)

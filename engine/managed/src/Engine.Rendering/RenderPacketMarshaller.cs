@@ -12,7 +12,8 @@ public static unsafe class RenderPacketMarshaller
         FrameArena frameArena,
         IReadOnlyList<DrawCommand> drawCommands,
         IReadOnlyList<UiDrawCommand> uiDrawCommands,
-        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None)
+        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None,
+        RenderFeatureFlags featureFlags = RenderFeatureFlags.None)
     {
         ArgumentNullException.ThrowIfNull(frameArena);
         ArgumentNullException.ThrowIfNull(drawCommands);
@@ -30,7 +31,8 @@ public static unsafe class RenderPacketMarshaller
             nativeDrawBatch.Count,
             nativeUiBatch.Pointer,
             nativeUiBatch.Count,
-            debugViewMode);
+            debugViewMode,
+            featureFlags);
     }
 
     private static NativeBatch MarshalDrawBatch(IReadOnlyList<DrawCommand> drawCommands, FrameArena frameArena)

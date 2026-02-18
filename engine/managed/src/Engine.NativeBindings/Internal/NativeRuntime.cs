@@ -287,6 +287,7 @@ internal sealed partial class NativeRuntime
                 uiItemsPtr = pinnedUiItems.AddrOfPinnedObject();
                 uiItemsCount = uiItems.Length;
             }
+            byte renderFeatureFlags = (byte)packet.FeatureFlags;
 
             var nativePacket = new EngineNativeRenderPacket
             {
@@ -295,7 +296,7 @@ internal sealed partial class NativeRuntime
                 UiItems = uiItemsPtr,
                 UiItemCount = checked((uint)uiItemsCount),
                 DebugViewMode = (byte)packet.DebugViewMode,
-                Reserved0 = 0,
+                Reserved0 = renderFeatureFlags,
                 Reserved1 = 0,
                 Reserved2 = 0
             };

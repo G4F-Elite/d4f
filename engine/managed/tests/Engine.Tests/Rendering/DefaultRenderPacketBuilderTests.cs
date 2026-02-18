@@ -79,7 +79,7 @@ public sealed class DefaultRenderPacketBuilderTests
     }
 
     [Fact]
-    public void Build_PropagatesDebugViewModeFromRenderSettings()
+    public void Build_PropagatesRenderSettingsToPacket()
     {
         var world = new World();
         using var arena = new FrameArena(1024, 64);
@@ -88,9 +88,16 @@ public sealed class DefaultRenderPacketBuilderTests
             world,
             new FrameTiming(3, TimeSpan.FromMilliseconds(16), TimeSpan.FromMilliseconds(48)),
             arena,
-            new RenderSettings(RenderDebugViewMode.Albedo));
+            new RenderSettings(
+                RenderDebugViewMode.Albedo,
+                RenderFeatureFlags.DisableAutoExposure | RenderFeatureFlags.DisableJitterEffects));
 
         Assert.Equal(RenderDebugViewMode.Albedo, packet.DebugViewMode);
+        Assert.True(packet.DisableAutoExposure);
+        Assert.True(packet.DisableJitterEffects);
+        Assert.Equal(
+            RenderFeatureFlags.DisableAutoExposure | RenderFeatureFlags.DisableJitterEffects,
+            packet.FeatureFlags);
     }
 
     [Fact]

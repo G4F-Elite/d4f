@@ -137,7 +137,8 @@ public sealed class GameHost
         stageStart = Stopwatch.GetTimestamp();
         using var frameArena = _renderingFacade.BeginFrame(_options.FrameArenaBytes, _options.FrameArenaAlignment);
         _world.RunStage(SystemStage.PreRender, timing);
-        var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena, _options.RenderSettings);
+        RenderSettings renderSettings = ResolveRenderSettings();
+        var renderPacket = _renderPacketBuilder.Build(_world, timing, frameArena, renderSettings);
         TimeSpan preRenderCpuTime = Stopwatch.GetElapsedTime(stageStart);
 
         stageStart = Stopwatch.GetTimestamp();
@@ -183,5 +184,30 @@ public sealed class GameHost
         }
 
         return _options.FixedDt;
+    }
+
+    private RenderSettings ResolveRenderSettings()
+    {
+        RenderSettings settings = _options.RenderSettings;
+        DeterministicModeOptions deterministic = _options.DeterministicMode;
+        if (!deterministic.Enabled)
+        {
+            return settings;
+        }
+
+        RenderFeatureFlags flags = settings.FeatureFlags;
+        if (deterministic.DisableAutoExposure)
+        {
+            flags |= RenderFeatureFlags.DisableAutoExposure;
+        }
+
+        if (deterministic.DisableJitterEffects)
+        {
+            flags |= RenderFeatureFlags.DisableJitterEffects;
+        }
+
+        return flags == settings.FeatureFlags
+            ? settings
+            : new RenderSettings(settings.DebugViewMode, flags);
     }
 }

@@ -529,6 +529,75 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
                   {"shadow", "pbr_opaque", "ambient_occlusion",
                    "debug_ambient_occlusion", "present"});
 
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_render_packet_t deterministic_flags_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u,
+      .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE,
+      .reserved0 = static_cast<uint8_t>(
+          ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE |
+          ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS)};
+
+  assert(renderer_submit(renderer, &deterministic_flags_packet) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"shadow", "pbr_opaque", "ambient_occlusion", "bloom",
+                   "tonemap", "color_grading", "fxaa", "present"});
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+  assert(renderer_submit(renderer, &deterministic_flags_packet) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_submit(renderer, &draw_packet_b) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_submit(renderer, &deterministic_flags_packet) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_render_packet_t invalid_render_flags_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u,
+      .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE,
+      .reserved0 = static_cast<uint8_t>(0x80u)};
+  assert(renderer_submit(renderer, &invalid_render_flags_packet) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_submit(renderer, &draw_packet_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_render_packet_t invalid_reserved_packet{
+      .draw_items = draw_batch,
+      .draw_item_count = 1u,
+      .ui_items = nullptr,
+      .ui_item_count = 0u,
+      .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE,
+      .reserved0 = 0u,
+      .reserved1 = 1u};
+  assert(renderer_submit(renderer, &invalid_reserved_packet) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_submit(renderer, &draw_packet_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
 

@@ -6,12 +6,12 @@ namespace Engine.Rendering;
 public sealed unsafe class RenderPacket
 {
     public RenderPacket(long frameNumber, IReadOnlyList<DrawCommand> drawCommands)
-        : this(frameNumber, drawCommands, Array.Empty<UiDrawCommand>(), RenderDebugViewMode.None)
+        : this(frameNumber, drawCommands, Array.Empty<UiDrawCommand>(), RenderDebugViewMode.None, RenderFeatureFlags.None)
     {
     }
 
     public RenderPacket(long frameNumber, IReadOnlyList<DrawCommand> drawCommands, IReadOnlyList<UiDrawCommand> uiDrawCommands)
-        : this(frameNumber, drawCommands, uiDrawCommands, RenderDebugViewMode.None)
+        : this(frameNumber, drawCommands, uiDrawCommands, RenderDebugViewMode.None, RenderFeatureFlags.None)
     {
     }
 
@@ -19,8 +19,9 @@ public sealed unsafe class RenderPacket
         long frameNumber,
         IReadOnlyList<DrawCommand> drawCommands,
         IReadOnlyList<UiDrawCommand> uiDrawCommands,
-        RenderDebugViewMode debugViewMode)
-        : this(frameNumber, drawCommands, uiDrawCommands, IntPtr.Zero, 0, IntPtr.Zero, 0, debugViewMode)
+        RenderDebugViewMode debugViewMode,
+        RenderFeatureFlags featureFlags = RenderFeatureFlags.None)
+        : this(frameNumber, drawCommands, uiDrawCommands, IntPtr.Zero, 0, IntPtr.Zero, 0, debugViewMode, featureFlags)
     {
     }
 
@@ -32,7 +33,8 @@ public sealed unsafe class RenderPacket
         int nativeDrawItemCount,
         IntPtr nativeUiDrawItemsPointer,
         int nativeUiDrawItemCount,
-        RenderDebugViewMode debugViewMode)
+        RenderDebugViewMode debugViewMode,
+        RenderFeatureFlags featureFlags)
     {
         if (frameNumber < 0)
         {
@@ -47,6 +49,10 @@ public sealed unsafe class RenderPacket
         {
             throw new ArgumentOutOfRangeException(nameof(debugViewMode), $"Unsupported debug view mode value: {debugViewMode}.");
         }
+        if (!AreFeatureFlagsValid(featureFlags))
+        {
+            throw new ArgumentOutOfRangeException(nameof(featureFlags), $"Unsupported render feature flags value: {featureFlags}.");
+        }
 
         FrameNumber = frameNumber;
         DrawCommands = drawCommands;
@@ -56,6 +62,7 @@ public sealed unsafe class RenderPacket
         NativeUiDrawItemsPointer = nativeUiDrawItemsPointer;
         NativeUiDrawItemCount = nativeUiDrawItemCount;
         DebugViewMode = debugViewMode;
+        FeatureFlags = featureFlags;
     }
 
     public long FrameNumber { get; }
@@ -73,6 +80,12 @@ public sealed unsafe class RenderPacket
     public int NativeUiDrawItemCount { get; }
 
     public RenderDebugViewMode DebugViewMode { get; }
+
+    public RenderFeatureFlags FeatureFlags { get; }
+
+    public bool DisableAutoExposure => (FeatureFlags & RenderFeatureFlags.DisableAutoExposure) != 0;
+
+    public bool DisableJitterEffects => (FeatureFlags & RenderFeatureFlags.DisableJitterEffects) != 0;
 
     public ReadOnlySpan<NativeDrawItem> NativeDrawItems
         => NativeDrawItemCount == 0
@@ -92,7 +105,8 @@ public sealed unsafe class RenderPacket
         int nativeDrawItemCount,
         IntPtr nativeUiDrawItemsPointer,
         int nativeUiDrawItemCount,
-        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None)
+        RenderDebugViewMode debugViewMode = RenderDebugViewMode.None,
+        RenderFeatureFlags featureFlags = RenderFeatureFlags.None)
         => new(
             frameNumber,
             drawCommands,
@@ -101,7 +115,8 @@ public sealed unsafe class RenderPacket
             nativeDrawItemCount,
             nativeUiDrawItemsPointer,
             nativeUiDrawItemCount,
-            debugViewMode);
+            debugViewMode,
+            featureFlags);
 
     public static RenderPacket Empty(long frameNumber)
         => new(
@@ -112,7 +127,16 @@ public sealed unsafe class RenderPacket
             0,
             IntPtr.Zero,
             0,
-            RenderDebugViewMode.None);
+            RenderDebugViewMode.None,
+            RenderFeatureFlags.None);
+
+    private static bool AreFeatureFlagsValid(RenderFeatureFlags flags)
+    {
+        const RenderFeatureFlags supported =
+            RenderFeatureFlags.DisableAutoExposure |
+            RenderFeatureFlags.DisableJitterEffects;
+        return (flags & ~supported) == 0;
+    }
 
     private static void ValidatePointerCountPair(string pointerParam, IntPtr pointer, string countParam, int count)
     {

@@ -95,6 +95,13 @@ bool IsSupportedDebugViewMode(uint8_t mode) {
          mode == ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION;
 }
 
+bool IsSupportedRenderFeatureFlags(uint8_t flags) {
+  constexpr uint8_t kSupportedFlags =
+      ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE |
+      ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS;
+  return (flags & static_cast<uint8_t>(~kSupportedFlags)) == 0u;
+}
+
 uint32_t ExtractMaterialFeatureFlags(
     const engine_native_draw_item_t& draw_item) {
   return draw_item.sort_key_high & 0x7u;
@@ -307,6 +314,7 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   submitted_ui_count_ = 0u;
   submitted_draw_items_.clear();
   submitted_debug_view_mode_ = ENGINE_NATIVE_DEBUG_VIEW_NONE;
+  submitted_render_feature_flags_ = 0u;
   last_executed_rhi_passes_.clear();
   last_pass_mask_ = 0u;
 
@@ -341,6 +349,10 @@ engine_native_status_t RendererState::Submit(
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
   if (!IsSupportedDebugViewMode(packet.debug_view_mode)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (packet.reserved1 != 0u || packet.reserved2 != 0u ||
+      !IsSupportedRenderFeatureFlags(packet.reserved0)) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -378,6 +390,15 @@ engine_native_status_t RendererState::Submit(
                    packet.debug_view_mode)) {
       return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
     }
+  }
+  if (packet.reserved0 != 0u) {
+    if (submitted_render_feature_flags_ == 0u) {
+      submitted_render_feature_flags_ = packet.reserved0;
+    } else if (submitted_render_feature_flags_ != packet.reserved0) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+  } else if (submitted_render_feature_flags_ != 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
   if (packet.draw_item_count > 0u) {
@@ -764,6 +785,7 @@ void RendererState::ResetFrameState() {
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
   submitted_debug_view_mode_ = ENGINE_NATIVE_DEBUG_VIEW_NONE;
+  submitted_render_feature_flags_ = 0u;
   frame_graph_.Clear();
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();

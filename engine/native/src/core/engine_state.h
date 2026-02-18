@@ -106,6 +106,7 @@ class RendererState {
   std::vector<engine_native_draw_item_t> submitted_draw_items_;
   engine_native_debug_view_mode_t submitted_debug_view_mode_ =
       ENGINE_NATIVE_DEBUG_VIEW_NONE;
+  uint8_t submitted_render_feature_flags_ = 0u;
   render::MaterialSystem material_system_;
   rhi::PipelineStateCache pipeline_cache_;
   ResourceTable<ResourceBlob> resources_;

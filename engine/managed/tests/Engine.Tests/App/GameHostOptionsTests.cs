@@ -22,7 +22,9 @@ public sealed class GameHostOptionsTests
                 fixedDeltaTimeOverride: TimeSpan.FromMilliseconds(16),
                 disableAutoExposure: true,
                 disableJitterEffects: true),
-            renderSettings: new RenderSettings(RenderDebugViewMode.Albedo));
+            renderSettings: new RenderSettings(
+                RenderDebugViewMode.Albedo,
+                RenderFeatureFlags.DisableAutoExposure));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
@@ -35,6 +37,7 @@ public sealed class GameHostOptionsTests
         Assert.True(options.DeterministicMode.DisableAutoExposure);
         Assert.True(options.DeterministicMode.DisableJitterEffects);
         Assert.Equal(RenderDebugViewMode.Albedo, options.RenderSettings.DebugViewMode);
+        Assert.True(options.RenderSettings.DisableAutoExposure);
     }
 
     [Fact]
@@ -50,6 +53,7 @@ public sealed class GameHostOptionsTests
         Assert.True(options.MaxAccumulatedTime >= options.FixedDt);
         Assert.False(options.DeterministicMode.Enabled);
         Assert.Equal(RenderDebugViewMode.None, options.RenderSettings.DebugViewMode);
+        Assert.Equal(RenderFeatureFlags.None, options.RenderSettings.FeatureFlags);
     }
 
     [Fact]

@@ -96,6 +96,48 @@ public sealed class GameHostPipelineTests
     }
 
     [Fact]
+    public void RunFrames_AppliesDeterministicRenderOverridesToPacketBuilder()
+    {
+        var execution = new List<string>();
+        var world = new World();
+        world.RegisterSystem(SystemStage.PreRender, new RecordingWorldSystem("stage.prerender", execution));
+
+        var options = new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 1024,
+            frameArenaAlignment: 64,
+            deterministicMode: new DeterministicModeOptions(
+                enabled: true,
+                seed: 99,
+                fixedDeltaTimeOverride: TimeSpan.FromMilliseconds(16),
+                disableAutoExposure: true,
+                disableJitterEffects: true),
+            renderSettings: new RenderSettings(RenderDebugViewMode.Albedo));
+        var timing = new FrameTiming(0, TimeSpan.FromMilliseconds(16), TimeSpan.FromMilliseconds(16));
+        var packetBuilder = new RecordingPacketBuilder(execution);
+        var host = GameHostFactory.CreateHost(
+            world,
+            new RecordingPlatformFacade(execution, true),
+            new RecordingTimingFacade(execution, timing),
+            new RecordingPhysicsFacade(execution),
+            new RecordingUiFacade(execution),
+            packetBuilder,
+            new RecordingRenderingFacade(execution),
+            options);
+
+        int frames = host.RunFrames(1);
+
+        Assert.Equal(1, frames);
+        Assert.Equal(RenderDebugViewMode.Albedo, packetBuilder.LastRenderSettings.DebugViewMode);
+        Assert.True(packetBuilder.LastRenderSettings.DisableAutoExposure);
+        Assert.True(packetBuilder.LastRenderSettings.DisableJitterEffects);
+        Assert.Equal(
+            RenderFeatureFlags.DisableAutoExposure | RenderFeatureFlags.DisableJitterEffects,
+            packetBuilder.LastRenderSettings.FeatureFlags);
+    }
+
+    [Fact]
     public void RunFrames_SkipsPhysicsWhenNoSubstepsReady()
     {
         var execution = new List<string>();

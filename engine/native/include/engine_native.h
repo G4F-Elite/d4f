@@ -95,6 +95,9 @@ typedef enum engine_native_debug_view_mode {
   ENGINE_NATIVE_DEBUG_VIEW_AMBIENT_OCCLUSION = 5
 } engine_native_debug_view_mode_t;
 
+#define ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE 0x01u
+#define ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS 0x02u
+
 typedef struct engine_native_render_packet {
   const engine_native_draw_item_t* draw_items;
   uint32_t draw_item_count;
