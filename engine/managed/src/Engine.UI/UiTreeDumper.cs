@@ -61,6 +61,10 @@ public static class UiTreeDumper
         builder.Append(')');
         builder.Append(" layout=");
         builder.Append(element.LayoutMode);
+        if (element.Anchors != (UiAnchor.Left | UiAnchor.Top))
+        {
+            AppendAnchors(builder, element.Anchors);
+        }
 
         switch (element)
         {
@@ -176,6 +180,43 @@ public static class UiTreeDumper
     {
         float normalized = value == 0f ? 0f : value;
         builder.Append(normalized.ToString("G9", CultureInfo.InvariantCulture));
+    }
+
+    private static void AppendAnchors(StringBuilder builder, UiAnchor anchors)
+    {
+        builder.Append(" anchors=");
+        if (anchors == UiAnchor.None)
+        {
+            builder.Append("None");
+            return;
+        }
+
+        bool wroteAny = false;
+        AppendAnchorFlag(builder, anchors, UiAnchor.Left, "Left", ref wroteAny);
+        AppendAnchorFlag(builder, anchors, UiAnchor.Right, "Right", ref wroteAny);
+        AppendAnchorFlag(builder, anchors, UiAnchor.Top, "Top", ref wroteAny);
+        AppendAnchorFlag(builder, anchors, UiAnchor.Bottom, "Bottom", ref wroteAny);
+    }
+
+    private static void AppendAnchorFlag(
+        StringBuilder builder,
+        UiAnchor anchors,
+        UiAnchor flag,
+        string name,
+        ref bool wroteAny)
+    {
+        if ((anchors & flag) == 0)
+        {
+            return;
+        }
+
+        if (wroteAny)
+        {
+            builder.Append('|');
+        }
+
+        builder.Append(name);
+        wroteAny = true;
     }
 
     private static void AppendResolvedStyle(UiDocument document, UiElement element, StringBuilder builder)

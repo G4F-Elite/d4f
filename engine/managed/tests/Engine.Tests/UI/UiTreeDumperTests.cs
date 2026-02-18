@@ -184,4 +184,29 @@ public sealed class UiTreeDumperTests
         Assert.Throws<ArgumentNullException>(() => UiTreeDumper.Dump(null!));
         Assert.Equal(string.Empty, UiTreeDumper.Dump(new UiDocument()));
     }
+
+    [Fact]
+    public void DumpTree_IncludesAnchors_WhenNonDefaultAnchorsAreUsed()
+    {
+        var document = new UiDocument();
+        var root = new UiPanel("root", new TextureHandle(40))
+        {
+            Width = 200,
+            Height = 100
+        };
+        root.AddChild(new UiButton("anchored", new TextureHandle(41), "A")
+        {
+            Width = 30,
+            Height = 12,
+            X = 10,
+            Y = 5,
+            Anchors = UiAnchor.Right | UiAnchor.Bottom
+        });
+        document.AddRoot(root);
+
+        string dump = new RetainedUiFacade(document).DumpTree();
+
+        Assert.Contains("UiButton id=\"anchored\"", dump);
+        Assert.Contains("anchors=Right|Bottom", dump);
+    }
 }
