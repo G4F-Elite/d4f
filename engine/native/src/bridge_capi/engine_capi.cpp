@@ -1,4 +1,5 @@
 #include "bridge_capi/bridge_state.h"
+#include "bridge_capi/handle_registry.h"
 
 #include <new>
 
@@ -47,6 +48,8 @@ engine_native_status_t engine_destroy(engine_native_engine_t* engine) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
+  dff::native::bridge::UnregisterOwnedSubsystemHandles(engine);
+  dff::native::bridge::UnregisterEngineHandle(engine);
   delete engine;
   return ENGINE_NATIVE_STATUS_OK;
 }

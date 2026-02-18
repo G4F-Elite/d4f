@@ -1,4 +1,5 @@
 #include "bridge_capi/bridge_state.h"
+#include "bridge_capi/handle_registry.h"
 
 #include <new>
 
@@ -71,6 +72,7 @@ engine_native_status_t net_destroy(engine_native_net_t* net) {
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
+  dff::native::bridge::UnregisterNetHandle(net);
   delete net->owned_state;
   net->owned_state = nullptr;
   net->state = nullptr;

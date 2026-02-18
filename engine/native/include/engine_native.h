@@ -27,6 +27,13 @@ typedef struct engine_native_audio engine_native_audio_t;
 typedef struct engine_native_net engine_native_net_t;
 
 typedef uint64_t engine_native_resource_handle_t;
+typedef uint64_t engine_native_engine_handle_t;
+typedef uint64_t engine_native_renderer_handle_t;
+typedef uint64_t engine_native_physics_handle_t;
+typedef uint64_t engine_native_audio_handle_t;
+typedef uint64_t engine_native_net_handle_t;
+
+#define ENGINE_NATIVE_INVALID_HANDLE 0ull
 
 typedef enum engine_native_status {
   ENGINE_NATIVE_STATUS_OK = 0,
@@ -484,6 +491,175 @@ ENGINE_NATIVE_API engine_native_status_t physics_sweep(
 
 ENGINE_NATIVE_API engine_native_status_t physics_overlap(
     engine_native_physics_t* physics,
+    const engine_native_overlap_query_t* query,
+    engine_native_overlap_hit_t* hits,
+    uint32_t hit_capacity,
+    uint32_t* out_hit_count);
+
+ENGINE_NATIVE_API engine_native_status_t engine_create_handle(
+    const engine_native_create_desc_t* create_desc,
+    engine_native_engine_handle_t* out_engine);
+
+ENGINE_NATIVE_API engine_native_status_t engine_destroy_handle(
+    engine_native_engine_handle_t engine);
+
+ENGINE_NATIVE_API engine_native_status_t engine_pump_events_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_input_snapshot_t* out_input,
+    engine_native_window_events_t* out_events);
+
+ENGINE_NATIVE_API engine_native_status_t engine_get_renderer_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_renderer_handle_t* out_renderer);
+
+ENGINE_NATIVE_API engine_native_status_t engine_get_physics_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_physics_handle_t* out_physics);
+
+ENGINE_NATIVE_API engine_native_status_t engine_get_audio_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_audio_handle_t* out_audio);
+
+ENGINE_NATIVE_API engine_native_status_t engine_get_net_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_net_handle_t* out_net);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_pak_handle(
+    engine_native_engine_handle_t engine,
+    const char* pak_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_directory_handle(
+    engine_native_engine_handle_t engine,
+    const char* directory_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_read_file_handle(
+    engine_native_engine_handle_t engine,
+    const char* asset_path,
+    void* buffer,
+    size_t buffer_size,
+    size_t* out_size);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_begin_frame_handle(
+    engine_native_renderer_handle_t renderer,
+    size_t requested_bytes,
+    size_t alignment,
+    void** out_frame_memory);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_submit_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_render_packet_t* packet);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_present_handle(
+    engine_native_renderer_handle_t renderer);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_present_with_stats_handle(
+    engine_native_renderer_handle_t renderer,
+    engine_native_renderer_frame_stats_t* out_stats);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_blob_handle(
+    engine_native_renderer_handle_t renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_mesh);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_cpu_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_mesh_cpu_data_t* mesh_data,
+    engine_native_resource_handle_t* out_mesh);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_texture_from_blob_handle(
+    engine_native_renderer_handle_t renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_texture);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_texture_from_cpu_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_texture_cpu_data_t* texture_data,
+    engine_native_resource_handle_t* out_texture);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_create_material_from_blob_handle(
+    engine_native_renderer_handle_t renderer,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_material);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_destroy_resource_handle(
+    engine_native_renderer_handle_t renderer,
+    engine_native_resource_handle_t handle);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats_handle(
+    engine_native_renderer_handle_t renderer,
+    engine_native_renderer_frame_stats_t* out_stats);
+
+ENGINE_NATIVE_API engine_native_status_t capture_request_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_capture_request_t* request,
+    uint64_t* out_request_id);
+
+ENGINE_NATIVE_API engine_native_status_t audio_create_sound_from_blob_handle(
+    engine_native_audio_handle_t audio,
+    const void* data,
+    size_t size,
+    engine_native_resource_handle_t* out_sound);
+
+ENGINE_NATIVE_API engine_native_status_t audio_play_handle(
+    engine_native_audio_handle_t audio,
+    engine_native_resource_handle_t sound,
+    const engine_native_audio_play_desc_t* play_desc,
+    uint64_t* out_emitter_id);
+
+ENGINE_NATIVE_API engine_native_status_t audio_set_listener_handle(
+    engine_native_audio_handle_t audio,
+    const engine_native_listener_desc_t* listener_desc);
+
+ENGINE_NATIVE_API engine_native_status_t audio_set_emitter_params_handle(
+    engine_native_audio_handle_t audio,
+    uint64_t emitter_id,
+    const engine_native_emitter_params_t* params);
+
+ENGINE_NATIVE_API engine_native_status_t net_create_handle(
+    const engine_native_net_desc_t* desc,
+    engine_native_net_handle_t* out_net);
+
+ENGINE_NATIVE_API engine_native_status_t net_destroy_handle(
+    engine_native_net_handle_t net);
+
+ENGINE_NATIVE_API engine_native_status_t net_pump_handle(
+    engine_native_net_handle_t net,
+    engine_native_net_events_t* out_events);
+
+ENGINE_NATIVE_API engine_native_status_t net_send_handle(
+    engine_native_net_handle_t net,
+    const engine_native_net_send_desc_t* send_desc);
+
+ENGINE_NATIVE_API engine_native_status_t physics_step_handle(
+    engine_native_physics_handle_t physics,
+    double dt_seconds);
+
+ENGINE_NATIVE_API engine_native_status_t physics_sync_from_world_handle(
+    engine_native_physics_handle_t physics,
+    const engine_native_body_write_t* writes,
+    uint32_t write_count);
+
+ENGINE_NATIVE_API engine_native_status_t physics_sync_to_world_handle(
+    engine_native_physics_handle_t physics,
+    engine_native_body_read_t* reads,
+    uint32_t read_capacity,
+    uint32_t* out_read_count);
+
+ENGINE_NATIVE_API engine_native_status_t physics_raycast_handle(
+    engine_native_physics_handle_t physics,
+    const engine_native_raycast_query_t* query,
+    engine_native_raycast_hit_t* out_hit);
+
+ENGINE_NATIVE_API engine_native_status_t physics_sweep_handle(
+    engine_native_physics_handle_t physics,
+    const engine_native_sweep_query_t* query,
+    engine_native_sweep_hit_t* out_hit);
+
+ENGINE_NATIVE_API engine_native_status_t physics_overlap_handle(
+    engine_native_physics_handle_t physics,
     const engine_native_overlap_query_t* query,
     engine_native_overlap_hit_t* hits,
     uint32_t hit_capacity,
