@@ -43,7 +43,8 @@ internal static partial class ProceduralPreviewRasterizer
         TexturePayload normal = ResolveTextureBySuffix(content.MaterialBundle, ".normal");
         TexturePayload roughness = ResolveTextureBySuffix(content.MaterialBundle, ".roughness");
         TexturePayload ao = ResolveTextureBySuffix(content.MaterialBundle, ".ao");
-        return RasterizeMesh(content.Mesh, albedo, normal, roughness, ao, width, height, seed);
+        TexturePayload metallic = ResolveTextureBySuffix(content.MaterialBundle, ".metallic");
+        return RasterizeMesh(content.Mesh, albedo, normal, roughness, ao, metallic, width, height, seed);
     }
 
     private static GoldenImageBuffer BuildTexturePreview(LevelMeshChunk chunk, uint seed, int width, int height)
@@ -68,6 +69,7 @@ internal static partial class ProceduralPreviewRasterizer
         TexturePayload normal = ResolveTextureBySuffix(content.MaterialBundle, ".normal");
         TexturePayload roughness = ResolveTextureBySuffix(content.MaterialBundle, ".roughness");
         TexturePayload ao = ResolveTextureBySuffix(content.MaterialBundle, ".ao");
+        TexturePayload metallic = ResolveTextureBySuffix(content.MaterialBundle, ".metallic");
 
         var rgba = new byte[width * height * 4];
         Vector3 lightDir = Vector3.Normalize(new Vector3(0.45f, 0.65f, 0.62f));
@@ -100,6 +102,7 @@ internal static partial class ProceduralPreviewRasterizer
                 Vector3 normalSample = SampleNormal(normal, u, v);
                 float roughnessSample = SampleGray(roughness, u, v);
                 float aoSample = SampleGray(ao, u, v);
+                float metallicSample = SampleGray(metallic, u, v);
                 Vector3 sphereTangent = ComputeSurfaceTangent(sphereNormal);
                 Vector3 sphereBitangent = NormalizeOrFallback(
                     Vector3.Cross(sphereNormal, sphereTangent),
@@ -110,17 +113,15 @@ internal static partial class ProceduralPreviewRasterizer
                     sphereBitangent,
                     normalSample,
                     strength: 0.68f);
-
-                float ndotl = MathF.Max(0f, Vector3.Dot(perturbedNormal, lightDir));
-                Vector3 halfway = Vector3.Normalize(lightDir + viewDir);
-                float specPow = Lerp(64f, 8f, roughnessSample);
-                float specular = MathF.Pow(MathF.Max(0f, Vector3.Dot(perturbedNormal, halfway)), specPow);
-                float specIntensity = Lerp(0.05f, 0.3f, 1f - roughnessSample);
-                float fresnel = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(perturbedNormal, viewDir)), 5f) * 0.2f;
-
-                Vector3 lit = albedoSample * (0.15f + ndotl * aoSample * 0.85f)
-                    + Vector3.One * (specular * specIntensity + fresnel);
-                WritePixel(rgba, offset, lit);
+                Vector3 lit = EvaluatePbrLighting(
+                    albedoSample,
+                    perturbedNormal,
+                    lightDir,
+                    viewDir,
+                    roughnessSample,
+                    metallicSample,
+                    aoSample);
+                WritePixel(rgba, offset, lit + new Vector3(0.04f, 0.05f, 0.06f));
             }
         }
 
@@ -154,6 +155,7 @@ internal static partial class ProceduralPreviewRasterizer
         TexturePayload normalMap,
         TexturePayload roughnessMap,
         TexturePayload aoMap,
+        TexturePayload metallicMap,
         int width,
         int height,
         uint seed)
@@ -285,6 +287,7 @@ internal static partial class ProceduralPreviewRasterizer
                     Vector3 sampledNormal = SampleNormal(normalMap, uv.X, uv.Y);
                     float roughnessSample = SampleGray(roughnessMap, uv.X, uv.Y);
                     float aoSample = SampleGray(aoMap, uv.X, uv.Y);
+                    float metallicSample = SampleGray(metallicMap, uv.X, uv.Y);
                     Vector3 vertexTint = Vector3.Clamp(
                         (v0.Color * b0) +
                         (v1.Color * b1) +
@@ -298,15 +301,14 @@ internal static partial class ProceduralPreviewRasterizer
                         geometricBitangent,
                         sampledNormal,
                         strength: 0.62f);
-                    float ndotl = MathF.Max(0f, Vector3.Dot(perturbedNormal, lightDir));
-                    Vector3 halfway = Vector3.Normalize(lightDir + viewDir);
-                    float specPow = Lerp(72f, 10f, roughnessSample);
-                    float specular = MathF.Pow(MathF.Max(0f, Vector3.Dot(perturbedNormal, halfway)), specPow);
-                    float specIntensity = Lerp(0.04f, 0.22f, 1f - roughnessSample);
-                    float fresnel = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(perturbedNormal, viewDir)), 5f) * 0.18f;
-                    float rim = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(perturbedNormal, viewDir)), 2f) * 0.16f;
-                    Vector3 color = (albedoSample * vertexTint) * (0.14f + ndotl * aoSample * 0.86f)
-                        + Vector3.One * (specular * specIntensity + fresnel + rim * 0.08f);
+                    Vector3 color = EvaluatePbrLighting(
+                        albedoSample * vertexTint,
+                        perturbedNormal,
+                        lightDir,
+                        viewDir,
+                        roughnessSample,
+                        metallicSample,
+                        aoSample);
                     int offset = bufferIndex * 4;
                     WritePixel(rgba, offset, color);
                 }
