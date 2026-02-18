@@ -15,7 +15,9 @@ internal sealed record MultiplayerDemoStats(
     double RoundTripTimeMs,
     double LossPercent,
     double AverageSendBandwidthKbps,
-    double AverageReceiveBandwidthKbps);
+    double AverageReceiveBandwidthKbps,
+    double PeakSendBandwidthKbps,
+    double PeakReceiveBandwidthKbps);
 
 internal sealed record MultiplayerDemoClientStats(
     uint ClientId,
@@ -287,7 +289,9 @@ internal static class MultiplayerDemoArtifactGenerator
             RoundTripTimeMs: stats.RoundTripTimeMs,
             LossPercent: stats.LossPercent,
             AverageSendBandwidthKbps: stats.AverageSendBandwidthKbps,
-            AverageReceiveBandwidthKbps: stats.AverageReceiveBandwidthKbps);
+            AverageReceiveBandwidthKbps: stats.AverageReceiveBandwidthKbps,
+            PeakSendBandwidthKbps: stats.PeakSendBandwidthKbps,
+            PeakReceiveBandwidthKbps: stats.PeakReceiveBandwidthKbps);
     }
 
     private static void WriteProfileLog(string fullPath, MultiplayerDemoSummary summary)
@@ -337,7 +341,7 @@ internal static class MultiplayerDemoArtifactGenerator
 
         return string.Format(
             CultureInfo.InvariantCulture,
-            "{0} bytesSent={1} bytesReceived={2} messagesSent={3} messagesReceived={4} dropped={5} rttMs={6:F3} lossPercent={7:F3} sendKbps={8:F3} receiveKbps={9:F3}",
+            "{0} bytesSent={1} bytesReceived={2} messagesSent={3} messagesReceived={4} dropped={5} rttMs={6:F3} lossPercent={7:F3} sendKbps={8:F3} receiveKbps={9:F3} peakSendKbps={10:F3} peakReceiveKbps={11:F3}",
             scope,
             stats.BytesSent,
             stats.BytesReceived,
@@ -347,7 +351,9 @@ internal static class MultiplayerDemoArtifactGenerator
             stats.RoundTripTimeMs,
             stats.LossPercent,
             stats.AverageSendBandwidthKbps,
-            stats.AverageReceiveBandwidthKbps);
+            stats.AverageReceiveBandwidthKbps,
+            stats.PeakSendBandwidthKbps,
+            stats.PeakReceiveBandwidthKbps);
     }
 
     private static string NormalizePath(string path)

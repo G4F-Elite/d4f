@@ -18,6 +18,10 @@ public sealed class NetPeerStats
 
     public double AverageReceiveBandwidthKbps { get; private set; }
 
+    public double PeakSendBandwidthKbps { get; private set; }
+
+    public double PeakReceiveBandwidthKbps { get; private set; }
+
     public double LossPercent => MessagesSent == 0
         ? 0d
         : (double)MessagesDropped / MessagesSent * 100d;
@@ -81,6 +85,9 @@ public sealed class NetPeerStats
         double seconds = tickCount / (double)tickRateHz;
         AverageSendBandwidthKbps = (BytesSent * 8d) / 1000d / seconds;
         AverageReceiveBandwidthKbps = (BytesReceived * 8d) / 1000d / seconds;
+
+        PeakSendBandwidthKbps = Math.Max(PeakSendBandwidthKbps, AverageSendBandwidthKbps);
+        PeakReceiveBandwidthKbps = Math.Max(PeakReceiveBandwidthKbps, AverageReceiveBandwidthKbps);
     }
 
     internal NetPeerStats Clone()
@@ -94,6 +101,8 @@ public sealed class NetPeerStats
         clone.RoundTripTimeMs = RoundTripTimeMs;
         clone.AverageSendBandwidthKbps = AverageSendBandwidthKbps;
         clone.AverageReceiveBandwidthKbps = AverageReceiveBandwidthKbps;
+        clone.PeakSendBandwidthKbps = PeakSendBandwidthKbps;
+        clone.PeakReceiveBandwidthKbps = PeakReceiveBandwidthKbps;
         return clone;
     }
 }

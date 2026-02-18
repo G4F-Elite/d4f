@@ -66,11 +66,15 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(serverStats.GetProperty("messagesSent").GetInt32() > 0);
             Assert.True(serverStats.GetProperty("averageSendBandwidthKbps").GetDouble() > 0.0);
             Assert.True(serverStats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
+            Assert.True(serverStats.GetProperty("peakSendBandwidthKbps").GetDouble() >= serverStats.GetProperty("averageSendBandwidthKbps").GetDouble());
+            Assert.True(serverStats.GetProperty("peakReceiveBandwidthKbps").GetDouble() >= serverStats.GetProperty("averageReceiveBandwidthKbps").GetDouble());
             foreach (JsonElement clientStats in multiplayerRoot.GetProperty("clientStats").EnumerateArray())
             {
                 JsonElement stats = clientStats.GetProperty("stats");
                 Assert.True(stats.GetProperty("averageSendBandwidthKbps").GetDouble() >= 0.0);
                 Assert.True(stats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
+                Assert.True(stats.GetProperty("peakSendBandwidthKbps").GetDouble() >= stats.GetProperty("averageSendBandwidthKbps").GetDouble());
+                Assert.True(stats.GetProperty("peakReceiveBandwidthKbps").GetDouble() >= stats.GetProperty("averageReceiveBandwidthKbps").GetDouble());
             }
 
             string profileLog = File.ReadAllText(profileLogPath);
@@ -79,6 +83,8 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.Contains("lossPercent=", profileLog, StringComparison.Ordinal);
             Assert.Contains("sendKbps=", profileLog, StringComparison.Ordinal);
             Assert.Contains("receiveKbps=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("peakSendKbps=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("peakReceiveKbps=", profileLog, StringComparison.Ordinal);
             Assert.Contains("client-", profileLog, StringComparison.Ordinal);
 
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
