@@ -10,6 +10,7 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
 {
     static DffNativeInteropApi()
     {
+        EnsureHandleInteropSupported();
         NativeLibrary.SetDllImportResolver(typeof(DffNativeInteropApi).Assembly, ResolveNativeLibrary);
     }
 
@@ -62,35 +63,92 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         => NativeMethods.EngineGetNativeApiVersion();
 
     public EngineNativeStatus EngineCreate(in EngineNativeCreateDesc createDesc, out IntPtr engine)
-        => NativeMethods.EngineCreate(in createDesc, out engine);
+    {
+        engine = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.EngineCreateHandle(in createDesc, out ulong outEngine);
+        if (status == EngineNativeStatus.Ok)
+        {
+            engine = TokenFromHandle(outEngine);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus EngineDestroy(IntPtr engine)
-        => NativeMethods.EngineDestroy(engine);
+        => NativeMethods.EngineDestroyHandle(HandleFromToken(engine));
 
     public EngineNativeStatus EnginePumpEvents(
         IntPtr engine,
         out EngineNativeInputSnapshot input,
         out EngineNativeWindowEvents windowEvents)
-        => NativeMethods.EnginePumpEvents(engine, out input, out windowEvents);
+        => NativeMethods.EnginePumpEventsHandle(
+            HandleFromToken(engine),
+            out input,
+            out windowEvents);
 
     public EngineNativeStatus EngineGetRenderer(IntPtr engine, out IntPtr renderer)
-        => NativeMethods.EngineGetRenderer(engine, out renderer);
+    {
+        renderer = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.EngineGetRendererHandle(
+            HandleFromToken(engine),
+            out ulong outRenderer);
+        if (status == EngineNativeStatus.Ok)
+        {
+            renderer = TokenFromHandle(outRenderer);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus EngineGetPhysics(IntPtr engine, out IntPtr physics)
-        => NativeMethods.EngineGetPhysics(engine, out physics);
+    {
+        physics = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.EngineGetPhysicsHandle(
+            HandleFromToken(engine),
+            out ulong outPhysics);
+        if (status == EngineNativeStatus.Ok)
+        {
+            physics = TokenFromHandle(outPhysics);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus EngineGetAudio(IntPtr engine, out IntPtr audio)
-        => NativeMethods.EngineGetAudio(engine, out audio);
+    {
+        audio = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.EngineGetAudioHandle(
+            HandleFromToken(engine),
+            out ulong outAudio);
+        if (status == EngineNativeStatus.Ok)
+        {
+            audio = TokenFromHandle(outAudio);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net)
-        => NativeMethods.EngineGetNet(engine, out net);
+    {
+        net = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.EngineGetNetHandle(
+            HandleFromToken(engine),
+            out ulong outNet);
+        if (status == EngineNativeStatus.Ok)
+        {
+            net = TokenFromHandle(outNet);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus ContentMountPak(IntPtr engine, string pakPath)
     {
+        ulong engineHandle = HandleFromToken(engine);
         EngineNativeStringView pathView = CreateUtf8StringView(pakPath, out IntPtr allocatedUtf8);
         try
         {
-            return NativeMethods.ContentMountPakView(engine, in pathView);
+            return NativeMethods.ContentMountPakViewHandle(engineHandle, in pathView);
         }
         finally
         {
@@ -100,10 +158,11 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus ContentMountDirectory(IntPtr engine, string directoryPath)
     {
+        ulong engineHandle = HandleFromToken(engine);
         EngineNativeStringView pathView = CreateUtf8StringView(directoryPath, out IntPtr allocatedUtf8);
         try
         {
-            return NativeMethods.ContentMountDirectoryView(engine, in pathView);
+            return NativeMethods.ContentMountDirectoryViewHandle(engineHandle, in pathView);
         }
         finally
         {
@@ -118,11 +177,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         nuint bufferSize,
         out nuint outSize)
     {
+        ulong engineHandle = HandleFromToken(engine);
         EngineNativeStringView pathView = CreateUtf8StringView(assetPath, out IntPtr allocatedUtf8);
         try
         {
-            return NativeMethods.ContentReadFileView(
-                engine,
+            return NativeMethods.ContentReadFileViewHandle(
+                engineHandle,
                 in pathView,
                 buffer,
                 bufferSize,
@@ -139,65 +199,87 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         nuint requestedBytes,
         nuint alignment,
         out IntPtr frameMemory)
-        => NativeMethods.RendererBeginFrame(renderer, requestedBytes, alignment, out frameMemory);
+        => NativeMethods.RendererBeginFrameHandle(
+            HandleFromToken(renderer),
+            requestedBytes,
+            alignment,
+            out frameMemory);
 
     public EngineNativeStatus RendererSubmit(IntPtr renderer, in EngineNativeRenderPacket packet)
-        => NativeMethods.RendererSubmit(renderer, in packet);
+        => NativeMethods.RendererSubmitHandle(HandleFromToken(renderer), in packet);
 
     public EngineNativeStatus RendererPresent(IntPtr renderer)
-        => NativeMethods.RendererPresent(renderer);
+        => NativeMethods.RendererPresentHandle(HandleFromToken(renderer));
 
     public EngineNativeStatus RendererPresentWithStats(
         IntPtr renderer,
         out EngineNativeRendererFrameStats stats)
-        => NativeMethods.RendererPresentWithStats(renderer, out stats);
+        => NativeMethods.RendererPresentWithStatsHandle(HandleFromToken(renderer), out stats);
 
     public EngineNativeStatus RendererCreateMeshFromBlob(
         IntPtr renderer,
         IntPtr data,
         nuint size,
         out ulong mesh)
-        => NativeMethods.RendererCreateMeshFromBlob(renderer, data, size, out mesh);
+        => NativeMethods.RendererCreateMeshFromBlobHandle(
+            HandleFromToken(renderer),
+            data,
+            size,
+            out mesh);
 
     public EngineNativeStatus RendererCreateMeshFromCpu(
         IntPtr renderer,
         in EngineNativeMeshCpuData meshData,
         out ulong mesh)
-        => NativeMethods.RendererCreateMeshFromCpu(renderer, in meshData, out mesh);
+        => NativeMethods.RendererCreateMeshFromCpuHandle(
+            HandleFromToken(renderer),
+            in meshData,
+            out mesh);
 
     public EngineNativeStatus RendererCreateTextureFromBlob(
         IntPtr renderer,
         IntPtr data,
         nuint size,
         out ulong texture)
-        => NativeMethods.RendererCreateTextureFromBlob(renderer, data, size, out texture);
+        => NativeMethods.RendererCreateTextureFromBlobHandle(
+            HandleFromToken(renderer),
+            data,
+            size,
+            out texture);
 
     public EngineNativeStatus RendererCreateTextureFromCpu(
         IntPtr renderer,
         in EngineNativeTextureCpuData textureData,
         out ulong texture)
-        => NativeMethods.RendererCreateTextureFromCpu(renderer, in textureData, out texture);
+        => NativeMethods.RendererCreateTextureFromCpuHandle(
+            HandleFromToken(renderer),
+            in textureData,
+            out texture);
 
     public EngineNativeStatus RendererCreateMaterialFromBlob(
         IntPtr renderer,
         IntPtr data,
         nuint size,
         out ulong material)
-        => NativeMethods.RendererCreateMaterialFromBlob(renderer, data, size, out material);
+        => NativeMethods.RendererCreateMaterialFromBlobHandle(
+            HandleFromToken(renderer),
+            data,
+            size,
+            out material);
 
     public EngineNativeStatus RendererDestroyResource(IntPtr renderer, ulong handle)
-        => NativeMethods.RendererDestroyResource(renderer, handle);
+        => NativeMethods.RendererDestroyResourceHandle(HandleFromToken(renderer), handle);
 
     public EngineNativeStatus RendererGetLastFrameStats(
         IntPtr renderer,
         out EngineNativeRendererFrameStats stats)
-        => NativeMethods.RendererGetLastFrameStats(renderer, out stats);
+        => NativeMethods.RendererGetLastFrameStatsHandle(HandleFromToken(renderer), out stats);
 
     public EngineNativeStatus CaptureRequest(
         IntPtr renderer,
         in EngineNativeCaptureRequest request,
         out ulong requestId)
-        => NativeMethods.CaptureRequest(renderer, in request, out requestId);
+        => NativeMethods.CaptureRequestHandle(HandleFromToken(renderer), in request, out requestId);
 
     public EngineNativeStatus CapturePoll(
         ulong requestId,
@@ -213,60 +295,83 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         IntPtr data,
         nuint size,
         out ulong sound)
-        => NativeMethods.AudioCreateSoundFromBlob(audio, data, size, out sound);
+        => NativeMethods.AudioCreateSoundFromBlobHandle(
+            HandleFromToken(audio),
+            data,
+            size,
+            out sound);
 
     public EngineNativeStatus AudioPlay(
         IntPtr audio,
         ulong sound,
         in EngineNativeAudioPlayDesc playDesc,
         out ulong emitterId)
-        => NativeMethods.AudioPlay(audio, sound, in playDesc, out emitterId);
+        => NativeMethods.AudioPlayHandle(HandleFromToken(audio), sound, in playDesc, out emitterId);
 
     public EngineNativeStatus AudioSetListener(IntPtr audio, in EngineNativeListenerDesc listenerDesc)
-        => NativeMethods.AudioSetListener(audio, in listenerDesc);
+        => NativeMethods.AudioSetListenerHandle(HandleFromToken(audio), in listenerDesc);
 
     public EngineNativeStatus AudioSetEmitterParams(
         IntPtr audio,
         ulong emitterId,
         in EngineNativeEmitterParams emitterParams)
-        => NativeMethods.AudioSetEmitterParams(audio, emitterId, in emitterParams);
+        => NativeMethods.AudioSetEmitterParamsHandle(
+            HandleFromToken(audio),
+            emitterId,
+            in emitterParams);
 
     public EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net)
-        => NativeMethods.NetCreate(in desc, out net);
+    {
+        net = IntPtr.Zero;
+        EngineNativeStatus status = NativeMethods.NetCreateHandle(in desc, out ulong outNet);
+        if (status == EngineNativeStatus.Ok)
+        {
+            net = TokenFromHandle(outNet);
+        }
+
+        return status;
+    }
 
     public EngineNativeStatus NetDestroy(IntPtr net)
-        => NativeMethods.NetDestroy(net);
+        => NativeMethods.NetDestroyHandle(HandleFromToken(net));
 
     public EngineNativeStatus NetPump(IntPtr net, out EngineNativeNetEvents events)
-        => NativeMethods.NetPump(net, out events);
+        => NativeMethods.NetPumpHandle(HandleFromToken(net), out events);
 
     public EngineNativeStatus NetSend(IntPtr net, in EngineNativeNetSendDesc sendDesc)
-        => NativeMethods.NetSend(net, in sendDesc);
+        => NativeMethods.NetSendHandle(HandleFromToken(net), in sendDesc);
 
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)
-        => NativeMethods.PhysicsStep(physics, deltaSeconds);
+        => NativeMethods.PhysicsStepHandle(HandleFromToken(physics), deltaSeconds);
 
     public EngineNativeStatus PhysicsSyncFromWorld(IntPtr physics, IntPtr writes, uint writeCount)
-        => NativeMethods.PhysicsSyncFromWorld(physics, writes, writeCount);
+        => NativeMethods.PhysicsSyncFromWorldHandle(
+            HandleFromToken(physics),
+            writes,
+            writeCount);
 
     public EngineNativeStatus PhysicsSyncToWorld(
         IntPtr physics,
         IntPtr reads,
         uint readCapacity,
         out uint readCount)
-        => NativeMethods.PhysicsSyncToWorld(physics, reads, readCapacity, out readCount);
+        => NativeMethods.PhysicsSyncToWorldHandle(
+            HandleFromToken(physics),
+            reads,
+            readCapacity,
+            out readCount);
 
     public EngineNativeStatus PhysicsRaycast(
         IntPtr physics,
         in EngineNativeRaycastQuery query,
         out EngineNativeRaycastHit hit)
-        => NativeMethods.PhysicsRaycast(physics, in query, out hit);
+        => NativeMethods.PhysicsRaycastHandle(HandleFromToken(physics), in query, out hit);
 
     public EngineNativeStatus PhysicsSweep(
         IntPtr physics,
         in EngineNativeSweepQuery query,
         out EngineNativeSweepHit hit)
-        => NativeMethods.PhysicsSweep(physics, in query, out hit);
+        => NativeMethods.PhysicsSweepHandle(HandleFromToken(physics), in query, out hit);
 
     public EngineNativeStatus PhysicsOverlap(
         IntPtr physics,
@@ -274,7 +379,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         IntPtr hits,
         uint hitCapacity,
         out uint hitCount)
-        => NativeMethods.PhysicsOverlap(physics, in query, hits, hitCapacity, out hitCount);
+        => NativeMethods.PhysicsOverlapHandle(
+            HandleFromToken(physics),
+            in query,
+            hits,
+            hitCapacity,
+            out hitCount);
 
     private static EngineNativeStringView CreateUtf8StringView(
         string value,
@@ -303,152 +413,167 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         }
     }
 
+    private static ulong HandleFromToken(IntPtr token)
+        => token == IntPtr.Zero ? 0u : unchecked((ulong)token.ToInt64());
+
+    private static IntPtr TokenFromHandle(ulong handle)
+        => handle == 0u ? IntPtr.Zero : new IntPtr(unchecked((long)handle));
+
+    private static void EnsureHandleInteropSupported()
+    {
+        if (IntPtr.Size < sizeof(long))
+        {
+            throw new PlatformNotSupportedException(
+                "Handle-based native interop requires a 64-bit process.");
+        }
+    }
+
     private static partial class NativeMethods
     {
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_native_api_version")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial uint EngineGetNativeApiVersion();
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_create")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_create_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineCreate(
+        internal static partial EngineNativeStatus EngineCreateHandle(
             in EngineNativeCreateDesc createDesc,
-            out IntPtr outEngine);
+            out ulong outEngine);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_destroy")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_destroy_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineDestroy(IntPtr engine);
+        internal static partial EngineNativeStatus EngineDestroyHandle(ulong engine);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_pump_events")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_pump_events_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EnginePumpEvents(
-            IntPtr engine,
+        internal static partial EngineNativeStatus EnginePumpEventsHandle(
+            ulong engine,
             out EngineNativeInputSnapshot input,
             out EngineNativeWindowEvents windowEvents);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_renderer")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_renderer_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineGetRenderer(
-            IntPtr engine,
-            out IntPtr outRenderer);
+        internal static partial EngineNativeStatus EngineGetRendererHandle(
+            ulong engine,
+            out ulong outRenderer);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_physics")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_physics_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineGetPhysics(
-            IntPtr engine,
-            out IntPtr outPhysics);
+        internal static partial EngineNativeStatus EngineGetPhysicsHandle(
+            ulong engine,
+            out ulong outPhysics);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_audio")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_audio_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineGetAudio(
-            IntPtr engine,
-            out IntPtr outAudio);
+        internal static partial EngineNativeStatus EngineGetAudioHandle(
+            ulong engine,
+            out ulong outAudio);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_net")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_net_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus EngineGetNet(
-            IntPtr engine,
-            out IntPtr outNet);
+        internal static partial EngineNativeStatus EngineGetNetHandle(
+            ulong engine,
+            out ulong outNet);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_pak_view")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_pak_view_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentMountPakView(
-            IntPtr engine,
+        internal static partial EngineNativeStatus ContentMountPakViewHandle(
+            ulong engine,
             in EngineNativeStringView pakPath);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_directory_view")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_directory_view_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentMountDirectoryView(
-            IntPtr engine,
+        internal static partial EngineNativeStatus ContentMountDirectoryViewHandle(
+            ulong engine,
             in EngineNativeStringView directoryPath);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_read_file_view")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_read_file_view_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentReadFileView(
-            IntPtr engine,
+        internal static partial EngineNativeStatus ContentReadFileViewHandle(
+            ulong engine,
             in EngineNativeStringView assetPath,
             IntPtr buffer,
             nuint bufferSize,
             out nuint outSize);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_begin_frame")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_begin_frame_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererBeginFrame(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererBeginFrameHandle(
+            ulong renderer,
             nuint requestedBytes,
             nuint alignment,
             out IntPtr outFrameMemory);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_submit")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_submit_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererSubmit(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererSubmitHandle(
+            ulong renderer,
             in EngineNativeRenderPacket packet);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererPresent(IntPtr renderer);
+        internal static partial EngineNativeStatus RendererPresentHandle(ulong renderer);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present_with_stats")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present_with_stats_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererPresentWithStats(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererPresentWithStatsHandle(
+            ulong renderer,
             out EngineNativeRendererFrameStats outStats);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_blob")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_blob_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererCreateMeshFromBlob(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererCreateMeshFromBlobHandle(
+            ulong renderer,
             IntPtr data,
             nuint size,
             out ulong outMesh);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_cpu")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_cpu_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererCreateMeshFromCpu(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererCreateMeshFromCpuHandle(
+            ulong renderer,
             in EngineNativeMeshCpuData meshData,
             out ulong outMesh);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_blob")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_blob_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererCreateTextureFromBlob(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererCreateTextureFromBlobHandle(
+            ulong renderer,
             IntPtr data,
             nuint size,
             out ulong outTexture);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_cpu")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_texture_from_cpu_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererCreateTextureFromCpu(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererCreateTextureFromCpuHandle(
+            ulong renderer,
             in EngineNativeTextureCpuData textureData,
             out ulong outTexture);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_material_from_blob")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_material_from_blob_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererCreateMaterialFromBlob(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererCreateMaterialFromBlobHandle(
+            ulong renderer,
             IntPtr data,
             nuint size,
             out ulong outMaterial);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_destroy_resource")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_destroy_resource_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererDestroyResource(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererDestroyResourceHandle(
+            ulong renderer,
             ulong handle);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_get_last_frame_stats")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_get_last_frame_stats_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus RendererGetLastFrameStats(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus RendererGetLastFrameStatsHandle(
+            ulong renderer,
             out EngineNativeRendererFrameStats outStats);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_request")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_request_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus CaptureRequest(
-            IntPtr renderer,
+        internal static partial EngineNativeStatus CaptureRequestHandle(
+            ulong renderer,
             in EngineNativeCaptureRequest request,
             out ulong outRequestId);
 
@@ -464,94 +589,94 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus CaptureFreeResult(
             ref EngineNativeCaptureResult result);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_create_sound_from_blob")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_create_sound_from_blob_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus AudioCreateSoundFromBlob(
-            IntPtr audio,
+        internal static partial EngineNativeStatus AudioCreateSoundFromBlobHandle(
+            ulong audio,
             IntPtr data,
             nuint size,
             out ulong outSound);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_play")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_play_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus AudioPlay(
-            IntPtr audio,
+        internal static partial EngineNativeStatus AudioPlayHandle(
+            ulong audio,
             ulong sound,
             in EngineNativeAudioPlayDesc playDesc,
             out ulong outEmitterId);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_listener")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_listener_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus AudioSetListener(
-            IntPtr audio,
+        internal static partial EngineNativeStatus AudioSetListenerHandle(
+            ulong audio,
             in EngineNativeListenerDesc listenerDesc);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_emitter_params")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_emitter_params_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus AudioSetEmitterParams(
-            IntPtr audio,
+        internal static partial EngineNativeStatus AudioSetEmitterParamsHandle(
+            ulong audio,
             ulong emitterId,
             in EngineNativeEmitterParams emitterParams);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_create")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_create_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus NetCreate(
+        internal static partial EngineNativeStatus NetCreateHandle(
             in EngineNativeNetDesc desc,
-            out IntPtr outNet);
+            out ulong outNet);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_destroy")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_destroy_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus NetDestroy(IntPtr net);
+        internal static partial EngineNativeStatus NetDestroyHandle(ulong net);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_pump")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_pump_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus NetPump(
-            IntPtr net,
+        internal static partial EngineNativeStatus NetPumpHandle(
+            ulong net,
             out EngineNativeNetEvents outEvents);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_send")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_send_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus NetSend(
-            IntPtr net,
+        internal static partial EngineNativeStatus NetSendHandle(
+            ulong net,
             in EngineNativeNetSendDesc sendDesc);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_step_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsStep(IntPtr physics, double dtSeconds);
+        internal static partial EngineNativeStatus PhysicsStepHandle(ulong physics, double dtSeconds);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sync_from_world")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sync_from_world_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsSyncFromWorld(
-            IntPtr physics,
+        internal static partial EngineNativeStatus PhysicsSyncFromWorldHandle(
+            ulong physics,
             IntPtr writes,
             uint writeCount);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sync_to_world")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sync_to_world_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsSyncToWorld(
-            IntPtr physics,
+        internal static partial EngineNativeStatus PhysicsSyncToWorldHandle(
+            ulong physics,
             IntPtr reads,
             uint readCapacity,
             out uint outReadCount);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_raycast")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_raycast_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsRaycast(
-            IntPtr physics,
+        internal static partial EngineNativeStatus PhysicsRaycastHandle(
+            ulong physics,
             in EngineNativeRaycastQuery query,
             out EngineNativeRaycastHit hit);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sweep")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_sweep_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsSweep(
-            IntPtr physics,
+        internal static partial EngineNativeStatus PhysicsSweepHandle(
+            ulong physics,
             in EngineNativeSweepQuery query,
             out EngineNativeSweepHit hit);
 
-        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_overlap")]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "physics_overlap_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus PhysicsOverlap(
-            IntPtr physics,
+        internal static partial EngineNativeStatus PhysicsOverlapHandle(
+            ulong physics,
             in EngineNativeOverlapQuery query,
             IntPtr hits,
             uint hitCapacity,
