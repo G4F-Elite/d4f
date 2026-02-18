@@ -46,6 +46,7 @@ if(BUILD_TESTING)
   add_executable(dff_native_tests
     tests/native_tests.cpp
     tests/content/content_runtime_tests.cpp
+    tests/core/engine_pipeline_cache_persistence_tests.cpp
     tests/platform/platform_state_tests.cpp
     tests/render/frame_graph_builder_tests.cpp
     tests/render/material_system_tests.cpp

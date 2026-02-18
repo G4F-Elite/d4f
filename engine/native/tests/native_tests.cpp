@@ -9,6 +9,7 @@
 
 #include "bridge_capi/bridge_state.h"
 #include "content/content_runtime_tests.h"
+#include "core/engine_pipeline_cache_persistence_tests.h"
 #include "core/resource_table.h"
 #include "engine_native.h"
 #include "platform/platform_state_tests.h"
@@ -856,6 +857,7 @@ int main() {
   TestRendererPassOrderForDrawAndUiScenarios();
   TestRendererResourceBlobLifecycle();
   dff::native::tests::RunContentRuntimeTests();
+  dff::native::tests::RunEnginePipelineCachePersistenceTests();
   TestResourceTableGeneration();
   dff::native::tests::RunPlatformStateTests();
   dff::native::tests::RunFrameGraphBuilderTests();
