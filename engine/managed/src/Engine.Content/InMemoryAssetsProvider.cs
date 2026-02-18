@@ -15,6 +15,21 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
     private readonly string _buildConfigHash;
 
     public InMemoryAssetsProvider(
+        IEnumerable<System.Reflection.Assembly> assetAssemblies,
+        int runtimeCacheCapacity = 256,
+        string? buildConfigHash = null,
+        DevDiskAssetCache? devDiskCache = null,
+        IReadOnlyDictionary<Type, int>? runtimeTypeBudgets = null)
+        : this(
+            AssetRegistryDiscovery.BuildFromAssemblies(assetAssemblies),
+            runtimeCacheCapacity,
+            buildConfigHash,
+            devDiskCache,
+            runtimeTypeBudgets)
+    {
+    }
+
+    public InMemoryAssetsProvider(
         AssetRegistry assetRegistry,
         int runtimeCacheCapacity = 256,
         string? buildConfigHash = null,
