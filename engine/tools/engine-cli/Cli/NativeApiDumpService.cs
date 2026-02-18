@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Text;
 
 namespace Engine.Cli;
 
@@ -41,8 +42,9 @@ internal static partial class NativeApiDumpService
         Regex versionRegex = ApiVersionRegex();
         Regex functionRegex = FunctionRegex();
 
-        foreach (string line in lines)
+        for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
         {
+            string line = lines[lineIndex];
             Match versionMatch = versionRegex.Match(line);
             if (versionMatch.Success)
             {
@@ -58,7 +60,9 @@ internal static partial class NativeApiDumpService
 
             string returnType = functionMatch.Groups[1].Value.Trim();
             string name = functionMatch.Groups[2].Value.Trim();
-            functions.Add(new NativeApiFunction(returnType, name, line.Trim()));
+            string declaration = CollectDeclaration(lines, lineIndex, out int declarationEndLineIndex);
+            lineIndex = declarationEndLineIndex;
+            functions.Add(new NativeApiFunction(returnType, name, declaration));
         }
 
         if (apiVersion is null)
@@ -82,5 +86,75 @@ internal static partial class NativeApiDumpService
         string json = JsonSerializer.Serialize(dump, SerializerOptions);
         File.WriteAllText(fullOutputPath, json);
         return fullOutputPath;
+    }
+
+    private static string CollectDeclaration(
+        IReadOnlyList<string> lines,
+        int startIndex,
+        out int endIndex)
+    {
+        if (startIndex < 0 || startIndex >= lines.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(startIndex));
+        }
+
+        var builder = new StringBuilder();
+        endIndex = startIndex;
+
+        AppendDeclarationLine(builder, lines[startIndex]);
+        while (!LooksLikeCompleteDeclaration(builder))
+        {
+            if (endIndex + 1 >= lines.Count)
+            {
+                break;
+            }
+
+            endIndex++;
+            AppendDeclarationLine(builder, lines[endIndex]);
+        }
+
+        return builder.ToString();
+    }
+
+    private static void AppendDeclarationLine(StringBuilder builder, string line)
+    {
+        string trimmed = line.Trim();
+        if (trimmed.Length == 0)
+        {
+            return;
+        }
+
+        if (builder.Length > 0)
+        {
+            builder.Append(' ');
+        }
+
+        builder.Append(trimmed);
+    }
+
+    private static bool LooksLikeCompleteDeclaration(StringBuilder builder)
+    {
+        if (builder.Length == 0)
+        {
+            return false;
+        }
+
+        int parenDepth = 0;
+        for (int i = 0; i < builder.Length; i++)
+        {
+            char ch = builder[i];
+            if (ch == '(')
+            {
+                parenDepth++;
+                continue;
+            }
+
+            if (ch == ')' && parenDepth > 0)
+            {
+                parenDepth--;
+            }
+        }
+
+        return parenDepth == 0 && builder.ToString().Contains(';', StringComparison.Ordinal);
     }
 }
