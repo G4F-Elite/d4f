@@ -5,6 +5,13 @@ namespace Engine.Tests.Content;
 public sealed class DevDiskAssetCacheTests
 {
     [Fact]
+    public void Constructor_ShouldValidateRootDirectory()
+    {
+        Assert.Throws<ArgumentException>(() => new DevDiskAssetCache(""));
+        Assert.Throws<ArgumentException>(() => new DevDiskAssetCache("   "));
+    }
+
+    [Fact]
     public void StoreAndTryLoad_ShouldRoundTripPayload()
     {
         string root = CreateTempDirectory();
@@ -79,6 +86,29 @@ public sealed class DevDiskAssetCacheTests
 
             Assert.Contains(Path.Combine("g9", "r2"), path, StringComparison.Ordinal);
             Assert.EndsWith("AA11.bin", path, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ResolveEntryPath_ShouldSanitizeInvalidTokenCharacters()
+    {
+        string root = CreateTempDirectory();
+        try
+        {
+            char invalidChar = Path.GetInvalidFileNameChars()
+                .First(static c => c != Path.DirectorySeparatorChar && c != Path.AltDirectorySeparatorChar);
+            string token = $"A{invalidChar}B";
+            AssetKey key = new(token, 1, 1, token, token);
+            var cache = new DevDiskAssetCache(root);
+
+            string path = cache.ResolveEntryPath(key);
+
+            Assert.DoesNotContain(invalidChar.ToString(), path, StringComparison.Ordinal);
+            Assert.Contains("A_B", path, StringComparison.Ordinal);
         }
         finally
         {

@@ -81,6 +81,19 @@ public sealed class AssetsProviderTests
     }
 
     [Fact]
+    public void InMemoryProvider_GetOrCreate_ShouldFail_WhenCachedAssetTypeDiffers()
+    {
+        var provider = new InMemoryAssetsProvider(new AssetRegistry(), buildConfigHash: "CFG");
+        var generator = new CountingStringGenerator(generatorVersion: 1);
+        provider.RegisterGenerator<TestRecipe, string>("proc/string", generator);
+        var recipe = new TestRecipe("proc/string", recipeVersion: 1, seed: 5, payload: "x");
+
+        _ = provider.GetOrCreate<string>(recipe);
+
+        Assert.Throws<InvalidCastException>(() => provider.GetOrCreate<byte[]>(recipe));
+    }
+
+    [Fact]
     public void InMemoryProvider_GetOrCreate_ShouldRespectRuntimeTypeBudget()
     {
         var provider = new InMemoryAssetsProvider(
@@ -111,6 +124,26 @@ public sealed class AssetsProviderTests
         var recipe = new TestRecipe("missing", recipeVersion: 1, seed: 1, payload: "x");
 
         Assert.Throws<KeyNotFoundException>(() => provider.GetOrCreate<string>(recipe));
+    }
+
+    [Fact]
+    public void InMemoryProvider_RegisterGenerator_ShouldValidateGeneratorVersion()
+    {
+        var provider = new InMemoryAssetsProvider(new AssetRegistry(), buildConfigHash: "CFG");
+        var generator = new CountingStringGenerator(generatorVersion: 0);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            provider.RegisterGenerator<TestRecipe, string>("proc/string", generator));
+    }
+
+    [Fact]
+    public void InMemoryProvider_GetOrCreate_ShouldFail_WhenGeneratorReturnsNull()
+    {
+        var provider = new InMemoryAssetsProvider(new AssetRegistry(), buildConfigHash: "CFG");
+        provider.RegisterGenerator<TestRecipe, string>("proc/null", new NullStringGenerator(generatorVersion: 1));
+        var recipe = new TestRecipe("proc/null", recipeVersion: 1, seed: 3, payload: "x");
+
+        Assert.Throws<InvalidDataException>(() => provider.GetOrCreate<string>(recipe));
     }
 
     [Fact]
@@ -238,6 +271,21 @@ public sealed class AssetsProviderTests
         {
             CallCount++;
             return System.Text.Encoding.UTF8.GetBytes($"bytes:{recipe.Payload}");
+        }
+    }
+
+    private sealed class NullStringGenerator : IAssetGenerator<TestRecipe, string>
+    {
+        public NullStringGenerator(int generatorVersion)
+        {
+            GeneratorVersion = generatorVersion;
+        }
+
+        public int GeneratorVersion { get; }
+
+        public string Generate(TestRecipe recipe)
+        {
+            return null!;
         }
     }
 

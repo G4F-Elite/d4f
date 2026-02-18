@@ -61,6 +61,19 @@ public sealed class RuntimeAssetCacheTests
     }
 
     [Fact]
+    public void SetWithEvictionOutput_ShouldLeaveDefaults_WhenEntryFitsCapacity()
+    {
+        var cache = new RuntimeAssetCache<string>(capacity: 2);
+        AssetKey first = CreateKey("01");
+
+        bool evicted = cache.Set(first, "a", out AssetKey evictedKey, out string evictedValue);
+
+        Assert.False(evicted);
+        Assert.Equal(default, evictedKey);
+        Assert.Null(evictedValue);
+    }
+
+    [Fact]
     public void Set_ShouldUpdateExistingEntryWithoutChangingCount()
     {
         var cache = new RuntimeAssetCache<string>(capacity: 2);
@@ -90,6 +103,21 @@ public sealed class RuntimeAssetCacheTests
         Assert.False(cache.TryGet(first, out _));
         Assert.False(cache.TryGet(second, out _));
         Assert.Equal(0, cache.Count);
+    }
+
+    [Fact]
+    public void Remove_ShouldReturnFalseAndKeepCount_WhenEntryMissing()
+    {
+        var cache = new RuntimeAssetCache<string>(capacity: 2);
+        AssetKey first = CreateKey("01");
+        AssetKey missing = CreateKey("99");
+        cache.Set(first, "a");
+
+        bool removed = cache.Remove(missing);
+
+        Assert.False(removed);
+        Assert.Equal(1, cache.Count);
+        Assert.True(cache.TryGet(first, out _));
     }
 
     private static AssetKey CreateKey(string suffix)
