@@ -45,6 +45,12 @@ if(MSVC)
     MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
+if(UNIX AND NOT APPLE)
+  set_target_properties(dff_native PROPERTIES
+    BUILD_RPATH "$ORIGIN"
+    INSTALL_RPATH "$ORIGIN")
+endif()
+
 include(CTest)
 
 if(BUILD_TESTING)
