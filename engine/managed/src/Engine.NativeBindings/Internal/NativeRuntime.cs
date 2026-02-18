@@ -33,6 +33,7 @@ internal sealed partial class NativeRuntime
     private IntPtr _net;
     private bool _disposed;
     private RenderingFrameStats _lastFrameStats = RenderingFrameStats.Empty;
+    private RenderDebugViewMode _lastSubmittedDebugViewMode = RenderDebugViewMode.None;
 
     public NativeRuntime(INativeInteropApi interop)
     {
@@ -260,6 +261,7 @@ internal sealed partial class NativeRuntime
     {
         ArgumentNullException.ThrowIfNull(packet);
         ThrowIfDisposed();
+        _lastSubmittedDebugViewMode = packet.DebugViewMode;
 
         var drawItemsPtr = packet.NativeDrawItemsPointer;
         var drawItemsCount = packet.NativeDrawItemCount;

@@ -1,6 +1,7 @@
 using System;
 using System.Runtime.InteropServices;
 using Engine.NativeBindings.Internal.Interop;
+using Engine.Rendering;
 
 namespace Engine.NativeBindings.Internal;
 
@@ -27,7 +28,7 @@ internal sealed partial class NativeRuntime
             Width = width,
             Height = height,
             IncludeAlpha = includeAlpha ? (byte)1 : (byte)0,
-            Reserved0 = 0,
+            Reserved0 = MapCaptureSemantic(_lastSubmittedDebugViewMode),
             Reserved1 = 0,
             Reserved2 = 0
         };
@@ -141,5 +142,18 @@ internal sealed partial class NativeRuntime
         }
 
         return compact;
+    }
+
+    private static byte MapCaptureSemantic(RenderDebugViewMode debugViewMode)
+    {
+        return debugViewMode switch
+        {
+            RenderDebugViewMode.Depth => 1,
+            RenderDebugViewMode.Normals => 2,
+            RenderDebugViewMode.Albedo => 3,
+            RenderDebugViewMode.Roughness => 4,
+            RenderDebugViewMode.AmbientOcclusion => 5,
+            _ => 0
+        };
     }
 }

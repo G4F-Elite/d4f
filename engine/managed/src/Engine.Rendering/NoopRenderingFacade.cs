@@ -17,6 +17,7 @@ public sealed class NoopRenderingFacade : IRenderingFacade
     private ulong _pendingUploadBytes;
     private ulong _gpuMemoryBytes;
     private RenderingFrameStats _lastFrameStats = RenderingFrameStats.Empty;
+    private RenderDebugViewMode _lastSubmittedDebugViewMode = RenderDebugViewMode.None;
 
     private NoopRenderingFacade()
     {
@@ -43,6 +44,7 @@ public sealed class NoopRenderingFacade : IRenderingFacade
             _submittedDrawItemCount = checked(_submittedDrawItemCount + ResolveSubmittedDrawItemCount(packet));
             _submittedUiItemCount = checked(_submittedUiItemCount + ResolveSubmittedUiItemCount(packet));
             _submittedTriangleCount = checked(_submittedTriangleCount + ResolveTriangleCount(packet.DrawCommands));
+            _lastSubmittedDebugViewMode = packet.DebugViewMode;
         }
     }
 
@@ -149,9 +151,41 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         int heightDenominator = Math.Max(1, (int)height - 1);
         byte alpha = includeAlpha ? (byte)220 : (byte)255;
 
-        for (int y = 0; y < (int)height; y++)
+        switch (_lastSubmittedDebugViewMode)
         {
-            for (int x = 0; x < (int)width; x++)
+            case RenderDebugViewMode.Depth:
+                FillDepthCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
+            case RenderDebugViewMode.Normals:
+                FillNormalsCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
+            case RenderDebugViewMode.Albedo:
+                FillAlbedoCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
+            case RenderDebugViewMode.Roughness:
+            case RenderDebugViewMode.AmbientOcclusion:
+                FillShadowCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
+            default:
+                FillColorCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
+        }
+
+        return rgba;
+    }
+
+    private static void FillColorCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
             {
                 int pixelOffset = y * rowStride + x * 4;
                 byte red = (byte)(x * 255 / widthDenominator);
@@ -163,8 +197,107 @@ public sealed class NoopRenderingFacade : IRenderingFacade
                 rgba[pixelOffset + 3] = alpha;
             }
         }
+    }
 
-        return rgba;
+    private static void FillDepthCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int pixelOffset = y * rowStride + x * 4;
+                byte depth = (byte)(255 - (y * 255 / heightDenominator));
+                byte edge = (byte)(x * 24 / widthDenominator);
+                byte value = (byte)Math.Clamp(depth - edge, 0, 255);
+                rgba[pixelOffset] = value;
+                rgba[pixelOffset + 1] = value;
+                rgba[pixelOffset + 2] = value;
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
+    }
+
+    private static void FillNormalsCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            float ny = (y / (float)heightDenominator) * 2f - 1f;
+            for (int x = 0; x < width; x++)
+            {
+                float nx = (x / (float)widthDenominator) * 2f - 1f;
+                float nz = MathF.Sqrt(MathF.Max(0f, 1f - MathF.Min(1f, nx * nx + ny * ny)));
+                int pixelOffset = y * rowStride + x * 4;
+                rgba[pixelOffset] = (byte)Math.Clamp((int)MathF.Round((nx * 0.5f + 0.5f) * 255f), 0, 255);
+                rgba[pixelOffset + 1] = (byte)Math.Clamp((int)MathF.Round(((-ny) * 0.5f + 0.5f) * 255f), 0, 255);
+                rgba[pixelOffset + 2] = (byte)Math.Clamp((int)MathF.Round(nz * 255f), 0, 255);
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
+    }
+
+    private static void FillAlbedoCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int pixelOffset = y * rowStride + x * 4;
+                byte warm = (byte)(140 + (x * 80 / widthDenominator));
+                byte mid = (byte)(95 + (y * 100 / heightDenominator));
+                byte cool = (byte)(70 + (((x + y) * 70) / Math.Max(1, widthDenominator + heightDenominator)));
+                rgba[pixelOffset] = warm;
+                rgba[pixelOffset + 1] = mid;
+                rgba[pixelOffset + 2] = cool;
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
+    }
+
+    private static void FillShadowCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int pixelOffset = y * rowStride + x * 4;
+                bool lit = ((x / 6) + (y / 6)) % 2 == 0;
+                byte baseValue = lit ? (byte)168 : (byte)54;
+                byte horizon = (byte)(y * 56 / heightDenominator);
+                byte value = (byte)Math.Clamp(baseValue - horizon, 0, 255);
+                rgba[pixelOffset] = value;
+                rgba[pixelOffset + 1] = value;
+                rgba[pixelOffset + 2] = value;
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
     }
 
     private ulong AllocateResource(int payloadLength, ulong triangleCount)
