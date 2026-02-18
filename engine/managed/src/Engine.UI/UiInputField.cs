@@ -103,11 +103,33 @@ public sealed class UiInputField : UiElement
 
     public Action<string>? OnTextChanged { get; set; }
 
+    public Action? OnFocus { get; set; }
+
+    public Action? OnBlur { get; set; }
+
     public string DisplayText => string.IsNullOrEmpty(_text) ? _placeholder : _text;
 
-    internal void Focus() => IsFocused = true;
+    internal void Focus()
+    {
+        if (IsFocused)
+        {
+            return;
+        }
 
-    internal void Blur() => IsFocused = false;
+        IsFocused = true;
+        OnFocus?.Invoke();
+    }
+
+    internal void Blur()
+    {
+        if (!IsFocused)
+        {
+            return;
+        }
+
+        IsFocused = false;
+        OnBlur?.Invoke();
+    }
 
     internal void AppendText(string text)
     {
