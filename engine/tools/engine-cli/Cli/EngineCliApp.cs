@@ -1,4 +1,5 @@
 using System.Text.RegularExpressions;
+using System.Text.Json;
 using Engine.AssetPipeline;
 using Engine.Testing;
 
@@ -300,6 +301,15 @@ public sealed partial class EngineCliApp
 
         _stdout.WriteLine($"Test artifacts created: {artifactsDirectory}");
         _stdout.WriteLine($"Test manifest created: {artifactsOutput.ManifestPath}");
+
+        string renderStatsPath = Path.Combine(artifactsDirectory, "render", "frame-stats.json");
+        if (File.Exists(renderStatsPath))
+        {
+            RenderStatsSummary renderStats = ReadRenderStatsSummary(renderStatsPath);
+            _stdout.WriteLine(
+                $"Render stats: draw={renderStats.DrawItemCount}, ui={renderStats.UiItemCount}, triangles={renderStats.TriangleCount}, uploadBytes={renderStats.UploadBytes}, gpuMemoryBytes={renderStats.GpuMemoryBytes}.");
+        }
+
         return 0;
     }
 
@@ -309,4 +319,45 @@ public sealed partial class EngineCliApp
         _stdout.WriteLine($"Native API dump created: {outputPath}");
         return 0;
     }
+
+    private static RenderStatsSummary ReadRenderStatsSummary(string statsPath)
+    {
+        string json = File.ReadAllText(statsPath);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+
+        return new RenderStatsSummary(
+            DrawItemCount: ReadRequiredUInt(root, "drawItemCount"),
+            UiItemCount: ReadRequiredUInt(root, "uiItemCount"),
+            TriangleCount: ReadRequiredULong(root, "triangleCount"),
+            UploadBytes: ReadRequiredULong(root, "uploadBytes"),
+            GpuMemoryBytes: ReadRequiredULong(root, "gpuMemoryBytes"));
+    }
+
+    private static uint ReadRequiredUInt(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetUInt32(out uint value))
+        {
+            throw new InvalidDataException($"Render stats artifact is missing unsigned integer property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static ulong ReadRequiredULong(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetUInt64(out ulong value))
+        {
+            throw new InvalidDataException($"Render stats artifact is missing unsigned integer property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private readonly record struct RenderStatsSummary(
+        uint DrawItemCount,
+        uint UiItemCount,
+        ulong TriangleCount,
+        ulong UploadBytes,
+        ulong GpuMemoryBytes);
 }
