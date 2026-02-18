@@ -124,6 +124,11 @@ internal static class TestArtifactGenerator
             captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
         }
 
+        MultiplayerDemoArtifactOutput multiplayerArtifacts = MultiplayerDemoArtifactGenerator.Generate(
+            outputDirectory,
+            options.ReplaySeed,
+            options.FixedDeltaSeconds);
+
         string replayRelativePath = Path.Combine("replay", "recording.json");
         string replayFullPath = Path.Combine(outputDirectory, replayRelativePath);
         ReplayRecordingCodec.Write(
@@ -134,7 +139,8 @@ internal static class TestArtifactGenerator
                 Frames: BuildReplayFrames(options.CaptureFrame),
                 NetworkEvents:
                 [
-                    $"capture.frame={options.CaptureFrame}"
+                    $"capture.frame={options.CaptureFrame}",
+                    $"net.profile={multiplayerArtifacts.ProfileLogRelativePath}"
                 ]));
         manifestEntries.Add(
             new TestingArtifactEntry(
@@ -142,10 +148,6 @@ internal static class TestArtifactGenerator
                 RelativePath: NormalizePath(replayRelativePath),
                 Description: "Record/replay metadata."));
 
-        MultiplayerDemoArtifactOutput multiplayerArtifacts = MultiplayerDemoArtifactGenerator.Generate(
-            outputDirectory,
-            options.ReplaySeed,
-            options.FixedDeltaSeconds);
         manifestEntries.Add(
             new TestingArtifactEntry(
                 Kind: "multiplayer-demo",

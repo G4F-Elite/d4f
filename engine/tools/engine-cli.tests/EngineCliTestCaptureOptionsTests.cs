@@ -52,8 +52,9 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.Equal(12L, frames[12].GetProperty("tick").GetInt64());
 
             JsonElement networkEvents = replayJson.RootElement.GetProperty("networkEvents");
-            Assert.Single(networkEvents.EnumerateArray());
+            Assert.Equal(2, networkEvents.GetArrayLength());
             Assert.Equal("capture.frame=12", networkEvents[0].GetString());
+            Assert.Equal("net.profile=net/multiplayer-profile.log", networkEvents[1].GetString());
 
             using JsonDocument multiplayerJson = JsonDocument.Parse(File.ReadAllText(multiplayerPath));
             JsonElement multiplayerRoot = multiplayerJson.RootElement;
