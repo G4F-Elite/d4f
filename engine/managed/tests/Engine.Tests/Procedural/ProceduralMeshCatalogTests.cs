@@ -101,6 +101,30 @@ public sealed class ProceduralMeshCatalogTests
         Assert.True(minU < -0.01f);
     }
 
+    [Theory]
+    [InlineData("chunk/room/v1", true)]
+    [InlineData("chunk/shaft/v2", true)]
+    [InlineData("chunk/room/v0", false)]
+    [InlineData("chunk/shaft/v0", false)]
+    public void BuildChunkMesh_ShouldApplyAccentVertexTint_WhenAccentGeometryExists(string meshTag, bool expectsAccentTint)
+    {
+        LevelMeshChunk chunk = new(NodeId: 6, MeshTag: meshTag);
+
+        ProcMeshData mesh = ProceduralMeshCatalog.BuildChunkMesh(chunk, seed: 303u);
+        int uniqueColorCount = mesh.Vertices
+            .Select(static x => x.Color)
+            .Distinct()
+            .Count();
+
+        if (expectsAccentTint)
+        {
+            Assert.True(uniqueColorCount >= 2);
+            return;
+        }
+
+        Assert.Equal(1, uniqueColorCount);
+    }
+
     [Fact]
     public void BuildChunkMesh_ShouldRejectInvalidTag()
     {
