@@ -146,6 +146,18 @@ public sealed class ProceduralMeshCatalogTests
     }
 
     [Fact]
+    public void BuildChunkMesh_ShouldCreateOrderedLods()
+    {
+        LevelMeshChunk chunk = new(NodeId: 14, MeshTag: "chunk/junction/v2");
+
+        ProcMeshData mesh = ProceduralMeshCatalog.BuildChunkMesh(chunk, seed: 808u);
+
+        Assert.True(mesh.Lods.Count >= 2);
+        Assert.True(mesh.Lods[0].ScreenCoverage > mesh.Lods[1].ScreenCoverage);
+        Assert.True(mesh.Lods[0].Indices.Count > mesh.Lods[1].Indices.Count);
+    }
+
+    [Fact]
     public void BuildChunkMesh_ShouldRejectInvalidTag()
     {
         Assert.Throws<ArgumentNullException>(() => ProceduralMeshCatalog.BuildChunkMesh(null!, seed: 1u));
