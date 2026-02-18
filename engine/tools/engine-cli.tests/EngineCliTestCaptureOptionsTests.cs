@@ -91,6 +91,27 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(serverStats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
             Assert.True(serverStats.GetProperty("peakSendBandwidthKbps").GetDouble() >= serverStats.GetProperty("averageSendBandwidthKbps").GetDouble());
             Assert.True(serverStats.GetProperty("peakReceiveBandwidthKbps").GetDouble() >= serverStats.GetProperty("averageReceiveBandwidthKbps").GetDouble());
+
+            JsonElement runtimeTransport = multiplayerRoot.GetProperty("runtimeTransport");
+            bool runtimeTransportEnabled = runtimeTransport.GetProperty("enabled").GetBoolean();
+            bool runtimeTransportSucceeded = runtimeTransport.GetProperty("succeeded").GetBoolean();
+            int runtimeServerMessages = runtimeTransport.GetProperty("serverMessagesReceived").GetInt32();
+            int runtimeClientMessages = runtimeTransport.GetProperty("clientMessagesReceived").GetInt32();
+            Assert.True(runtimeServerMessages >= 0);
+            Assert.True(runtimeClientMessages >= 0);
+            if (runtimeTransportEnabled)
+            {
+                Assert.True(runtimeTransportSucceeded);
+                Assert.True(runtimeServerMessages > 0);
+                Assert.True(runtimeClientMessages > 0);
+            }
+            else
+            {
+                Assert.False(runtimeTransportSucceeded);
+                Assert.Equal(0, runtimeServerMessages);
+                Assert.Equal(0, runtimeClientMessages);
+            }
+
             foreach (JsonElement clientStats in multiplayerRoot.GetProperty("clientStats").EnumerateArray())
             {
                 JsonElement stats = clientStats.GetProperty("stats");

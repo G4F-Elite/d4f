@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using Engine.NativeBindings;
 using Engine.Net;
 using Engine.Procedural;
 using Engine.Rendering;
@@ -31,6 +32,12 @@ internal sealed record MultiplayerDemoArtifactOutput(
     string SummaryRelativePath,
     string ProfileLogRelativePath);
 
+internal sealed record RuntimeTransportSummary(
+    bool Enabled,
+    bool Succeeded,
+    int ServerMessagesReceived,
+    int ClientMessagesReceived);
+
 internal sealed record MultiplayerDemoSummary(
     ulong Seed,
     uint ProceduralSeed,
@@ -44,7 +51,8 @@ internal sealed record MultiplayerDemoSummary(
     IReadOnlyList<string> SampleAssetKeys,
     MultiplayerDemoStats ServerStats,
     IReadOnlyList<MultiplayerDemoClientStats> ClientStats,
-    IReadOnlyList<MultiplayerDemoOwnershipStats> OwnershipStats);
+    IReadOnlyList<MultiplayerDemoOwnershipStats> OwnershipStats,
+    RuntimeTransportSummary RuntimeTransport);
 
 internal static class MultiplayerDemoArtifactGenerator
 {
@@ -134,6 +142,8 @@ internal static class MultiplayerDemoArtifactGenerator
             throw new InvalidDataException("Multiplayer demo produced divergent client snapshots.");
         }
 
+        RuntimeTransportSummary runtimeTransport = RunRuntimeTransportDemoIfAvailable();
+
         string[] sampleAssetKeys = firstResult.ActiveEntities
             .Select(static x => x.AssetKey)
             .Distinct(StringComparer.Ordinal)
@@ -157,7 +167,73 @@ internal static class MultiplayerDemoArtifactGenerator
                 new MultiplayerDemoClientStats(firstClientId, ToStats(session.GetClientStats(firstClientId))),
                 new MultiplayerDemoClientStats(secondClientId, ToStats(session.GetClientStats(secondClientId)))
             ],
-            OwnershipStats: BuildOwnershipStats(firstSnapshot, [firstClientId, secondClientId]));
+            OwnershipStats: BuildOwnershipStats(firstSnapshot, [firstClientId, secondClientId]),
+            RuntimeTransport: runtimeTransport);
+    }
+
+    private static RuntimeTransportSummary RunRuntimeTransportDemoIfAvailable()
+    {
+        string? previousPeerId = Environment.GetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID");
+        try
+        {
+            using NativeFacadeSet? server = TryCreateNativePeer(100u);
+            using NativeFacadeSet? clientA = TryCreateNativePeer(200u);
+            using NativeFacadeSet? clientB = TryCreateNativePeer(300u);
+            if (server is null || clientA is null || clientB is null)
+            {
+                return new RuntimeTransportSummary(false, false, 0, 0);
+            }
+
+            _ = server.Net.Pump();
+            _ = clientA.Net.Pump();
+            _ = clientB.Net.Pump();
+
+            server.Net.Send(200u, NetworkChannel.Unreliable, [1, 2, 3, 4]);
+            server.Net.Send(300u, NetworkChannel.Unreliable, [5, 6, 7, 8]);
+            clientA.Net.Send(100u, NetworkChannel.ReliableOrdered, [11, 12]);
+            clientB.Net.Send(100u, NetworkChannel.ReliableOrdered, [13, 14, 15]);
+
+            int serverMessages = CountMessageEvents(server.Net.Pump());
+            int clientMessages = CountMessageEvents(clientA.Net.Pump()) + CountMessageEvents(clientB.Net.Pump());
+            bool success = serverMessages >= 2 && clientMessages >= 2;
+            return new RuntimeTransportSummary(true, success, serverMessages, clientMessages);
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or
+            EntryPointNotFoundException or
+            BadImageFormatException or
+            FileNotFoundException or
+            InvalidDataException or
+            InvalidOperationException or
+            TypeInitializationException)
+        {
+            return new RuntimeTransportSummary(false, false, 0, 0);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID", previousPeerId);
+        }
+    }
+
+    private static NativeFacadeSet? TryCreateNativePeer(uint peerId)
+    {
+        Environment.SetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID", peerId.ToString(CultureInfo.InvariantCulture));
+        return NativeFacadeFactory.CreateNativeFacadeSet();
+    }
+
+    private static int CountMessageEvents(IReadOnlyList<NetEvent> events)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        int count = 0;
+        for (int i = 0; i < events.Count; i++)
+        {
+            if (events[i].Kind == NetEventKind.Message)
+            {
+                count++;
+            }
+        }
+
+        return count;
     }
 
     private static InMemoryNetSession CreateSession(int tickRate)
@@ -381,13 +457,20 @@ internal static class MultiplayerDemoArtifactGenerator
         {
             string.Format(
                 CultureInfo.InvariantCulture,
-                "seed={0} proceduralSeed={1} fixedDt={2:F6} tickRateHz={3} simulatedTicks={4} synchronized={5}",
+                "seed={0} proceduralSeed={1} fixedDt={2:F6} tickRateHz={3} simulatedTicks={4} synchronized={5} runtimeTransportEnabled={6} runtimeTransportSucceeded={7}",
                 summary.Seed,
                 summary.ProceduralSeed,
                 summary.FixedDeltaSeconds,
                 summary.TickRateHz,
                 summary.SimulatedTicks,
-                summary.Synchronized),
+                summary.Synchronized,
+                summary.RuntimeTransport.Enabled,
+                summary.RuntimeTransport.Succeeded),
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "runtime-transport serverMessages={0} clientMessages={1}",
+                summary.RuntimeTransport.ServerMessagesReceived,
+                summary.RuntimeTransport.ClientMessagesReceived),
             FormatStatsLine("server", summary.ServerStats)
         };
 
