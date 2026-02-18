@@ -3,7 +3,7 @@ using Engine.Core.Geometry;
 
 namespace Engine.UI;
 
-internal static class UiLayoutEngine
+internal static partial class UiLayoutEngine
 {
     public static void Apply(UiDocument document)
     {
@@ -35,8 +35,8 @@ internal static class UiLayoutEngine
 
         float effectiveX = localX ?? element.X;
         float effectiveY = localY ?? element.Y;
-        float effectiveWidth = widthOverride ?? element.Width;
-        float effectiveHeight = heightOverride ?? element.Height;
+        float effectiveWidth = widthOverride ?? ResolveAnchoredWidth(element, effectiveX, element.Width, parentContentWidth);
+        float effectiveHeight = heightOverride ?? ResolveAnchoredHeight(element, effectiveY, element.Height, parentContentHeight);
         float clampedWidth = ClampDimension(effectiveWidth, element.MinWidth, element.MaxWidth);
         float clampedHeight = ClampDimension(effectiveHeight, element.MinHeight, element.MaxHeight);
         float absoluteX = parentContentX + ResolveAnchoredX(element, effectiveX, clampedWidth, parentContentWidth);
@@ -352,28 +352,6 @@ internal static class UiLayoutEngine
             clamped = Math.Min(clamped, max.Value);
         }
         return clamped;
-    }
-
-    private static float ResolveAnchoredX(UiElement element, float x, float width, float? parentContentWidth)
-    {
-        bool isRightAnchored = (element.Anchors & UiAnchor.Right) != 0;
-        bool isLeftAnchored = (element.Anchors & UiAnchor.Left) != 0;
-        if (!parentContentWidth.HasValue || !isRightAnchored || isLeftAnchored)
-        {
-            return x + element.Margin.Left;
-        }
-        return parentContentWidth.Value - width - x - element.Margin.Right;
-    }
-
-    private static float ResolveAnchoredY(UiElement element, float y, float height, float? parentContentHeight)
-    {
-        bool isBottomAnchored = (element.Anchors & UiAnchor.Bottom) != 0;
-        bool isTopAnchored = (element.Anchors & UiAnchor.Top) != 0;
-        if (!parentContentHeight.HasValue || !isBottomAnchored || isTopAnchored)
-        {
-            return y + element.Margin.Top;
-        }
-        return parentContentHeight.Value - height - y - element.Margin.Bottom;
     }
 
     private sealed class FlexLine
