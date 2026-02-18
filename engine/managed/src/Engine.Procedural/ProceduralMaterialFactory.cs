@@ -115,18 +115,14 @@ public static class ProceduralMaterialFactory
         string metallicKey = $"{textureKeyPrefix}.metallic";
         string aoKey = $"{textureKeyPrefix}.ao";
 
-        ProceduralMaterial baseMaterial = MaterialTemplates.CreateLitPbr(albedoKey, normalKey, roughness, metallic);
-        var textureRefs = new Dictionary<string, string>(baseMaterial.TextureRefs, StringComparer.Ordinal)
-        {
-            ["roughness"] = roughnessKey,
-            ["metallic"] = metallicKey,
-            ["ao"] = aoKey
-        };
-        var material = new ProceduralMaterial(
-            Template: MaterialTemplateId.DffLitPbr,
-            Scalars: new Dictionary<string, float>(baseMaterial.Scalars, StringComparer.Ordinal),
-            Vectors: new Dictionary<string, Vector4>(baseMaterial.Vectors, StringComparer.Ordinal),
-            TextureRefs: textureRefs).Validate();
+        ProceduralMaterial material = MaterialTemplates.CreateLitPbr(
+            albedoKey,
+            normalKey,
+            roughness,
+            metallic,
+            roughnessKey,
+            metallicKey,
+            aoKey);
 
         IReadOnlyList<TextureMipLevel> albedoMips = CloneMipChain(surface.MipChain);
         IReadOnlyList<TextureMipLevel> normalMips = CloneMipChain(

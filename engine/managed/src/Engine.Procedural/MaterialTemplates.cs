@@ -34,6 +34,25 @@ public static class MaterialTemplates
 {
     public static ProceduralMaterial CreateLitPbr(string albedoTexture, string normalTexture, float roughness, float metallic)
     {
+        return CreateLitPbr(
+            albedoTexture,
+            normalTexture,
+            roughness,
+            metallic,
+            roughnessTexture: null,
+            metallicTexture: null,
+            ambientOcclusionTexture: null);
+    }
+
+    public static ProceduralMaterial CreateLitPbr(
+        string albedoTexture,
+        string normalTexture,
+        float roughness,
+        float metallic,
+        string? roughnessTexture,
+        string? metallicTexture,
+        string? ambientOcclusionTexture)
+    {
         ValidateTextureKey(albedoTexture, nameof(albedoTexture));
         ValidateTextureKey(normalTexture, nameof(normalTexture));
         if (roughness < 0f || roughness > 1f)
@@ -46,6 +65,15 @@ public static class MaterialTemplates
             throw new ArgumentOutOfRangeException(nameof(metallic), "Metallic must be within [0,1].");
         }
 
+        var textureRefs = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["albedo"] = albedoTexture,
+            ["normal"] = normalTexture
+        };
+        AddOptionalTextureRef(textureRefs, "roughness", roughnessTexture);
+        AddOptionalTextureRef(textureRefs, "metallic", metallicTexture);
+        AddOptionalTextureRef(textureRefs, "ao", ambientOcclusionTexture);
+
         return new ProceduralMaterial(
             Template: MaterialTemplateId.DffLitPbr,
             Scalars: new Dictionary<string, float>(StringComparer.Ordinal)
@@ -57,11 +85,7 @@ public static class MaterialTemplates
             {
                 ["baseColor"] = Vector4.One
             },
-            TextureRefs: new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["albedo"] = albedoTexture,
-                ["normal"] = normalTexture
-            }).Validate();
+            TextureRefs: textureRefs).Validate();
     }
 
     public static ProceduralMaterial CreateUnlit(Vector4 color)
@@ -115,5 +139,25 @@ public static class MaterialTemplates
         {
             throw new ArgumentException("Texture key cannot be empty.", paramName);
         }
+    }
+
+    private static void AddOptionalTextureRef(
+        Dictionary<string, string> textureRefs,
+        string slot,
+        string? textureKey)
+    {
+        if (textureKey is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(textureKey))
+        {
+            throw new ArgumentException(
+                $"Texture key for slot '{slot}' cannot be empty when provided.",
+                nameof(textureKey));
+        }
+
+        textureRefs[slot] = textureKey;
     }
 }
