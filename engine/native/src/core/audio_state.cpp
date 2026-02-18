@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <new>
 
@@ -9,12 +11,28 @@ namespace dff::native {
 
 namespace {
 
+constexpr uint32_t kSoundBlobMagic = 0x424E5344u;  // DSNB
+constexpr uint32_t kSoundBlobVersion = 1u;
+
 bool IsDirectionValid(const std::array<float, 3>& direction) {
   constexpr float kEpsilon = 1e-6f;
   const float sqr_length = direction[0] * direction[0] +
                            direction[1] * direction[1] +
                            direction[2] * direction[2];
   return std::isfinite(sqr_length) && sqr_length > kEpsilon;
+}
+
+bool IsValidSoundBlob(const void* data, size_t size) {
+  if (data == nullptr || size < sizeof(uint32_t) * 2u) {
+    return false;
+  }
+
+  uint32_t magic = 0u;
+  uint32_t version = 0u;
+  std::memcpy(&magic, data, sizeof(uint32_t));
+  std::memcpy(&version, static_cast<const uint8_t*>(data) + sizeof(uint32_t),
+              sizeof(uint32_t));
+  return magic == kSoundBlobMagic && version == kSoundBlobVersion;
 }
 
 }  // namespace
@@ -58,6 +76,9 @@ engine_native_status_t AudioState::CreateSoundFromBlob(
 
   *out_sound = kInvalidResourceHandle;
   if (data == nullptr || size == 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (!IsValidSoundBlob(data, size)) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 

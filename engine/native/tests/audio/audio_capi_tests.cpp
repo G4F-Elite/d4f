@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <vector>
 
 #include "bridge_capi/bridge_state.h"
 #include "engine_native.h"
@@ -17,6 +18,37 @@ engine_native_engine_t* CreateEngine() {
   assert(engine_create(&create_desc, &engine) == ENGINE_NATIVE_STATUS_OK);
   assert(engine != nullptr);
   return engine;
+}
+
+template <typename T>
+void AppendValue(std::vector<uint8_t>* bytes, const T& value) {
+  const auto* raw = reinterpret_cast<const uint8_t*>(&value);
+  bytes->insert(bytes->end(), raw, raw + sizeof(T));
+}
+
+std::vector<uint8_t> CreateValidSoundBlob() {
+  constexpr uint32_t kMagic = 0x424E5344u;      // DSNB
+  constexpr uint32_t kVersion = 1u;
+  constexpr int32_t kSampleRate = 48000;
+  constexpr int32_t kChannels = 1;
+  constexpr uint32_t kEncoding = 100u;          // SourceEncoded
+  constexpr int32_t kLoopStart = -1;
+  constexpr int32_t kLoopEnd = -1;
+  constexpr int32_t kPayloadSize = 4;
+  const uint8_t payload[4]{1u, 2u, 3u, 4u};
+
+  std::vector<uint8_t> bytes;
+  bytes.reserve(4u * 8u + sizeof(payload));
+  AppendValue(&bytes, kMagic);
+  AppendValue(&bytes, kVersion);
+  AppendValue(&bytes, kSampleRate);
+  AppendValue(&bytes, kChannels);
+  AppendValue(&bytes, kEncoding);
+  AppendValue(&bytes, kLoopStart);
+  AppendValue(&bytes, kLoopEnd);
+  AppendValue(&bytes, kPayloadSize);
+  bytes.insert(bytes.end(), payload, payload + sizeof(payload));
+  return bytes;
 }
 
 void TestEngineGetAudioValidation() {
@@ -38,28 +70,33 @@ void TestAudioSoundLifecycleAndPlayback() {
   engine_native_audio_t* audio = nullptr;
   assert(engine_get_audio(engine, &audio) == ENGINE_NATIVE_STATUS_OK);
 
-  uint8_t sound_blob[8]{1u, 2u, 3u, 4u, 5u, 6u, 7u, 8u};
+  const std::vector<uint8_t> sound_blob = CreateValidSoundBlob();
+  uint8_t invalid_sound_blob[8]{0u};
   engine_native_resource_handle_t sound = 0u;
 
   assert(audio_create_sound_from_blob(nullptr,
-                                      sound_blob,
-                                      sizeof(sound_blob),
+                                      sound_blob.data(),
+                                      sound_blob.size(),
                                       &sound) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(audio_create_sound_from_blob(audio,
                                       nullptr,
-                                      sizeof(sound_blob),
+                                      sound_blob.size(),
                                       &sound) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(audio_create_sound_from_blob(audio,
-                                      sound_blob,
+                                      sound_blob.data(),
                                       0u,
                                       &sound) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(audio_create_sound_from_blob(audio,
-                                      sound_blob,
-                                      sizeof(sound_blob),
+                                      sound_blob.data(),
+                                      sound_blob.size(),
                                       nullptr) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(audio_create_sound_from_blob(audio,
-                                      sound_blob,
-                                      sizeof(sound_blob),
+                                      invalid_sound_blob,
+                                      sizeof(invalid_sound_blob),
+                                      &sound) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(audio_create_sound_from_blob(audio,
+                                      sound_blob.data(),
+                                      sound_blob.size(),
                                       &sound) == ENGINE_NATIVE_STATUS_OK);
   assert(sound != 0u);
   assert(internal_engine->state.audio.sound_count() == 1u);
@@ -117,9 +154,9 @@ void TestAudioListenerAndEmitterUpdates() {
   engine_native_audio_t* audio = nullptr;
   assert(engine_get_audio(engine, &audio) == ENGINE_NATIVE_STATUS_OK);
 
-  uint8_t sound_blob[4]{9u, 8u, 7u, 6u};
+  const std::vector<uint8_t> sound_blob = CreateValidSoundBlob();
   engine_native_resource_handle_t sound = 0u;
-  assert(audio_create_sound_from_blob(audio, sound_blob, sizeof(sound_blob), &sound) ==
+  assert(audio_create_sound_from_blob(audio, sound_blob.data(), sound_blob.size(), &sound) ==
          ENGINE_NATIVE_STATUS_OK);
 
   engine_native_audio_play_desc_t play_desc{};

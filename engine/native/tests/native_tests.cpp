@@ -1,6 +1,7 @@
 #include <assert.h>
 
 #include <cstdint>
+#include <cstring>
 #include <cmath>
 #include <initializer_list>
 #include <string>
@@ -28,6 +29,92 @@ void AssertPassOrder(const std::vector<std::string>& actual,
     assert(actual[index] == expected_name);
     ++index;
   }
+}
+
+template <typename T>
+void AppendValue(std::vector<uint8_t>* bytes, const T& value) {
+  const auto* raw = reinterpret_cast<const uint8_t*>(&value);
+  bytes->insert(bytes->end(), raw, raw + sizeof(T));
+}
+
+std::vector<uint8_t> CreateValidMeshBlob() {
+  constexpr uint32_t kMagic = 0x424D4644u;    // DFMB
+  constexpr uint32_t kVersion = 1u;
+  constexpr uint32_t kIndexFormat = 2u;       // UInt32
+  constexpr uint32_t kSourceKind = 1u;
+  const uint8_t source_payload[4]{1u, 2u, 3u, 4u};
+  constexpr int32_t kZero = 0;
+  constexpr float kBounds = 0.0f;
+  constexpr int32_t kSourcePayloadSize = 4;
+
+  std::vector<uint8_t> bytes;
+  bytes.reserve(4u * 10u + 6u * sizeof(float) + sizeof(source_payload));
+  AppendValue(&bytes, kMagic);
+  AppendValue(&bytes, kVersion);
+  AppendValue(&bytes, kZero);            // vertexCount
+  AppendValue(&bytes, kZero);            // streamCount
+  AppendValue(&bytes, kIndexFormat);     // indexFormat
+  AppendValue(&bytes, kZero);            // indexDataSize
+  AppendValue(&bytes, kZero);            // submeshCount
+  for (int i = 0; i < 6; ++i) {
+    AppendValue(&bytes, kBounds);
+  }
+  AppendValue(&bytes, kZero);               // lodCount
+  AppendValue(&bytes, kSourceKind);         // sourceKind
+  AppendValue(&bytes, kSourcePayloadSize);  // sourcePayloadSize
+  bytes.insert(bytes.end(), source_payload,
+               source_payload + sizeof(source_payload));
+  return bytes;
+}
+
+std::vector<uint8_t> CreateValidTextureBlob() {
+  constexpr uint32_t kMagic = 0x42544644u;      // DFTB
+  constexpr uint32_t kVersion = 1u;
+  constexpr uint32_t kFormat = 100u;            // SourcePng
+  constexpr uint32_t kColorSpace = 1u;          // Srgb
+  constexpr int32_t kWidth = 1;
+  constexpr int32_t kHeight = 1;
+  constexpr int32_t kMipCount = 1;
+  constexpr int32_t kRowPitch = 0;
+  constexpr int32_t kPayloadSize = 1;
+  const uint8_t payload[1]{0x89u};
+
+  std::vector<uint8_t> bytes;
+  bytes.reserve(4u * 11u + sizeof(payload));
+  AppendValue(&bytes, kMagic);
+  AppendValue(&bytes, kVersion);
+  AppendValue(&bytes, kFormat);
+  AppendValue(&bytes, kColorSpace);
+  AppendValue(&bytes, kWidth);
+  AppendValue(&bytes, kHeight);
+  AppendValue(&bytes, kMipCount);
+  AppendValue(&bytes, kWidth);
+  AppendValue(&bytes, kHeight);
+  AppendValue(&bytes, kRowPitch);
+  AppendValue(&bytes, kPayloadSize);
+  bytes.insert(bytes.end(), payload, payload + sizeof(payload));
+  return bytes;
+}
+
+std::vector<uint8_t> CreateValidMaterialBlob() {
+  constexpr uint32_t kMagic = 0x424D4144u;    // DAMB
+  constexpr uint32_t kVersion = 1u;
+  constexpr uint8_t kTemplateLength = 1u;
+  constexpr char kTemplate = 'T';
+  constexpr int32_t kParameterBlockSize = 1;
+  constexpr uint8_t kParameter = 0xAAu;
+  constexpr int32_t kTextureRefCount = 0;
+
+  std::vector<uint8_t> bytes;
+  bytes.reserve(32u);
+  AppendValue(&bytes, kMagic);
+  AppendValue(&bytes, kVersion);
+  AppendValue(&bytes, kTemplateLength);      // 7-bit encoded length for "T"
+  AppendValue(&bytes, kTemplate);            // template string bytes
+  AppendValue(&bytes, kParameterBlockSize);
+  AppendValue(&bytes, kParameter);
+  AppendValue(&bytes, kTextureRefCount);
+  return bytes;
 }
 
 void TestEngineCreateValidation() {
@@ -442,28 +529,35 @@ void TestRendererResourceBlobLifecycle() {
   engine_native_resource_handle_t texture = 0u;
   engine_native_resource_handle_t texture_from_cpu = 0u;
   engine_native_resource_handle_t material = 0u;
-  uint8_t mesh_blob[6]{1u, 2u, 3u, 4u, 5u, 6u};
-  uint8_t texture_blob[5]{6u, 5u, 4u, 3u, 2u};
-  uint8_t material_blob[4]{9u, 8u, 7u, 6u};
+  const std::vector<uint8_t> mesh_blob = CreateValidMeshBlob();
+  const std::vector<uint8_t> texture_blob = CreateValidTextureBlob();
+  const std::vector<uint8_t> material_blob = CreateValidMaterialBlob();
+  uint8_t invalid_blob[8]{0u};
 
-  assert(renderer_create_mesh_from_blob(nullptr, mesh_blob, sizeof(mesh_blob), &mesh) ==
+  assert(renderer_create_mesh_from_blob(nullptr, mesh_blob.data(), mesh_blob.size(), &mesh) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
-  assert(renderer_create_mesh_from_blob(renderer, nullptr, sizeof(mesh_blob), &mesh) ==
+  assert(renderer_create_mesh_from_blob(renderer, nullptr, mesh_blob.size(), &mesh) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
-  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, 0u, &mesh) ==
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob.data(), 0u, &mesh) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
-  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, sizeof(mesh_blob), nullptr) ==
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob.data(), mesh_blob.size(), nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
-  assert(renderer_create_mesh_from_blob(renderer, mesh_blob, sizeof(mesh_blob), &mesh) ==
+  assert(renderer_create_mesh_from_blob(renderer, invalid_blob, sizeof(invalid_blob), &mesh) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_create_mesh_from_blob(renderer, mesh_blob.data(), mesh_blob.size(), &mesh) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(mesh != 0u);
 
   assert(renderer_create_texture_from_blob(renderer,
-                                           texture_blob,
-                                           sizeof(texture_blob),
+                                           texture_blob.data(),
+                                           texture_blob.size(),
                                            &texture) == ENGINE_NATIVE_STATUS_OK);
   assert(texture != 0u);
   assert(texture != mesh);
+  assert(renderer_create_texture_from_blob(renderer,
+                                           invalid_blob,
+                                           sizeof(invalid_blob),
+                                           &texture) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   float positions[9]{0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f};
   uint32_t indices[3]{0u, 1u, 2u};
@@ -496,12 +590,16 @@ void TestRendererResourceBlobLifecycle() {
   assert(texture_from_cpu != texture);
 
   assert(renderer_create_material_from_blob(renderer,
-                                            material_blob,
-                                            sizeof(material_blob),
+                                            material_blob.data(),
+                                            material_blob.size(),
                                             &material) == ENGINE_NATIVE_STATUS_OK);
   assert(material != 0u);
   assert(material != mesh);
   assert(material != texture);
+  assert(renderer_create_material_from_blob(renderer,
+                                            invalid_blob,
+                                            sizeof(invalid_blob),
+                                            &material) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
   assert(internal_engine->state.renderer.resource_count() == 5u);

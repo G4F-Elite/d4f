@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <new>
 #include <string>
@@ -20,6 +21,12 @@ constexpr uint8_t kPhysicsBodyTypeKinematic = 2u;
 constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
+constexpr uint32_t kBlobVersion = 1u;
+constexpr uint32_t kMeshBlobMagic = 0x424D4644u;      // DFMB
+constexpr uint32_t kTextureBlobMagic = 0x42544644u;   // DFTB
+constexpr uint32_t kMaterialBlobMagic = 0x424D4144u;  // DAMB
+constexpr uint32_t kMeshCpuMagic = 0x4D435031u;       // MCP1
+constexpr uint32_t kTextureCpuMagic = 0x54435031u;    // TCP1
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
@@ -91,6 +98,67 @@ uint32_t ExtractMaterialFeatureFlags(
 uint64_t ComposePipelineKey(engine_native_resource_handle_t material,
                             const render::ShaderVariantKey& variant) {
   return (material << 32u) ^ static_cast<uint64_t>(variant.value);
+}
+
+bool TryReadU32(const void* data,
+                size_t size,
+                size_t offset,
+                uint32_t* out_value) {
+  if (data == nullptr || out_value == nullptr ||
+      offset > size ||
+      size - offset < sizeof(uint32_t)) {
+    return false;
+  }
+
+  uint32_t value = 0u;
+  std::memcpy(&value, static_cast<const uint8_t*>(data) + offset,
+              sizeof(uint32_t));
+  *out_value = value;
+  return true;
+}
+
+bool HasMagicAndVersion(const void* data,
+                        size_t size,
+                        uint32_t expected_magic,
+                        uint32_t expected_version) {
+  uint32_t magic = 0u;
+  uint32_t version = 0u;
+  return TryReadU32(data, size, 0u, &magic) &&
+         TryReadU32(data, size, sizeof(uint32_t), &version) &&
+         magic == expected_magic && version == expected_version;
+}
+
+bool IsValidResourceBlob(RendererState::ResourceKind kind,
+                         const void* data,
+                         size_t size) {
+  if (data == nullptr || size == 0u) {
+    return false;
+  }
+
+  switch (kind) {
+    case RendererState::ResourceKind::kMesh: {
+      if (HasMagicAndVersion(data, size, kMeshBlobMagic, kBlobVersion)) {
+        return true;
+      }
+
+      uint32_t magic = 0u;
+      return TryReadU32(data, size, 0u, &magic) && magic == kMeshCpuMagic &&
+             size >= sizeof(uint32_t) * 3u;
+    }
+    case RendererState::ResourceKind::kTexture: {
+      if (HasMagicAndVersion(data, size, kTextureBlobMagic, kBlobVersion)) {
+        return true;
+      }
+
+      uint32_t magic = 0u;
+      return TryReadU32(data, size, 0u, &magic) && magic == kTextureCpuMagic &&
+             size >= sizeof(uint32_t) * 4u;
+    }
+    case RendererState::ResourceKind::kMaterial:
+      return HasMagicAndVersion(data, size, kMaterialBlobMagic, kBlobVersion);
+  }
+
+  return false;
 }
 
 }  // namespace
@@ -338,7 +406,6 @@ engine_native_status_t RendererState::CreateMeshFromCpu(
   }
   const size_t index_bytes = index_count * sizeof(uint32_t);
 
-  constexpr uint32_t kMeshCpuMagic = 0x4D435031u;  // "MCP1"
   std::vector<uint8_t> encoded_blob;
   try {
     encoded_blob.reserve(sizeof(kMeshCpuMagic) + sizeof(uint32_t) * 2u +
@@ -402,7 +469,6 @@ engine_native_status_t RendererState::CreateTextureFromCpu(
   }
 
   const size_t payload_bytes = row_bytes * row_count;
-  constexpr uint32_t kTextureCpuMagic = 0x54435031u;  // "TCP1"
   std::vector<uint8_t> encoded_blob;
   try {
     encoded_blob.reserve(sizeof(kTextureCpuMagic) + sizeof(uint32_t) * 3u +
@@ -469,6 +535,9 @@ engine_native_status_t RendererState::CreateResourceFromBlob(
   *out_handle = kInvalidResourceHandle;
 
   if (data == nullptr || size == 0u) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+  if (!IsValidResourceBlob(kind, data, size)) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
