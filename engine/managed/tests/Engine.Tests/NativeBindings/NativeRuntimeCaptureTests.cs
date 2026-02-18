@@ -56,8 +56,30 @@ public sealed class NativeRuntimeCaptureTests
 
         Assert.Contains("not ready", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(1, backend.CountCall("capture_request"));
-        Assert.Equal(1, backend.CountCall("capture_poll"));
+        Assert.True(backend.CountCall("capture_poll") > 1);
         Assert.Equal(0, backend.CountCall("capture_free_result"));
+    }
+
+    [Fact]
+    public void CaptureFrameRgba8_RetriesPollUntilCaptureBecomesReady()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            CapturePollsBeforeReady = 2,
+            CaptureResultWidthToReturn = 1u,
+            CaptureResultHeightToReturn = 1u,
+            CaptureResultStrideToReturn = 4u,
+            CaptureResultFormatToReturn = (uint)EngineNativeCaptureFormat.Rgba8Unorm,
+            CapturePixelsToReturn = [17, 33, 65, 255]
+        };
+
+        using var runtime = new NativeRuntime(backend);
+
+        byte[] pixels = runtime.CaptureFrameRgba8(1u, 1u);
+
+        Assert.Equal([17, 33, 65, 255], pixels);
+        Assert.Equal(3, backend.CountCall("capture_poll"));
+        Assert.Equal(1, backend.CountCall("capture_free_result"));
     }
 
     [Fact]

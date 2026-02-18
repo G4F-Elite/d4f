@@ -63,6 +63,7 @@ engine_native_status_t CaptureStore::QueueCapture(
   pending.width = request.width;
   pending.height = request.height;
   pending.stride = static_cast<uint32_t>(stride);
+  pending.polls_until_ready = 1u;
 
   try {
     pending.pixels.assign(pixel_bytes, static_cast<uint8_t>(0u));
@@ -121,6 +122,11 @@ engine_native_status_t CaptureStore::PollCapture(
     auto it = pending_.find(request_id);
     if (it == pending_.end()) {
       return ENGINE_NATIVE_STATUS_NOT_FOUND;
+    }
+
+    if (it->second.polls_until_ready > 0u) {
+      --it->second.polls_until_ready;
+      return ENGINE_NATIVE_STATUS_OK;
     }
 
     pending = std::move(it->second);

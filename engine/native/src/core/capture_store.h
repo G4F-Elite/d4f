@@ -35,6 +35,7 @@ class CaptureStore {
     uint32_t width = 0u;
     uint32_t height = 0u;
     uint32_t stride = 0u;
+    uint32_t polls_until_ready = 1u;
     std::vector<uint8_t> pixels;
   };
 

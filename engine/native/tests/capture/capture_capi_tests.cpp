@@ -47,6 +47,10 @@ void TestCaptureFlowAndValidation() {
   engine_native_capture_result_t result{};
   uint8_t is_ready = 0u;
   assert(capture_poll(request_id, &result, &is_ready) == ENGINE_NATIVE_STATUS_OK);
+  assert(is_ready == 0u);
+  assert(result.pixels == nullptr);
+
+  assert(capture_poll(request_id, &result, &is_ready) == ENGINE_NATIVE_STATUS_OK);
   assert(is_ready == 1u);
   assert(result.width == 4u);
   assert(result.height == 2u);

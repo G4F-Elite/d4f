@@ -133,6 +133,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public byte CapturePollReadyToReturn { get; set; } = 1;
 
+    public int CapturePollsBeforeReady { get; set; }
+
     public uint CaptureResultWidthToReturn { get; set; } = 1u;
 
     public uint CaptureResultHeightToReturn { get; set; } = 1u;
@@ -438,6 +440,12 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         if (CapturePollStatus != EngineNativeStatus.Ok)
         {
             return CapturePollStatus;
+        }
+
+        if (CapturePollsBeforeReady > 0)
+        {
+            CapturePollsBeforeReady--;
+            return EngineNativeStatus.Ok;
         }
 
         if (CapturePollReadyToReturn == 0)

@@ -6,6 +6,8 @@ namespace Engine.NativeBindings.Internal;
 
 internal sealed partial class NativeRuntime
 {
+    private const int MaxCapturePollAttempts = 32;
+
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
     {
         if (width == 0u)
@@ -44,16 +46,25 @@ internal sealed partial class NativeRuntime
 
         try
         {
-            NativeStatusGuard.ThrowIfFailed(
-                _interop.CapturePoll(requestId, out result, out var isReady),
-                "capture_poll");
-
-            if (isReady == 0u)
+            for (int attempt = 0; attempt < MaxCapturePollAttempts; attempt++)
             {
-                throw new InvalidOperationException($"Capture request '{requestId}' is not ready.");
+                NativeStatusGuard.ThrowIfFailed(
+                    _interop.CapturePoll(requestId, out result, out var isReady),
+                    "capture_poll");
+
+                if (isReady != 0u)
+                {
+                    hasCaptureResult = true;
+                    break;
+                }
             }
 
-            hasCaptureResult = true;
+            if (!hasCaptureResult)
+            {
+                throw new InvalidOperationException(
+                    $"Capture request '{requestId}' is not ready after {MaxCapturePollAttempts} poll attempts.");
+            }
+
             ValidateCaptureResult(result);
 
             if (result.Format != (uint)EngineNativeCaptureFormat.Rgba8Unorm)
