@@ -53,6 +53,10 @@ public sealed class UiPreviewHost
 
     public void QueueTextInput(string text) => _facade.QueueTextInput(text);
 
+    public void QueueKeyDown(UiKey key) => _facade.QueueKeyDown(key);
+
+    public void QueueKeyUp(UiKey key) => _facade.QueueKeyUp(key);
+
     public void QueueBackspace() => _facade.QueueBackspace();
 
     private bool TryGetRenderBatch(out UiRenderBatch renderBatch)

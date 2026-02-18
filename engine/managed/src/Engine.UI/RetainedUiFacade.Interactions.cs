@@ -34,6 +34,12 @@ public sealed partial class RetainedUiFacade
                 case UiInteractionKind.TextInput:
                     DispatchTextInput(interaction.Text);
                     break;
+                case UiInteractionKind.KeyDown:
+                    DispatchKeyDown(interaction.Key);
+                    break;
+                case UiInteractionKind.KeyUp:
+                    DispatchKeyUp(interaction.Key);
+                    break;
                 case UiInteractionKind.Backspace:
                     DispatchBackspace();
                     break;

@@ -40,6 +40,8 @@ public sealed class UiPreviewHostTests
     {
         var pointerDownCount = 0;
         var pointerUpCount = 0;
+        var keyDownCount = 0;
+        var keyUpCount = 0;
         var document = new UiDocument();
         var root = new UiPanel("root", new TextureHandle(10))
         {
@@ -60,7 +62,9 @@ public sealed class UiPreviewHostTests
             X = 10,
             Y = 40,
             Width = 100,
-            Height = 20
+            Height = 20,
+            OnKeyDown = _ => keyDownCount++,
+            OnKeyUp = _ => keyUpCount++
         };
         root.AddChild(toggle);
         root.AddChild(input);
@@ -73,6 +77,8 @@ public sealed class UiPreviewHostTests
         host.QueuePointerClick(15, 15);
         host.QueuePointerClick(15, 45);
         host.QueueTextInput("abc");
+        host.QueueKeyDown(UiKey.Enter);
+        host.QueueKeyUp(UiKey.Enter);
         host.QueueBackspace();
         host.BuildDrawData(new FrameTiming(0, TimeSpan.Zero, TimeSpan.Zero));
 
@@ -82,6 +88,8 @@ public sealed class UiPreviewHostTests
         Assert.True(toggle.IsHovered);
         Assert.Equal(1, pointerDownCount);
         Assert.Equal(1, pointerUpCount);
+        Assert.Equal(1, keyDownCount);
+        Assert.Equal(1, keyUpCount);
     }
 
     [Fact]

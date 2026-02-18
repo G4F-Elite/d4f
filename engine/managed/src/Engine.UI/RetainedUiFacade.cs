@@ -140,6 +140,26 @@ public sealed partial class RetainedUiFacade : IUiFacade
         _queuedInteractions.Enqueue(UiQueuedInteraction.CreateTextInput(text));
     }
 
+    public void QueueKeyDown(UiKey key)
+    {
+        if (!Enum.IsDefined(key))
+        {
+            throw new ArgumentOutOfRangeException(nameof(key), key, "Unsupported key value.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreateKeyDown(key));
+    }
+
+    public void QueueKeyUp(UiKey key)
+    {
+        if (!Enum.IsDefined(key))
+        {
+            throw new ArgumentOutOfRangeException(nameof(key), key, "Unsupported key value.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreateKeyUp(key));
+    }
+
     public void QueueBackspace()
     {
         _queuedInteractions.Enqueue(UiQueuedInteraction.CreateBackspace());

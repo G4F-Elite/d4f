@@ -228,6 +228,10 @@ public abstract class UiElement
 
     public Action<float, float>? OnPointerMove { get; set; }
 
+    public Action<UiKey>? OnKeyDown { get; set; }
+
+    public Action<UiKey>? OnKeyUp { get; set; }
+
     public RectF LayoutBounds { get; private set; } = RectF.Empty;
 
     public UiElement? Parent { get; private set; }
@@ -305,5 +309,15 @@ public abstract class UiElement
     internal void InvokePointerUp(float pointerX, float pointerY)
     {
         OnPointerUp?.Invoke(pointerX, pointerY);
+    }
+
+    internal void InvokeKeyDown(UiKey key)
+    {
+        OnKeyDown?.Invoke(key);
+    }
+
+    internal void InvokeKeyUp(UiKey key)
+    {
+        OnKeyUp?.Invoke(key);
     }
 }
