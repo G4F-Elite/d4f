@@ -1,5 +1,7 @@
 #include "bridge_capi/handle_registry.h"
 
+#include <cstring>
+
 namespace {
 
 engine_native_status_t ResolveEngine(
@@ -170,7 +172,11 @@ engine_native_status_t content_mount_pak_handle(
     return resolve_status;
   }
 
-  return content_mount_pak(raw_engine, pak_path);
+  const engine_native_string_view_t pak_path_view{
+      .data = pak_path,
+      .length = pak_path == nullptr ? 0u : std::strlen(pak_path),
+  };
+  return content_mount_pak_view(raw_engine, pak_path_view);
 }
 
 engine_native_status_t content_mount_directory_handle(
@@ -183,7 +189,11 @@ engine_native_status_t content_mount_directory_handle(
     return resolve_status;
   }
 
-  return content_mount_directory(raw_engine, directory_path);
+  const engine_native_string_view_t directory_path_view{
+      .data = directory_path,
+      .length = directory_path == nullptr ? 0u : std::strlen(directory_path),
+  };
+  return content_mount_directory_view(raw_engine, directory_path_view);
 }
 
 engine_native_status_t content_read_file_handle(
@@ -199,7 +209,55 @@ engine_native_status_t content_read_file_handle(
     return resolve_status;
   }
 
-  return content_read_file(raw_engine, asset_path, buffer, buffer_size, out_size);
+  const engine_native_string_view_t asset_path_view{
+      .data = asset_path,
+      .length = asset_path == nullptr ? 0u : std::strlen(asset_path),
+  };
+  return content_read_file_view(raw_engine, asset_path_view, buffer, buffer_size,
+                                out_size);
+}
+
+engine_native_status_t content_mount_pak_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t pak_path) {
+  engine_native_engine_t* raw_engine = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveEngine(engine, &raw_engine);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return content_mount_pak_view(raw_engine, pak_path);
+}
+
+engine_native_status_t content_mount_directory_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t directory_path) {
+  engine_native_engine_t* raw_engine = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveEngine(engine, &raw_engine);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return content_mount_directory_view(raw_engine, directory_path);
+}
+
+engine_native_status_t content_read_file_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t asset_path,
+    void* buffer,
+    size_t buffer_size,
+    size_t* out_size) {
+  engine_native_engine_t* raw_engine = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveEngine(engine, &raw_engine);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return content_read_file_view(raw_engine, asset_path, buffer, buffer_size,
+                                out_size);
 }
 
 }  // extern "C"

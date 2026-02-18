@@ -232,6 +232,27 @@ if(BUILD_TESTING)
 
   add_test(NAME dff_native_net_tests COMMAND dff_native_net_tests)
 
+  add_executable(dff_native_content_capi_tests
+    tests/content/content_string_view_capi_tests.cpp
+  )
+
+  target_compile_features(dff_native_content_capi_tests PRIVATE cxx_std_20)
+
+  target_include_directories(dff_native_content_capi_tests PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests
+  )
+
+  target_link_libraries(dff_native_content_capi_tests PRIVATE dff_native)
+
+  if(MSVC)
+    set_target_properties(dff_native_content_capi_tests PROPERTIES
+      MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+  endif()
+
+  add_test(NAME dff_native_content_capi_tests COMMAND dff_native_content_capi_tests)
+
   add_executable(dff_native_handle_tests
     tests/handle/handle_capi_tests.cpp
   )

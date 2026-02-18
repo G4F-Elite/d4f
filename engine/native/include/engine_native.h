@@ -63,6 +63,11 @@ typedef struct engine_native_window_events {
   uint32_t height;
 } engine_native_window_events_t;
 
+typedef struct engine_native_string_view {
+  const char* data;
+  size_t length;
+} engine_native_string_view_t;
+
 typedef struct engine_native_draw_item {
   engine_native_resource_handle_t mesh;
   engine_native_resource_handle_t material;
@@ -362,6 +367,21 @@ ENGINE_NATIVE_API engine_native_status_t content_read_file(
     size_t buffer_size,
     size_t* out_size);
 
+ENGINE_NATIVE_API engine_native_status_t content_mount_pak_view(
+    engine_native_engine_t* engine,
+    engine_native_string_view_t pak_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_directory_view(
+    engine_native_engine_t* engine,
+    engine_native_string_view_t directory_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_read_file_view(
+    engine_native_engine_t* engine,
+    engine_native_string_view_t asset_path,
+    void* buffer,
+    size_t buffer_size,
+    size_t* out_size);
+
 ENGINE_NATIVE_API engine_native_status_t renderer_begin_frame(
     engine_native_renderer_t* renderer,
     size_t requested_bytes,
@@ -535,6 +555,21 @@ ENGINE_NATIVE_API engine_native_status_t content_mount_directory_handle(
 ENGINE_NATIVE_API engine_native_status_t content_read_file_handle(
     engine_native_engine_handle_t engine,
     const char* asset_path,
+    void* buffer,
+    size_t buffer_size,
+    size_t* out_size);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_pak_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t pak_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_mount_directory_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t directory_path);
+
+ENGINE_NATIVE_API engine_native_status_t content_read_file_view_handle(
+    engine_native_engine_handle_t engine,
+    engine_native_string_view_t asset_path,
     void* buffer,
     size_t buffer_size,
     size_t* out_size);
