@@ -21,6 +21,7 @@ public sealed class EngineCliTestCaptureOptionsTests
                 "test",
                 "--project", tempRoot,
                 "--out", "artifacts/tests",
+                "--host", "hidden-window",
                 "--capture-frame", "12",
                 "--seed", "9001",
                 "--fixed-dt", "0.02"
@@ -39,9 +40,11 @@ public sealed class EngineCliTestCaptureOptionsTests
             string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
             string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
             string renderStatsPath = Path.Combine(artifactsRoot, "render", "frame-stats.json");
+            string hostConfigPath = Path.Combine(artifactsRoot, "runtime", "test-host.json");
             Assert.True(File.Exists(multiplayerPath));
             Assert.True(File.Exists(profileLogPath));
             Assert.True(File.Exists(renderStatsPath));
+            Assert.True(File.Exists(hostConfigPath));
 
             string replayPath = Path.Combine(artifactsRoot, "replay", "recording.json");
             Assert.True(File.Exists(replayPath));
@@ -95,6 +98,9 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(renderStatsRoot.GetProperty("triangleCount").GetUInt64() > 0);
             Assert.True(renderStatsRoot.GetProperty("uploadBytes").GetUInt64() > 0);
             Assert.True(renderStatsRoot.GetProperty("gpuMemoryBytes").GetUInt64() > 0);
+            using JsonDocument hostConfigJson = JsonDocument.Parse(File.ReadAllText(hostConfigPath));
+            Assert.Equal("hidden-window", hostConfigJson.RootElement.GetProperty("mode").GetString());
+            Assert.Equal(0.02, hostConfigJson.RootElement.GetProperty("fixedDeltaSeconds").GetDouble(), 6);
 
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
             using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
@@ -117,6 +123,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "render-stats-log",
                     StringComparison.Ordinal));
             Assert.True(hasRenderStatsLog);
+            bool hasHostConfig = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "test-host-config",
+                    StringComparison.Ordinal));
+            Assert.True(hasHostConfig);
         }
         finally
         {

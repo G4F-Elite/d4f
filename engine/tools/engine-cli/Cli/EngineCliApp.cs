@@ -240,7 +240,8 @@ public sealed partial class EngineCliApp
         var generationOptions = new TestArtifactGenerationOptions(
             command.CaptureFrame,
             command.ReplaySeed,
-            command.FixedDeltaSeconds);
+            command.FixedDeltaSeconds,
+            command.HostMode);
         TestArtifactsOutput artifactsOutput = TestArtifactGenerator.Generate(artifactsDirectory, generationOptions);
 
         if (!string.IsNullOrWhiteSpace(command.GoldenDirectory))
@@ -280,6 +281,7 @@ public sealed partial class EngineCliApp
 
         _stdout.WriteLine($"Test artifacts created: {artifactsDirectory}");
         _stdout.WriteLine($"Test manifest created: {artifactsOutput.ManifestPath}");
+        _stdout.WriteLine($"Test host mode: {command.HostMode}");
 
         string renderStatsPath = Path.Combine(artifactsDirectory, "render", "frame-stats.json");
         if (File.Exists(renderStatsPath))

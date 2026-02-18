@@ -120,6 +120,7 @@ public sealed class EngineCliParserTests
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
         Assert.Equal(Path.Combine("game", "artifacts", "tests"), command.ArtifactsDirectory);
         Assert.Equal("Debug", command.Configuration);
+        Assert.Equal(TestHostMode.HeadlessOffscreen, command.HostMode);
         Assert.Null(command.GoldenDirectory);
         Assert.False(command.PixelPerfectGolden);
         Assert.Equal(1, command.CaptureFrame);
@@ -152,6 +153,7 @@ public sealed class EngineCliParserTests
         [
             "test",
             "--project", "game",
+            "--host", "hidden-window",
             "--capture-frame", "12",
             "--seed", "9001",
             "--fixed-dt", "0.0333333",
@@ -160,6 +162,7 @@ public sealed class EngineCliParserTests
         ]);
 
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
+        Assert.Equal(TestHostMode.HiddenWindow, command.HostMode);
         Assert.Equal(12, command.CaptureFrame);
         Assert.Equal(9001UL, command.ReplaySeed);
         Assert.Equal(0.0333333, command.FixedDeltaSeconds, 6);
@@ -214,6 +217,17 @@ public sealed class EngineCliParserTests
         ]);
         Assert.False(invalidPsnr.IsSuccess);
         Assert.Equal("Option '--psnr-threshold' must be a positive number.", invalidPsnr.Error);
+
+        EngineCliParseResult invalidHost = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--host", "windowed"
+        ]);
+        Assert.False(invalidHost.IsSuccess);
+        Assert.Equal(
+            "Option '--host' must be one of: headless, offscreen, headless-offscreen, hidden, hidden-window.",
+            invalidHost.Error);
     }
 
     [Fact]

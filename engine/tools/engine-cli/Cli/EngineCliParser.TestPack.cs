@@ -29,6 +29,33 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure(outError);
         }
 
+        TestHostMode hostMode = TestHostMode.HeadlessOffscreen;
+        if (options.TryGetValue("host", out string? hostValue))
+        {
+            if (string.IsNullOrWhiteSpace(hostValue))
+            {
+                return EngineCliParseResult.Failure("Option '--host' cannot be empty.");
+            }
+
+            if (string.Equals(hostValue, "headless", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(hostValue, "offscreen", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(hostValue, "headless-offscreen", StringComparison.OrdinalIgnoreCase))
+            {
+                hostMode = TestHostMode.HeadlessOffscreen;
+            }
+            else if (string.Equals(hostValue, "hidden", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(hostValue, "hidden-window", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(hostValue, "window-hidden", StringComparison.OrdinalIgnoreCase))
+            {
+                hostMode = TestHostMode.HiddenWindow;
+            }
+            else
+            {
+                return EngineCliParseResult.Failure(
+                    "Option '--host' must be one of: headless, offscreen, headless-offscreen, hidden, hidden-window.");
+            }
+        }
+
         string? goldenDirectory = options.TryGetValue("golden", out string? goldenValue)
             ? goldenValue
             : null;
@@ -109,6 +136,7 @@ public static partial class EngineCliParser
                 project,
                 artifacts,
                 configuration,
+                hostMode,
                 goldenDirectory,
                 pixelPerfect,
                 captureFrame,

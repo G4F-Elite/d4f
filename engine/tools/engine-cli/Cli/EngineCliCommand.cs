@@ -4,6 +4,12 @@ namespace Engine.Cli;
 
 public abstract record EngineCliCommand;
 
+public enum TestHostMode
+{
+    HiddenWindow = 0,
+    HeadlessOffscreen = 1
+}
+
 public sealed record InitCommand(string Name, string OutputDirectory) : EngineCliCommand;
 
 public sealed record NewCommand(string Name, string OutputDirectory) : EngineCliCommand;
@@ -35,6 +41,7 @@ public sealed record TestCommand(
     string ProjectDirectory,
     string ArtifactsDirectory,
     string Configuration,
+    TestHostMode HostMode,
     string? GoldenDirectory,
     bool PixelPerfectGolden,
     int CaptureFrame,

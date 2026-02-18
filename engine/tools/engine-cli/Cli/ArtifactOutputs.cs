@@ -64,9 +64,10 @@ internal sealed record RenderStatsArtifact(
 internal sealed record TestArtifactGenerationOptions(
     int CaptureFrame,
     ulong ReplaySeed,
-    double FixedDeltaSeconds)
+    double FixedDeltaSeconds,
+    TestHostMode HostMode)
 {
-    public static TestArtifactGenerationOptions Default { get; } = new(1, 1337UL, 1.0 / 60.0);
+    public static TestArtifactGenerationOptions Default { get; } = new(1, 1337UL, 1.0 / 60.0, TestHostMode.HeadlessOffscreen);
 
     public TestArtifactGenerationOptions Validate()
     {
@@ -78,6 +79,11 @@ internal sealed record TestArtifactGenerationOptions(
         if (FixedDeltaSeconds <= 0.0)
         {
             throw new ArgumentOutOfRangeException(nameof(FixedDeltaSeconds), "Fixed delta must be greater than zero.");
+        }
+
+        if (!Enum.IsDefined(HostMode))
+        {
+            throw new InvalidDataException($"Unsupported test host mode: {HostMode}.");
         }
 
         return this;
@@ -136,6 +142,9 @@ internal static class TestArtifactGenerator
             outputDirectory,
             options.ReplaySeed,
             options.FixedDeltaSeconds);
+        string hostConfigRelativePath = Path.Combine("runtime", "test-host.json");
+        string hostConfigFullPath = Path.Combine(outputDirectory, hostConfigRelativePath);
+        WriteTestHostConfig(hostConfigFullPath, options.HostMode, options.FixedDeltaSeconds);
         string renderStatsRelativePath = Path.Combine("render", "frame-stats.json");
         string renderStatsFullPath = Path.Combine(outputDirectory, renderStatsRelativePath);
         RenderStatsArtifact renderStats = CaptureRenderStats(captureFacade);
@@ -159,6 +168,11 @@ internal static class TestArtifactGenerator
                 Kind: "replay",
                 RelativePath: NormalizePath(replayRelativePath),
                 Description: "Record/replay metadata."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
+                Kind: "test-host-config",
+                RelativePath: NormalizePath(hostConfigRelativePath),
+                Description: "Test execution mode metadata (headless/offscreen or hidden window)."));
 
         manifestEntries.Add(
             new TestingArtifactEntry(
@@ -316,6 +330,36 @@ internal static class TestArtifactGenerator
         }
 
         string json = JsonSerializer.Serialize(stats, ArtifactOutputWriter.SerializerOptions);
+        File.WriteAllText(outputPath, json);
+    }
+
+    private static void WriteTestHostConfig(
+        string outputPath,
+        TestHostMode hostMode,
+        double fixedDeltaSeconds)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        if (!Enum.IsDefined(hostMode))
+        {
+            throw new InvalidDataException($"Unsupported test host mode: {hostMode}.");
+        }
+
+        string? directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string modeLabel = hostMode == TestHostMode.HeadlessOffscreen
+            ? "headless-offscreen"
+            : "hidden-window";
+        string json = JsonSerializer.Serialize(
+            new
+            {
+                mode = modeLabel,
+                fixedDeltaSeconds
+            },
+            ArtifactOutputWriter.SerializerOptions);
         File.WriteAllText(outputPath, json);
     }
 }
