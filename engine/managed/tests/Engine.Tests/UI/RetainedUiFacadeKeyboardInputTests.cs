@@ -114,4 +114,33 @@ public sealed class RetainedUiFacadeKeyboardInputTests
         Assert.Throws<ArgumentOutOfRangeException>(() => facade.QueueKeyUp((UiKey)999));
         Assert.Throws<ArgumentOutOfRangeException>(() => facade.QueueKeyUp((UiKey)(-1)));
     }
+
+    [Fact]
+    public void QueueKeyDown_Backspace_RemovesCharacterFromFocusedInput()
+    {
+        var document = new UiDocument();
+        var root = new UiPanel("root", new TextureHandle(100))
+        {
+            Width = 200,
+            Height = 120
+        };
+        var input = new UiInputField("input", new TextureHandle(101), new TextureHandle(102), text: "abc")
+        {
+            X = 10,
+            Y = 10,
+            Width = 100,
+            Height = 20
+        };
+        root.AddChild(input);
+        document.AddRoot(root);
+
+        var facade = new RetainedUiFacade(document);
+        var world = new World();
+        facade.QueuePointerClick(12, 12);
+        facade.QueueKeyDown(UiKey.Backspace);
+        facade.Update(world, new FrameTiming(0, TimeSpan.Zero, TimeSpan.Zero));
+
+        Assert.True(input.IsFocused);
+        Assert.Equal("ab", input.Text);
+    }
 }

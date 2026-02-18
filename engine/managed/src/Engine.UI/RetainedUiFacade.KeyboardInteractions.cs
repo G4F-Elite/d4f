@@ -6,6 +6,10 @@ public sealed partial class RetainedUiFacade
     {
         UiElement? target = ResolveKeyboardTarget();
         target?.InvokeKeyDown(key);
+        if (key == UiKey.Backspace && target is UiInputField inputField)
+        {
+            inputField.Backspace();
+        }
     }
 
     private void DispatchKeyUp(UiKey key)
