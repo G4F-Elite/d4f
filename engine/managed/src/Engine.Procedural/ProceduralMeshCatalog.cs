@@ -34,9 +34,22 @@ public static class ProceduralMeshCatalog
         }
 
         float uvScale = 1.2f + SampleRange(seed, chunk.NodeId, parsedTag.Variant, salt: 31u, min: 0.0f, max: 0.8f);
-        builder.GenerateUv(UvProjection.Box, uvScale);
+        builder.GenerateUv(SelectUvProjection(parsedTag), uvScale);
         builder.GenerateLod(screenCoverage: 0.55f);
         return builder.Build();
+    }
+
+    private static UvProjection SelectUvProjection(LevelChunkTag tag)
+    {
+        return tag.NodeType switch
+        {
+            LevelNodeType.Corridor => UvProjection.Cylindrical,
+            LevelNodeType.Shaft => UvProjection.Cylindrical,
+            LevelNodeType.Room => UvProjection.Box,
+            LevelNodeType.Junction => UvProjection.Box,
+            LevelNodeType.DeadEnd => UvProjection.Box,
+            _ => throw new InvalidDataException($"Unsupported node type '{tag.NodeType}' for UV projection.")
+        };
     }
 
     private static void BuildRoomMesh(

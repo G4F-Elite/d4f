@@ -79,6 +79,28 @@ public sealed class ProceduralMeshCatalogTests
         Assert.Equal(expectAccentSubmesh, hasAccentSubmesh);
     }
 
+    [Theory]
+    [InlineData("chunk/shaft/v1", true)]
+    [InlineData("chunk/corridor/v2", true)]
+    [InlineData("chunk/room/v0", false)]
+    public void BuildChunkMesh_ShouldChooseExpectedUvProjection(string meshTag, bool expectsCylindricalProjection)
+    {
+        LevelMeshChunk chunk = new(NodeId: 8, MeshTag: meshTag);
+
+        ProcMeshData mesh = ProceduralMeshCatalog.BuildChunkMesh(chunk, seed: 19u);
+        float minU = mesh.Vertices.Min(static x => x.Uv.X);
+        float maxU = mesh.Vertices.Max(static x => x.Uv.X);
+
+        if (expectsCylindricalProjection)
+        {
+            Assert.True(minU >= -0.0001f);
+            Assert.True(maxU <= 1.0f);
+            return;
+        }
+
+        Assert.True(minU < -0.01f);
+    }
+
     [Fact]
     public void BuildChunkMesh_ShouldRejectInvalidTag()
     {
