@@ -15,10 +15,10 @@ public static partial class TextureBuilder
         _ = recipe.Validate();
 
         float[] height = GenerateHeight(recipe);
-        byte[] albedo = GenerateRgba8(recipe);
         byte[] normal = HeightToNormalMap(height, recipe.Width, recipe.Height, normalStrength);
         byte[] roughness = HeightToRoughnessMap(height, recipe.Width, recipe.Height, roughnessContrast);
         byte[] ao = HeightToAmbientOcclusionMap(height, recipe.Width, recipe.Height, aoRadius, aoStrength);
+        byte[] albedo = HeightToAlbedoMap(height, recipe.Width, recipe.Height, recipe.Kind, recipe.Seed, ao);
         IReadOnlyList<TextureMipLevel> mipChain = GenerateMipChainRgba8(albedo, recipe.Width, recipe.Height);
 
         return new ProceduralTextureSurface(
@@ -30,6 +30,49 @@ public static partial class TextureBuilder
             RoughnessRgba8: roughness,
             AmbientOcclusionRgba8: ao,
             MipChain: mipChain).Validate();
+    }
+
+    public static byte[] HeightToAlbedoMap(
+        float[] height,
+        int width,
+        int heightPixels,
+        ProceduralTextureKind kind,
+        uint seed,
+        byte[]? ambientOcclusionRgba8 = null)
+    {
+        ValidateHeightArray(height, width, heightPixels);
+
+        int expectedAoLength = checked(width * heightPixels * 4);
+        if (ambientOcclusionRgba8 is not null && ambientOcclusionRgba8.Length != expectedAoLength)
+        {
+            throw new InvalidDataException(
+                $"Ambient occlusion payload size {ambientOcclusionRgba8.Length} does not match expected size {expectedAoLength}.");
+        }
+
+        (Vector3 dark, Vector3 mid, Vector3 light) = ResolveAlbedoPalette(kind, seed);
+        var albedo = new byte[expectedAoLength];
+        for (int y = 0; y < heightPixels; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int pixelIndex = y * width + x;
+                int offset = pixelIndex * 4;
+                float h = height[pixelIndex];
+                float ao = ambientOcclusionRgba8 is null ? 1f : ambientOcclusionRgba8[offset] / 255f;
+                float detail = (Hash01((uint)x, (uint)y, seed ^ 0x5B1D9E37u) - 0.5f) * 0.16f;
+                float mix = Math.Clamp(h + detail, 0f, 1f);
+                Vector3 baseColor = SampleAlbedoRamp(mix, dark, mid, light);
+                float luminanceScale = Math.Clamp(0.72f + ao * 0.36f, 0.55f, 1.2f);
+                Vector3 shaded = Vector3.Clamp(baseColor * luminanceScale, Vector3.Zero, Vector3.One);
+
+                albedo[offset] = EncodeColor(shaded.X);
+                albedo[offset + 1] = EncodeColor(shaded.Y);
+                albedo[offset + 2] = EncodeColor(shaded.Z);
+                albedo[offset + 3] = 255;
+            }
+        }
+
+        return albedo;
     }
 
     public static byte[] HeightToRoughnessMap(
@@ -174,6 +217,44 @@ public static partial class TextureBuilder
         }
 
         return bytes;
+    }
+
+    private static (Vector3 Dark, Vector3 Mid, Vector3 Light) ResolveAlbedoPalette(ProceduralTextureKind kind, uint seed)
+    {
+        (Vector3 Dark, Vector3 Mid, Vector3 Light) palette = kind switch
+        {
+            ProceduralTextureKind.Perlin => (new Vector3(0.19f, 0.17f, 0.15f), new Vector3(0.41f, 0.36f, 0.31f), new Vector3(0.70f, 0.66f, 0.60f)),
+            ProceduralTextureKind.Simplex => (new Vector3(0.13f, 0.17f, 0.18f), new Vector3(0.30f, 0.38f, 0.40f), new Vector3(0.56f, 0.64f, 0.66f)),
+            ProceduralTextureKind.Worley => (new Vector3(0.12f, 0.13f, 0.11f), new Vector3(0.27f, 0.31f, 0.24f), new Vector3(0.52f, 0.57f, 0.43f)),
+            ProceduralTextureKind.Grid => (new Vector3(0.09f, 0.11f, 0.14f), new Vector3(0.20f, 0.25f, 0.32f), new Vector3(0.45f, 0.50f, 0.62f)),
+            ProceduralTextureKind.Brick => (new Vector3(0.18f, 0.08f, 0.06f), new Vector3(0.43f, 0.20f, 0.14f), new Vector3(0.66f, 0.40f, 0.30f)),
+            ProceduralTextureKind.Stripes => (new Vector3(0.08f, 0.11f, 0.15f), new Vector3(0.24f, 0.29f, 0.35f), new Vector3(0.58f, 0.64f, 0.72f)),
+            _ => (new Vector3(0.14f, 0.14f, 0.14f), new Vector3(0.33f, 0.33f, 0.33f), new Vector3(0.62f, 0.62f, 0.62f))
+        };
+
+        Vector3 tint = new(
+            0.92f + Hash01(seed, 31u, 0xA341316Cu) * 0.16f,
+            0.92f + Hash01(seed, 32u, 0xC8013EA4u) * 0.16f,
+            0.92f + Hash01(seed, 33u, 0xAD90777Du) * 0.16f);
+        return (
+            Vector3.Clamp(palette.Dark * tint, Vector3.Zero, Vector3.One),
+            Vector3.Clamp(palette.Mid * tint, Vector3.Zero, Vector3.One),
+            Vector3.Clamp(palette.Light * tint, Vector3.Zero, Vector3.One));
+    }
+
+    private static Vector3 SampleAlbedoRamp(float sample, Vector3 dark, Vector3 mid, Vector3 light)
+    {
+        if (sample <= 0.5f)
+        {
+            return Vector3.Lerp(dark, mid, sample * 2f);
+        }
+
+        return Vector3.Lerp(mid, light, (sample - 0.5f) * 2f);
+    }
+
+    private static byte EncodeColor(float value)
+    {
+        return (byte)Math.Clamp((int)MathF.Round(Math.Clamp(value, 0f, 1f) * 255f), 0, 255);
     }
 
     private static IReadOnlyList<TextureMipLevel> GenerateMipChain(
