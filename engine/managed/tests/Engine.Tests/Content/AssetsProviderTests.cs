@@ -81,6 +81,30 @@ public sealed class AssetsProviderTests
     }
 
     [Fact]
+    public void InMemoryProvider_GetOrCreate_ShouldRespectRuntimeTypeBudget()
+    {
+        var provider = new InMemoryAssetsProvider(
+            new AssetRegistry(),
+            buildConfigHash: "CFG",
+            runtimeTypeBudgets: new Dictionary<Type, int>
+            {
+                [typeof(string)] = 1
+            });
+
+        var generator = new CountingStringGenerator(generatorVersion: 1);
+        provider.RegisterGenerator<TestRecipe, string>("proc/string", generator);
+
+        var firstRecipe = new TestRecipe("proc/string", recipeVersion: 1, seed: 1, payload: "A");
+        var secondRecipe = new TestRecipe("proc/string", recipeVersion: 1, seed: 2, payload: "B");
+
+        _ = provider.GetOrCreate<string>(firstRecipe);
+        _ = provider.GetOrCreate<string>(secondRecipe);
+        _ = provider.GetOrCreate<string>(firstRecipe);
+
+        Assert.Equal(3, generator.CallCount);
+    }
+
+    [Fact]
     public void InMemoryProvider_GetOrCreate_ShouldFail_WhenGeneratorMissing()
     {
         var provider = new InMemoryAssetsProvider(new AssetRegistry(), buildConfigHash: "CFG");

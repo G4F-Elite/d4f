@@ -5,6 +5,10 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
     private readonly AssetRegistry _assetRegistry;
     private readonly RuntimeAssetCache<object> _runtimeCache;
     private readonly DevDiskAssetCache? _devDiskCache;
+    private readonly Dictionary<Type, int> _runtimeTypeBudgets;
+    private readonly Dictionary<Type, LinkedList<AssetKey>> _runtimeTypeLru = new();
+    private readonly Dictionary<AssetKey, LinkedListNode<AssetKey>> _typeLruNodesByKey = new();
+    private readonly Dictionary<AssetKey, Type> _runtimeKeyTypes = new();
     private readonly Dictionary<string, object> _pathAssets = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IUntypedAssetGenerator> _generators = new(StringComparer.Ordinal);
     private readonly List<IAssetRecipe> _bakeQueue = [];
@@ -14,11 +18,13 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
         AssetRegistry assetRegistry,
         int runtimeCacheCapacity = 256,
         string? buildConfigHash = null,
-        DevDiskAssetCache? devDiskCache = null)
+        DevDiskAssetCache? devDiskCache = null,
+        IReadOnlyDictionary<Type, int>? runtimeTypeBudgets = null)
     {
         _assetRegistry = assetRegistry ?? throw new ArgumentNullException(nameof(assetRegistry));
         _runtimeCache = new RuntimeAssetCache<object>(runtimeCacheCapacity);
         _devDiskCache = devDiskCache;
+        _runtimeTypeBudgets = NormalizeTypeBudgets(runtimeTypeBudgets);
         _buildConfigHash = string.IsNullOrWhiteSpace(buildConfigHash)
             ? AssetKeyBuilder.ComputeBuildConfigHash(new Dictionary<string, string>
             {
@@ -92,6 +98,7 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
         AssetKey key = ResolveKey(recipe, out IUntypedAssetGenerator generator);
         if (_runtimeCache.TryGet(key, out object cachedAsset))
         {
+            TouchTrackedKey(key);
             if (cachedAsset is not T typedCachedAsset)
             {
                 throw new InvalidCastException(
@@ -106,7 +113,7 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
             && _devDiskCache.TryLoad(key, out byte[] cachedBytes))
         {
             object boxedBytes = cachedBytes;
-            _runtimeCache.Set(key, boxedBytes);
+            StoreRuntimeAsset(key, boxedBytes);
             return (T)boxedBytes;
         }
 
@@ -117,7 +124,7 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
                 $"Generator '{recipe.GeneratorId}' produced '{generatedAsset.GetType().FullName}', requested '{typeof(T).FullName}'.");
         }
 
-        _runtimeCache.Set(key, generatedAsset);
+        StoreRuntimeAsset(key, generatedAsset);
         if (generatedAsset is byte[] generatedBytes && _devDiskCache is not null)
         {
             _devDiskCache.Store(key, generatedBytes);
@@ -138,12 +145,12 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
 
             if (_devDiskCache is not null && _devDiskCache.TryLoad(key, out byte[] cachedBytes))
             {
-                _runtimeCache.Set(key, cachedBytes);
+                StoreRuntimeAsset(key, cachedBytes);
                 continue;
             }
 
             object generatedAsset = generator.Generate(recipe);
-            _runtimeCache.Set(key, generatedAsset);
+            StoreRuntimeAsset(key, generatedAsset);
 
             if (generatedAsset is byte[] generatedBytes && _devDiskCache is not null)
             {
@@ -166,6 +173,137 @@ public sealed class InMemoryAssetsProvider : IAssetsProvider
         }
 
         return AssetKeyBuilder.Create(recipe, generator.GeneratorVersion, _buildConfigHash);
+    }
+
+    private static Dictionary<Type, int> NormalizeTypeBudgets(IReadOnlyDictionary<Type, int>? runtimeTypeBudgets)
+    {
+        if (runtimeTypeBudgets is null || runtimeTypeBudgets.Count == 0)
+        {
+            return new Dictionary<Type, int>();
+        }
+
+        var normalized = new Dictionary<Type, int>();
+        foreach ((Type type, int budget) in runtimeTypeBudgets)
+        {
+            if (type is null)
+            {
+                throw new InvalidDataException("Runtime type budget map cannot contain null keys.");
+            }
+
+            if (budget <= 0)
+            {
+                throw new InvalidDataException(
+                    $"Runtime type budget for '{type.FullName}' must be greater than zero.");
+            }
+
+            normalized[type] = budget;
+        }
+
+        return normalized;
+    }
+
+    private void StoreRuntimeAsset(AssetKey key, object asset)
+    {
+        if (_runtimeCache.Set(key, asset, out AssetKey evictedKey, out _))
+        {
+            RemoveTrackedKey(evictedKey);
+        }
+
+        TrackRuntimeAsset(key, asset.GetType());
+        EnforceTypeBudget(asset.GetType());
+    }
+
+    private void EnforceTypeBudget(Type assetType)
+    {
+        if (!_runtimeTypeBudgets.TryGetValue(assetType, out int budget))
+        {
+            return;
+        }
+
+        if (!_runtimeTypeLru.TryGetValue(assetType, out LinkedList<AssetKey>? list))
+        {
+            return;
+        }
+
+        while (list.Count > budget)
+        {
+            LinkedListNode<AssetKey>? tail = list.Last;
+            if (tail is null)
+            {
+                return;
+            }
+
+            AssetKey evictedKey = tail.Value;
+            _runtimeCache.Remove(evictedKey);
+            RemoveTrackedKey(evictedKey);
+        }
+    }
+
+    private void TouchTrackedKey(AssetKey key)
+    {
+        if (!_typeLruNodesByKey.TryGetValue(key, out LinkedListNode<AssetKey>? node))
+        {
+            return;
+        }
+
+        if (!_runtimeKeyTypes.TryGetValue(key, out Type? assetType))
+        {
+            return;
+        }
+
+        if (!_runtimeTypeLru.TryGetValue(assetType, out LinkedList<AssetKey>? list))
+        {
+            return;
+        }
+
+        list.Remove(node);
+        list.AddFirst(node);
+    }
+
+    private void TrackRuntimeAsset(AssetKey key, Type assetType)
+    {
+        if (_runtimeKeyTypes.TryGetValue(key, out Type? existingType))
+        {
+            if (existingType == assetType)
+            {
+                TouchTrackedKey(key);
+                return;
+            }
+
+            RemoveTrackedKey(key);
+        }
+
+        if (!_runtimeTypeLru.TryGetValue(assetType, out LinkedList<AssetKey>? list))
+        {
+            list = new LinkedList<AssetKey>();
+            _runtimeTypeLru.Add(assetType, list);
+        }
+
+        LinkedListNode<AssetKey> node = list.AddFirst(key);
+        _runtimeKeyTypes[key] = assetType;
+        _typeLruNodesByKey[key] = node;
+    }
+
+    private void RemoveTrackedKey(AssetKey key)
+    {
+        if (!_runtimeKeyTypes.TryGetValue(key, out Type? assetType))
+        {
+            return;
+        }
+
+        _runtimeKeyTypes.Remove(key);
+        if (_typeLruNodesByKey.TryGetValue(key, out LinkedListNode<AssetKey>? node))
+        {
+            _typeLruNodesByKey.Remove(key);
+            if (_runtimeTypeLru.TryGetValue(assetType, out LinkedList<AssetKey>? list))
+            {
+                list.Remove(node);
+                if (list.Count == 0)
+                {
+                    _runtimeTypeLru.Remove(assetType);
+                }
+            }
+        }
     }
 
     private interface IUntypedAssetGenerator

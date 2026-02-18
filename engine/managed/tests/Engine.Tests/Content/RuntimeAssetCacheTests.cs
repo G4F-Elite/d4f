@@ -43,6 +43,24 @@ public sealed class RuntimeAssetCacheTests
     }
 
     [Fact]
+    public void SetWithEvictionOutput_ShouldReturnEvictedEntry()
+    {
+        var cache = new RuntimeAssetCache<string>(capacity: 2);
+        AssetKey first = CreateKey("01");
+        AssetKey second = CreateKey("02");
+        AssetKey third = CreateKey("03");
+
+        cache.Set(first, "a");
+        cache.Set(second, "b");
+
+        bool evicted = cache.Set(third, "c", out AssetKey evictedKey, out string evictedValue);
+
+        Assert.True(evicted);
+        Assert.Equal(first, evictedKey);
+        Assert.Equal("a", evictedValue);
+    }
+
+    [Fact]
     public void Set_ShouldUpdateExistingEntryWithoutChangingCount()
     {
         var cache = new RuntimeAssetCache<string>(capacity: 2);
