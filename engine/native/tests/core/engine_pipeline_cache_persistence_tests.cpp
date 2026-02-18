@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <string>
 
 #include "engine_native.h"
@@ -121,10 +122,45 @@ void TestPipelineCachePersistsAcrossEngineLifetime() {
   std::filesystem::remove(cache_path, remove_error);
 }
 
+void TestPipelineCacheCorruptedFileIsIgnored() {
+  const std::filesystem::path cache_path = MakeTempCachePath();
+  std::error_code remove_error;
+  std::filesystem::remove(cache_path, remove_error);
+
+  {
+    std::ofstream corrupted(cache_path, std::ios::binary | std::ios::trunc);
+    assert(corrupted.is_open());
+    const uint8_t bytes[4]{0xFFu, 0x00u, 0x12u, 0x77u};
+    corrupted.write(reinterpret_cast<const char*>(bytes), sizeof(bytes));
+  }
+
+  assert(SetPipelineCachePathEnv(cache_path));
+
+  engine_native_create_desc_t create_desc{
+      .api_version = ENGINE_NATIVE_API_VERSION,
+      .user_data = nullptr};
+
+  engine_native_engine_t* engine = nullptr;
+  assert(engine_create(&create_desc, &engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(engine != nullptr);
+
+  engine_native_renderer_frame_stats_t stats{};
+  assert(ExecuteSingleDrawFrame(engine, 777u, &stats) == ENGINE_NATIVE_STATUS_OK);
+  assert(stats.pipeline_cache_hits == 0u);
+  assert(stats.pipeline_cache_misses >= 1u);
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(std::filesystem::exists(cache_path));
+  assert(std::filesystem::file_size(cache_path) > sizeof(uint32_t));
+
+  assert(ClearPipelineCachePathEnv());
+  std::filesystem::remove(cache_path, remove_error);
+}
+
 }  // namespace
 
 void RunEnginePipelineCachePersistenceTests() {
   TestPipelineCachePersistsAcrossEngineLifetime();
+  TestPipelineCacheCorruptedFileIsIgnored();
 }
 
 }  // namespace dff::native::tests
