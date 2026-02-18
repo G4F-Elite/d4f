@@ -18,7 +18,9 @@ public sealed record ProceduralTextureRecipe(
     int Height,
     uint Seed,
     int FbmOctaves = 4,
-    float Frequency = 4f)
+    float Frequency = 4f,
+    float DomainWarpStrength = 0f,
+    float DomainWarpFrequency = 8f)
 {
     public ProceduralTextureRecipe Validate()
     {
@@ -42,6 +44,16 @@ public sealed record ProceduralTextureRecipe(
             throw new ArgumentOutOfRangeException(nameof(Frequency), "Frequency must be greater than zero.");
         }
 
+        if (!float.IsFinite(DomainWarpStrength) || DomainWarpStrength < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(DomainWarpStrength), "Domain warp strength must be finite and non-negative.");
+        }
+
+        if (!float.IsFinite(DomainWarpFrequency) || DomainWarpFrequency <= 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(DomainWarpFrequency), "Domain warp frequency must be finite and greater than zero.");
+        }
+
         return this;
     }
 }
@@ -60,14 +72,15 @@ public static partial class TextureBuilder
             {
                 float u = x / (float)recipe.Width;
                 float v = y / (float)recipe.Height;
+                (float sampleU, float sampleV) = ApplyDomainWarp(u, v, recipe);
                 data[y * recipe.Width + x] = recipe.Kind switch
                 {
-                    ProceduralTextureKind.Perlin => FractalNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Simplex => FractalSimplexNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Worley => FractalWorleyNoise(u, v, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
-                    ProceduralTextureKind.Grid => Grid(u, v, recipe.Frequency, recipe.Seed),
-                    ProceduralTextureKind.Brick => Brick(u, v, recipe.Frequency, recipe.Seed),
-                    ProceduralTextureKind.Stripes => Stripes(u, recipe.Frequency, recipe.Seed),
+                    ProceduralTextureKind.Perlin => FractalNoise(sampleU, sampleV, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
+                    ProceduralTextureKind.Simplex => FractalSimplexNoise(sampleU, sampleV, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
+                    ProceduralTextureKind.Worley => FractalWorleyNoise(sampleU, sampleV, recipe.Seed, recipe.FbmOctaves, recipe.Frequency),
+                    ProceduralTextureKind.Grid => Grid(sampleU, sampleV, recipe.Frequency, recipe.Seed),
+                    ProceduralTextureKind.Brick => Brick(sampleU, sampleV, recipe.Frequency, recipe.Seed),
+                    ProceduralTextureKind.Stripes => Stripes(sampleU, recipe.Frequency, recipe.Seed),
                     _ => throw new InvalidDataException($"Unsupported procedural texture kind: {recipe.Kind}.")
                 };
             }
