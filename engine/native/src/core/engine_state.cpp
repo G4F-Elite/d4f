@@ -1,6 +1,7 @@
 #include "core/engine_state.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -84,6 +85,17 @@ bool IsSupportedColliderShape(uint8_t collider_shape) {
 
 bool IsUnitRange(float value) {
   return value >= 0.0f && value <= 1.0f;
+}
+
+bool IsFiniteNonNegative(float value) {
+  return std::isfinite(value) && value >= 0.0f;
+}
+
+bool HasValidUiScissor(const engine_native_ui_draw_item_t& item) {
+  return IsFiniteNonNegative(item.scissor_x) &&
+         IsFiniteNonNegative(item.scissor_y) &&
+         IsFiniteNonNegative(item.scissor_width) &&
+         IsFiniteNonNegative(item.scissor_height);
 }
 
 bool IsSupportedDebugViewMode(uint8_t mode) {
@@ -313,6 +325,7 @@ engine_native_status_t RendererState::BeginFrame(size_t requested_bytes,
   submitted_draw_count_ = 0u;
   submitted_ui_count_ = 0u;
   submitted_draw_items_.clear();
+  submitted_ui_items_.clear();
   submitted_debug_view_mode_ = ENGINE_NATIVE_DEBUG_VIEW_NONE;
   submitted_render_feature_flags_ = 0u;
   last_executed_rhi_passes_.clear();
@@ -431,6 +444,20 @@ engine_native_status_t RendererState::Submit(
 
       pipeline_cache_.GetOrCreate(ComposePipelineKey(draw_item.material, variant));
     }
+  }
+
+  if (packet.ui_item_count > 0u) {
+    for (uint32_t i = 0u; i < packet.ui_item_count; ++i) {
+      if (!HasValidUiScissor(packet.ui_items[i])) {
+        return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+      }
+    }
+
+    const size_t old_size = submitted_ui_items_.size();
+    const size_t added = static_cast<size_t>(packet.ui_item_count);
+    submitted_ui_items_.resize(old_size + added);
+    std::copy_n(packet.ui_items, packet.ui_item_count,
+                submitted_ui_items_.data() + old_size);
   }
 
   return ENGINE_NATIVE_STATUS_OK;
@@ -790,6 +817,7 @@ void RendererState::ResetFrameState() {
   compiled_pass_order_.clear();
   pass_kinds_by_id_.clear();
   submitted_draw_items_.clear();
+  submitted_ui_items_.clear();
   frame_open_ = false;
   frame_storage_.clear();
 }

@@ -419,9 +419,17 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   ui_batch[0].texture = 10u;
   ui_batch[0].vertex_count = 6u;
   ui_batch[0].index_count = 6u;
+  ui_batch[0].scissor_x = 12.0f;
+  ui_batch[0].scissor_y = 24.0f;
+  ui_batch[0].scissor_width = 32.0f;
+  ui_batch[0].scissor_height = 48.0f;
   ui_batch[1].texture = 11u;
   ui_batch[1].vertex_count = 6u;
   ui_batch[1].index_count = 6u;
+  ui_batch[1].scissor_x = 4.0f;
+  ui_batch[1].scissor_y = 8.0f;
+  ui_batch[1].scissor_width = 64.0f;
+  ui_batch[1].scissor_height = 16.0f;
 
   engine_native_render_packet_t ui_packet{
       .draw_items = nullptr,
@@ -430,7 +438,19 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
       .ui_item_count = 2u};
 
   assert(renderer_submit(renderer, &ui_packet) == ENGINE_NATIVE_STATUS_OK);
+  assert(internal_engine->state.renderer.submitted_ui_items().size() == 2u);
+  assert(internal_engine->state.renderer.submitted_ui_items()[0].texture == 10u);
+  assert(internal_engine->state.renderer.submitted_ui_items()[0].scissor_x == 12.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[0].scissor_y == 24.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[0].scissor_width == 32.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[0].scissor_height == 48.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[1].texture == 11u);
+  assert(internal_engine->state.renderer.submitted_ui_items()[1].scissor_x == 4.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[1].scissor_y == 8.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[1].scissor_width == 64.0f);
+  assert(internal_engine->state.renderer.submitted_ui_items()[1].scissor_height == 16.0f);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(internal_engine->state.renderer.submitted_ui_items().empty());
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"ui", "present"});
 
@@ -576,6 +596,29 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
       .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE,
       .reserved0 = static_cast<uint8_t>(0x80u)};
   assert(renderer_submit(renderer, &invalid_render_flags_packet) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_submit(renderer, &draw_packet_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+
+  frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_ui_draw_item_t invalid_ui_batch[1]{};
+  invalid_ui_batch[0].texture = 42u;
+  invalid_ui_batch[0].vertex_count = 3u;
+  invalid_ui_batch[0].index_count = 3u;
+  invalid_ui_batch[0].scissor_x = 0.0f;
+  invalid_ui_batch[0].scissor_y = 0.0f;
+  invalid_ui_batch[0].scissor_width = -1.0f;
+  invalid_ui_batch[0].scissor_height = 8.0f;
+  engine_native_render_packet_t invalid_scissor_packet{
+      .draw_items = nullptr,
+      .draw_item_count = 0u,
+      .ui_items = invalid_ui_batch,
+      .ui_item_count = 1u};
+  assert(renderer_submit(renderer, &invalid_scissor_packet) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_submit(renderer, &draw_packet_a) == ENGINE_NATIVE_STATUS_OK);
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);

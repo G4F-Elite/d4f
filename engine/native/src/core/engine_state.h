@@ -74,6 +74,9 @@ class RendererState {
   const std::vector<std::string>& last_executed_rhi_passes() const {
     return last_executed_rhi_passes_;
   }
+  const std::vector<engine_native_ui_draw_item_t>& submitted_ui_items() const {
+    return submitted_ui_items_;
+  }
   uint64_t pipeline_cache_hits() const { return pipeline_cache_.hit_count(); }
   uint64_t pipeline_cache_misses() const { return pipeline_cache_.miss_count(); }
   size_t cached_pipeline_count() const { return pipeline_cache_.size(); }
@@ -104,6 +107,7 @@ class RendererState {
   std::vector<std::string> last_executed_rhi_passes_;
   std::array<float, 4> last_clear_color_{0.05f, 0.07f, 0.10f, 1.0f};
   std::vector<engine_native_draw_item_t> submitted_draw_items_;
+  std::vector<engine_native_ui_draw_item_t> submitted_ui_items_;
   engine_native_debug_view_mode_t submitted_debug_view_mode_ =
       ENGINE_NATIVE_DEBUG_VIEW_NONE;
   uint8_t submitted_render_feature_flags_ = 0u;
