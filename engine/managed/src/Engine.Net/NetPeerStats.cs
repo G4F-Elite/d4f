@@ -22,9 +22,11 @@ public sealed class NetPeerStats
 
     public double PeakReceiveBandwidthKbps { get; private set; }
 
-    public double LossPercent => MessagesSent == 0
+    public int MessagesAttempted => checked(MessagesSent + MessagesDropped);
+
+    public double LossPercent => MessagesAttempted == 0
         ? 0d
-        : (double)MessagesDropped / MessagesSent * 100d;
+        : (double)MessagesDropped / MessagesAttempted * 100d;
 
     internal void RecordSent(int byteCount)
     {

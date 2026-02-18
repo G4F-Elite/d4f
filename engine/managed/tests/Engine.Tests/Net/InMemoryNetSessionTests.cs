@@ -74,6 +74,12 @@ public sealed class InMemoryNetSessionTests
         NetRpcMessage rpc = new(77u, "move", [1], NetworkChannel.ReliableOrdered);
 
         Assert.Throws<KeyNotFoundException>(() => session.QueueClientRpc(clientId, rpc));
+
+        NetPeerStats clientStats = session.GetClientStats(clientId);
+        Assert.Equal(0, clientStats.MessagesSent);
+        Assert.Equal(1, clientStats.MessagesDropped);
+        Assert.Equal(1, clientStats.MessagesAttempted);
+        Assert.Equal(100d, clientStats.LossPercent, 6);
     }
 
     [Fact]
@@ -200,6 +206,25 @@ public sealed class InMemoryNetSessionTests
         Assert.True(clientStats.BytesReceived > 0);
         Assert.Equal(0, serverStats.MessagesDropped);
         Assert.True(clientStats.MessagesReceived >= 2);
+    }
+
+    [Fact]
+    public void LossPercent_ShouldIncludeDroppedMessagesInDenominator()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+        uint clientId = session.ConnectClient();
+        session.UpsertServerEntity(CreateEntity(1u, clientId, "transform", [1]));
+
+        session.QueueClientRpc(clientId, new NetRpcMessage(1u, "ok", [1], NetworkChannel.Unreliable));
+        Assert.Throws<KeyNotFoundException>(() =>
+            session.QueueClientRpc(clientId, new NetRpcMessage(99u, "bad", [2], NetworkChannel.Unreliable)));
+
+        NetPeerStats stats = session.GetClientStats(clientId);
+        Assert.Equal(1, stats.MessagesSent);
+        Assert.Equal(1, stats.MessagesDropped);
+        Assert.Equal(2, stats.MessagesAttempted);
+        Assert.Equal(50d, stats.LossPercent, 6);
     }
 
     private static InMemoryNetSession CreateSession(NetworkConfig? config = null)
