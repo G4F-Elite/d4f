@@ -107,10 +107,35 @@ public sealed partial class RetainedUiFacade
 
                 break;
             case UiText text:
-                uint textGlyphCount = checked((uint)text.Content.Length);
-                if (textGlyphCount > 0u && canDrawSelf)
+                if (text.Content.Length == 0 || !canDrawSelf)
                 {
+                    break;
+                }
+
+                if (text.WrapMode == UiTextWrapMode.NoWrap &&
+                    text.HorizontalAlignment == UiTextHorizontalAlignment.Left &&
+                    text.VerticalAlignment == UiTextVerticalAlignment.Top)
+                {
+                    uint textGlyphCount = checked((uint)text.Content.Length);
                     AppendCommand(text.FontTexture, textGlyphCount, selfBounds, commands, ref vertexOffset, ref indexOffset);
+                    break;
+                }
+
+                var layout = ComputeTextLayout(text, selfBounds);
+                if (layout.GlyphCount == 0u)
+                {
+                    break;
+                }
+
+                if (TryClipBounds(layout.Bounds, clipBounds, out RectF clippedTextBounds) || !clipBounds.HasValue)
+                {
+                    AppendCommand(
+                        text.FontTexture,
+                        layout.GlyphCount,
+                        clippedTextBounds,
+                        commands,
+                        ref vertexOffset,
+                        ref indexOffset);
                 }
 
                 break;
@@ -323,4 +348,136 @@ public sealed partial class RetainedUiFacade
         clippedBounds = new RectF(left, top, right - left, bottom - top);
         return true;
     }
+
+    private static TextLayoutResult ComputeTextLayout(UiText text, RectF bounds)
+    {
+        const float glyphWidth = 8f;
+        const float lineHeight = 16f;
+
+        if (bounds.Width <= 0f || bounds.Height <= 0f)
+        {
+            return new TextLayoutResult(0u, RectF.Empty);
+        }
+
+        string[] lines = BuildTextLines(text.Content, text.WrapMode, bounds.Width, glyphWidth);
+        if (lines.Length == 0)
+        {
+            return new TextLayoutResult(0u, RectF.Empty);
+        }
+
+        int maxCharsInLine = 0;
+        int glyphCount = 0;
+        for (int i = 0; i < lines.Length; i++)
+        {
+            string line = lines[i];
+            maxCharsInLine = Math.Max(maxCharsInLine, line.Length);
+            glyphCount += line.Length;
+        }
+
+        if (glyphCount == 0)
+        {
+            return new TextLayoutResult(0u, RectF.Empty);
+        }
+
+        float textWidth = Math.Min(bounds.Width, maxCharsInLine * glyphWidth);
+        float textHeight = Math.Min(bounds.Height, lines.Length * lineHeight);
+
+        float x = text.HorizontalAlignment switch
+        {
+            UiTextHorizontalAlignment.Left => bounds.X,
+            UiTextHorizontalAlignment.Center => bounds.X + ((bounds.Width - textWidth) * 0.5f),
+            UiTextHorizontalAlignment.Right => bounds.Right - textWidth,
+            _ => bounds.X
+        };
+        float y = text.VerticalAlignment switch
+        {
+            UiTextVerticalAlignment.Top => bounds.Y,
+            UiTextVerticalAlignment.Middle => bounds.Y + ((bounds.Height - textHeight) * 0.5f),
+            UiTextVerticalAlignment.Bottom => bounds.Bottom - textHeight,
+            _ => bounds.Y
+        };
+
+        x = Math.Clamp(x, bounds.X, bounds.Right - textWidth);
+        y = Math.Clamp(y, bounds.Y, bounds.Bottom - textHeight);
+
+        return new TextLayoutResult(
+            checked((uint)glyphCount),
+            new RectF(x, y, textWidth, textHeight));
+    }
+
+    private static string[] BuildTextLines(
+        string content,
+        UiTextWrapMode wrapMode,
+        float availableWidth,
+        float glyphWidth)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        if (content.Length == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        if (wrapMode == UiTextWrapMode.NoWrap)
+        {
+            return content.Split('\n', StringSplitOptions.None);
+        }
+
+        int maxCharsPerLine = Math.Max(1, (int)MathF.Floor(availableWidth / glyphWidth));
+        var lines = new List<string>();
+        string[] paragraphs = content.Split('\n', StringSplitOptions.None);
+        for (int i = 0; i < paragraphs.Length; i++)
+        {
+            string paragraph = paragraphs[i];
+            if (paragraph.Length == 0)
+            {
+                lines.Add(string.Empty);
+                continue;
+            }
+
+            string[] words = paragraph.Split(' ', StringSplitOptions.None);
+            string current = string.Empty;
+            for (int wordIndex = 0; wordIndex < words.Length; wordIndex++)
+            {
+                string word = words[wordIndex];
+                if (word.Length > maxCharsPerLine)
+                {
+                    if (current.Length > 0)
+                    {
+                        lines.Add(current);
+                        current = string.Empty;
+                    }
+
+                    int offset = 0;
+                    while (offset < word.Length)
+                    {
+                        int take = Math.Min(maxCharsPerLine, word.Length - offset);
+                        lines.Add(word.Substring(offset, take));
+                        offset += take;
+                    }
+
+                    continue;
+                }
+
+                string candidate = current.Length == 0 ? word : $"{current} {word}";
+                if (candidate.Length <= maxCharsPerLine)
+                {
+                    current = candidate;
+                }
+                else
+                {
+                    lines.Add(current);
+                    current = word;
+                }
+            }
+
+            if (current.Length > 0)
+            {
+                lines.Add(current);
+            }
+        }
+
+        return lines.Count == 0 ? Array.Empty<string>() : lines.ToArray();
+    }
+
+    private readonly record struct TextLayoutResult(uint GlyphCount, RectF Bounds);
 }
