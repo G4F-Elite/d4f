@@ -4,7 +4,7 @@ using Engine.Testing;
 
 namespace Engine.Cli;
 
-internal static class ProceduralPreviewRasterizer
+internal static partial class ProceduralPreviewRasterizer
 {
     public static GoldenImageBuffer BuildPreview(
         string kind,
@@ -341,9 +341,10 @@ internal static class ProceduralPreviewRasterizer
 
     private static void WritePixel(byte[] rgba, int offset, Vector3 color)
     {
-        rgba[offset] = ToByte(color.X * 255f);
-        rgba[offset + 1] = ToByte(color.Y * 255f);
-        rgba[offset + 2] = ToByte(color.Z * 255f);
+        Vector3 displayColor = ToneMapToDisplay(color);
+        rgba[offset] = ToByte(displayColor.X * 255f);
+        rgba[offset + 1] = ToByte(displayColor.Y * 255f);
+        rgba[offset + 2] = ToByte(displayColor.Z * 255f);
         rgba[offset + 3] = 255;
     }
 
