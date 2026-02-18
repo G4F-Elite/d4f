@@ -245,6 +245,7 @@ public static class ProceduralChunkSurfaceCatalog
             albedo,
             surface.NormalRgba8.ToArray(),
             roughness,
+            surface.MetallicRgba8.ToArray(),
             surface.AmbientOcclusionRgba8.ToArray(),
             mipChain).Validate();
     }

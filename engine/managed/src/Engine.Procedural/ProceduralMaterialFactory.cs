@@ -112,12 +112,14 @@ public static class ProceduralMaterialFactory
         string albedoKey = $"{textureKeyPrefix}.albedo";
         string normalKey = $"{textureKeyPrefix}.normal";
         string roughnessKey = $"{textureKeyPrefix}.roughness";
+        string metallicKey = $"{textureKeyPrefix}.metallic";
         string aoKey = $"{textureKeyPrefix}.ao";
 
         ProceduralMaterial baseMaterial = MaterialTemplates.CreateLitPbr(albedoKey, normalKey, roughness, metallic);
         var textureRefs = new Dictionary<string, string>(baseMaterial.TextureRefs, StringComparer.Ordinal)
         {
             ["roughness"] = roughnessKey,
+            ["metallic"] = metallicKey,
             ["ao"] = aoKey
         };
         var material = new ProceduralMaterial(
@@ -131,6 +133,8 @@ public static class ProceduralMaterialFactory
             TextureBuilder.GenerateNormalMipChainRgba8(surface.NormalRgba8, surface.Width, surface.Height));
         IReadOnlyList<TextureMipLevel> roughnessMips = CloneMipChain(
             TextureBuilder.GenerateMipChainRgba8(surface.RoughnessRgba8, surface.Width, surface.Height));
+        IReadOnlyList<TextureMipLevel> metallicMips = CloneMipChain(
+            TextureBuilder.GenerateMipChainRgba8(surface.MetallicRgba8, surface.Width, surface.Height));
         IReadOnlyList<TextureMipLevel> aoMips = CloneMipChain(
             TextureBuilder.GenerateMipChainRgba8(surface.AmbientOcclusionRgba8, surface.Width, surface.Height));
 
@@ -139,6 +143,7 @@ public static class ProceduralMaterialFactory
             CreateTextureExport(albedoKey, surface.Width, surface.Height, surface.AlbedoRgba8, albedoMips),
             CreateTextureExport(normalKey, surface.Width, surface.Height, surface.NormalRgba8, normalMips),
             CreateTextureExport(roughnessKey, surface.Width, surface.Height, surface.RoughnessRgba8, roughnessMips),
+            CreateTextureExport(metallicKey, surface.Width, surface.Height, surface.MetallicRgba8, metallicMips),
             CreateTextureExport(aoKey, surface.Width, surface.Height, surface.AmbientOcclusionRgba8, aoMips)
         ];
 

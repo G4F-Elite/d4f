@@ -17,6 +17,7 @@ public static partial class TextureBuilder
         float[] height = GenerateHeight(recipe);
         byte[] normal = HeightToNormalMap(height, recipe.Width, recipe.Height, normalStrength);
         byte[] roughness = HeightToRoughnessMap(height, recipe.Width, recipe.Height, roughnessContrast);
+        byte[] metallic = HeightToMetallicMap(height, recipe.Width, recipe.Height, recipe.Kind);
         byte[] ao = HeightToAmbientOcclusionMap(height, recipe.Width, recipe.Height, aoRadius, aoStrength);
         byte[] albedo = HeightToAlbedoMap(height, recipe.Width, recipe.Height, recipe.Kind, recipe.Seed, ao);
         IReadOnlyList<TextureMipLevel> mipChain = GenerateMipChainRgba8(albedo, recipe.Width, recipe.Height);
@@ -28,6 +29,7 @@ public static partial class TextureBuilder
             AlbedoRgba8: albedo,
             NormalRgba8: normal,
             RoughnessRgba8: roughness,
+            MetallicRgba8: metallic,
             AmbientOcclusionRgba8: ao,
             MipChain: mipChain).Validate();
     }
@@ -113,6 +115,37 @@ public static partial class TextureBuilder
         }
 
         return ToGrayscaleRgba(roughness);
+    }
+
+    public static byte[] HeightToMetallicMap(
+        float[] height,
+        int width,
+        int heightPixels,
+        ProceduralTextureKind kind,
+        float accentStrength = 0.12f)
+    {
+        ValidateHeightArray(height, width, heightPixels);
+
+        if (!float.IsFinite(accentStrength) || accentStrength < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(accentStrength), "Metallic accent strength must be finite and non-negative.");
+        }
+
+        float baseMetallic = kind switch
+        {
+            ProceduralTextureKind.Grid => 0.28f,
+            ProceduralTextureKind.Stripes => 0.20f,
+            ProceduralTextureKind.Brick => 0.02f,
+            _ => 0.06f
+        };
+        var metallic = new float[height.Length];
+        for (int i = 0; i < height.Length; i++)
+        {
+            float shapeAccent = MathF.Pow(Math.Clamp(height[i], 0f, 1f), 2.2f);
+            metallic[i] = Math.Clamp(baseMetallic + shapeAccent * accentStrength, 0f, 1f);
+        }
+
+        return ToGrayscaleRgba(metallic);
     }
 
     public static byte[] HeightToAmbientOcclusionMap(

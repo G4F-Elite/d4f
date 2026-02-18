@@ -29,6 +29,7 @@ public sealed record ProceduralTextureSurface(
     byte[] AlbedoRgba8,
     byte[] NormalRgba8,
     byte[] RoughnessRgba8,
+    byte[] MetallicRgba8,
     byte[] AmbientOcclusionRgba8,
     IReadOnlyList<TextureMipLevel> MipChain)
 {
@@ -43,6 +44,7 @@ public sealed record ProceduralTextureSurface(
         ArgumentNullException.ThrowIfNull(AlbedoRgba8);
         ArgumentNullException.ThrowIfNull(NormalRgba8);
         ArgumentNullException.ThrowIfNull(RoughnessRgba8);
+        ArgumentNullException.ThrowIfNull(MetallicRgba8);
         ArgumentNullException.ThrowIfNull(AmbientOcclusionRgba8);
         ArgumentNullException.ThrowIfNull(MipChain);
 
@@ -52,6 +54,7 @@ public sealed record ProceduralTextureSurface(
             AlbedoRgba8.Length != rgbaCount ||
             NormalRgba8.Length != rgbaCount ||
             RoughnessRgba8.Length != rgbaCount ||
+            MetallicRgba8.Length != rgbaCount ||
             AmbientOcclusionRgba8.Length != rgbaCount)
         {
             throw new InvalidDataException("Surface maps dimensions are inconsistent.");

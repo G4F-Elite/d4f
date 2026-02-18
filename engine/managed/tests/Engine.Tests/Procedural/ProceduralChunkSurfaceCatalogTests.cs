@@ -26,6 +26,7 @@ public sealed class ProceduralChunkSurfaceCatalogTests
         Assert.Equal(64 * 48 * 4, surface.AlbedoRgba8.Length);
         Assert.Equal(64 * 48 * 4, surface.NormalRgba8.Length);
         Assert.Equal(64 * 48 * 4, surface.RoughnessRgba8.Length);
+        Assert.Equal(64 * 48 * 4, surface.MetallicRgba8.Length);
         Assert.Equal(64 * 48 * 4, surface.AmbientOcclusionRgba8.Length);
         Assert.True(surface.MipChain.Count >= 2);
         Assert.Equal(64, surface.MipChain[0].Width);
@@ -44,6 +45,7 @@ public sealed class ProceduralChunkSurfaceCatalogTests
         Assert.Equal(first.AlbedoRgba8, second.AlbedoRgba8);
         Assert.Equal(first.NormalRgba8, second.NormalRgba8);
         Assert.Equal(first.RoughnessRgba8, second.RoughnessRgba8);
+        Assert.Equal(first.MetallicRgba8, second.MetallicRgba8);
         Assert.Equal(first.AmbientOcclusionRgba8, second.AmbientOcclusionRgba8);
         Assert.Equal(first.MipChain.Count, second.MipChain.Count);
     }
@@ -109,6 +111,7 @@ public sealed class ProceduralChunkSurfaceCatalogTests
         Assert.Equal(first.AlbedoRgba8, second.AlbedoRgba8);
         Assert.Equal(first.NormalRgba8, second.NormalRgba8);
         Assert.Equal(first.RoughnessRgba8, second.RoughnessRgba8);
+        Assert.Equal(first.MetallicRgba8, second.MetallicRgba8);
         Assert.Equal(first.AmbientOcclusionRgba8, second.AmbientOcclusionRgba8);
     }
 

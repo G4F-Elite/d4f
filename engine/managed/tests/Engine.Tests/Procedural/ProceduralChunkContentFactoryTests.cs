@@ -21,7 +21,7 @@ public sealed class ProceduralChunkContentFactoryTests
         Assert.True(content.Mesh.Vertices.Count > 0);
         Assert.True(content.Mesh.Indices.Count > 0);
         Assert.Equal(MaterialTemplateId.DffLitPbr, content.MaterialBundle.Material.Template);
-        Assert.Equal(4, content.MaterialBundle.Textures.Count);
+        Assert.Equal(5, content.MaterialBundle.Textures.Count);
         Assert.StartsWith("proc/chunk/room/v1/n12", content.MaterialBundle.Textures[0].Key, StringComparison.Ordinal);
     }
 
@@ -79,7 +79,7 @@ public sealed class ProceduralChunkContentFactoryTests
         Assert.All(chunks, static chunk =>
         {
             Assert.True(chunk.Mesh.Vertices.Count > 0);
-            Assert.Equal(4, chunk.MaterialBundle.Textures.Count);
+            Assert.Equal(5, chunk.MaterialBundle.Textures.Count);
         });
     }
 

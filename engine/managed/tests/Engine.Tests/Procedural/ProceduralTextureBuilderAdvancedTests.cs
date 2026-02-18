@@ -6,7 +6,7 @@ namespace Engine.Tests.Procedural;
 public sealed class ProceduralTextureBuilderAdvancedTests
 {
     [Fact]
-    public void GenerateSurfaceMaps_ShouldProduceDeterministicRoughnessAoAndMipChain()
+    public void GenerateSurfaceMaps_ShouldProduceDeterministicRoughnessMetallicAoAndMipChain()
     {
         ProceduralTextureRecipe recipe = new(
             Kind: ProceduralTextureKind.Perlin,
@@ -21,9 +21,11 @@ public sealed class ProceduralTextureBuilderAdvancedTests
 
         Assert.Equal(first.HeightMap, second.HeightMap);
         Assert.Equal(first.RoughnessRgba8, second.RoughnessRgba8);
+        Assert.Equal(first.MetallicRgba8, second.MetallicRgba8);
         Assert.Equal(first.AmbientOcclusionRgba8, second.AmbientOcclusionRgba8);
         Assert.Equal(first.MipChain.Count, second.MipChain.Count);
         Assert.Equal(32 * 16 * 4, first.RoughnessRgba8.Length);
+        Assert.Equal(32 * 16 * 4, first.MetallicRgba8.Length);
         Assert.Equal(32 * 16 * 4, first.AmbientOcclusionRgba8.Length);
         Assert.Equal(32, first.MipChain[0].Width);
         Assert.Equal(16, first.MipChain[0].Height);
@@ -91,6 +93,25 @@ public sealed class ProceduralTextureBuilderAdvancedTests
         int flatOffset = 1 * 4;
         int edgeOffset = 3 * 4;
         Assert.True(roughness[edgeOffset] > roughness[flatOffset]);
+    }
+
+    [Fact]
+    public void HeightToMetallicMap_ShouldStayWithinUnitRange_AndReflectTextureKind()
+    {
+        const int width = 8;
+        const int height = 1;
+        var heightMap = new float[width * height];
+        for (int x = 0; x < width; x++)
+        {
+            heightMap[x] = x / (float)(width - 1);
+        }
+
+        byte[] brick = TextureBuilder.HeightToMetallicMap(heightMap, width, height, ProceduralTextureKind.Brick);
+        byte[] grid = TextureBuilder.HeightToMetallicMap(heightMap, width, height, ProceduralTextureKind.Grid);
+
+        Assert.True(grid[0] > brick[0]);
+        Assert.InRange(brick.Min(static x => x), 0, 255);
+        Assert.InRange(grid.Max(static x => x), 0, 255);
     }
 
     [Fact]

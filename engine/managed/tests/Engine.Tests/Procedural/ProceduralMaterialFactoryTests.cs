@@ -34,6 +34,7 @@ public sealed class ProceduralMaterialFactoryTests
         Assert.Equal(first.Material.TextureRefs["albedo"], second.Material.TextureRefs["albedo"]);
         Assert.Equal(first.Material.TextureRefs["normal"], second.Material.TextureRefs["normal"]);
         Assert.Equal(first.Material.TextureRefs["roughness"], second.Material.TextureRefs["roughness"]);
+        Assert.Equal(first.Material.TextureRefs["metallic"], second.Material.TextureRefs["metallic"]);
         Assert.Equal(first.Material.TextureRefs["ao"], second.Material.TextureRefs["ao"]);
 
         Assert.Equal(first.Textures.Count, second.Textures.Count);
@@ -72,16 +73,18 @@ public sealed class ProceduralMaterialFactoryTests
             surface,
             textureKeyPrefix: "proc/cave");
 
-        Assert.Equal(4, bundle.Textures.Count);
+        Assert.Equal(5, bundle.Textures.Count);
         Assert.Equal("proc/cave.albedo", bundle.Material.TextureRefs["albedo"]);
         Assert.Equal("proc/cave.normal", bundle.Material.TextureRefs["normal"]);
         Assert.Equal("proc/cave.roughness", bundle.Material.TextureRefs["roughness"]);
+        Assert.Equal("proc/cave.metallic", bundle.Material.TextureRefs["metallic"]);
         Assert.Equal("proc/cave.ao", bundle.Material.TextureRefs["ao"]);
 
         Assert.Equal(bundle.Material.TextureRefs["albedo"], bundle.Textures[0].Key);
         Assert.Equal(bundle.Material.TextureRefs["normal"], bundle.Textures[1].Key);
         Assert.Equal(bundle.Material.TextureRefs["roughness"], bundle.Textures[2].Key);
-        Assert.Equal(bundle.Material.TextureRefs["ao"], bundle.Textures[3].Key);
+        Assert.Equal(bundle.Material.TextureRefs["metallic"], bundle.Textures[3].Key);
+        Assert.Equal(bundle.Material.TextureRefs["ao"], bundle.Textures[4].Key);
     }
 
     [Fact]
@@ -110,6 +113,7 @@ public sealed class ProceduralMaterialFactoryTests
             AlbedoRgba8: new byte[16],
             NormalRgba8: new byte[16],
             RoughnessRgba8: new byte[16],
+            MetallicRgba8: new byte[16],
             AmbientOcclusionRgba8: new byte[16],
             MipChain: Array.Empty<TextureMipLevel>());
 
@@ -148,6 +152,13 @@ public sealed class ProceduralMaterialFactoryTests
             255, 255, 255, 255,
             255, 255, 255, 255
         ];
+        byte[] metallic =
+        [
+            20, 20, 20, 255,
+            20, 20, 20, 255,
+            20, 20, 20, 255,
+            20, 20, 20, 255
+        ];
         ProceduralTextureSurface surface = new(
             Width: 2,
             Height: 2,
@@ -155,6 +166,7 @@ public sealed class ProceduralMaterialFactoryTests
             AlbedoRgba8: albedo,
             NormalRgba8: normals,
             RoughnessRgba8: roughness,
+            MetallicRgba8: metallic,
             AmbientOcclusionRgba8: ao,
             MipChain: TextureBuilder.GenerateMipChainRgba8(albedo, 2, 2));
 
