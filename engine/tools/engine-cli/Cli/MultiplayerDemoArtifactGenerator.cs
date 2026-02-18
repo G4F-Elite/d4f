@@ -21,6 +21,10 @@ internal sealed record MultiplayerDemoClientStats(
     uint ClientId,
     MultiplayerDemoStats Stats);
 
+internal sealed record MultiplayerDemoArtifactOutput(
+    string SummaryRelativePath,
+    string ProfileLogRelativePath);
+
 internal sealed record MultiplayerDemoSummary(
     ulong Seed,
     uint ProceduralSeed,
@@ -42,7 +46,7 @@ internal static class MultiplayerDemoArtifactGenerator
     private const int DefaultSurfaceHeight = 64;
     private const int SimulatedTickCount = 3;
 
-    public static string Generate(string outputDirectory, ulong seed, double fixedDeltaSeconds)
+    public static MultiplayerDemoArtifactOutput Generate(string outputDirectory, ulong seed, double fixedDeltaSeconds)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
         if (fixedDeltaSeconds <= 0.0)
@@ -51,18 +55,25 @@ internal static class MultiplayerDemoArtifactGenerator
         }
 
         MultiplayerDemoSummary summary = BuildSummary(seed, fixedDeltaSeconds);
-        string relativePath = Path.Combine("net", "multiplayer-demo.json");
-        string fullPath = Path.Combine(outputDirectory, relativePath);
+        string summaryRelativePath = Path.Combine("net", "multiplayer-demo.json");
+        string summaryFullPath = Path.Combine(outputDirectory, summaryRelativePath);
 
-        string? directory = Path.GetDirectoryName(fullPath);
+        string? directory = Path.GetDirectoryName(summaryFullPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
             Directory.CreateDirectory(directory);
         }
 
         string json = JsonSerializer.Serialize(summary, ArtifactOutputWriter.SerializerOptions);
-        File.WriteAllText(fullPath, json);
-        return NormalizePath(relativePath);
+        File.WriteAllText(summaryFullPath, json);
+
+        string profileLogRelativePath = Path.Combine("net", "multiplayer-profile.log");
+        string profileLogFullPath = Path.Combine(outputDirectory, profileLogRelativePath);
+        WriteProfileLog(profileLogFullPath, summary);
+
+        return new MultiplayerDemoArtifactOutput(
+            SummaryRelativePath: NormalizePath(summaryRelativePath),
+            ProfileLogRelativePath: NormalizePath(profileLogRelativePath));
     }
 
     private static MultiplayerDemoSummary BuildSummary(ulong seed, double fixedDeltaSeconds)
@@ -277,6 +288,66 @@ internal static class MultiplayerDemoArtifactGenerator
             LossPercent: stats.LossPercent,
             AverageSendBandwidthKbps: stats.AverageSendBandwidthKbps,
             AverageReceiveBandwidthKbps: stats.AverageReceiveBandwidthKbps);
+    }
+
+    private static void WriteProfileLog(string fullPath, MultiplayerDemoSummary summary)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(fullPath);
+        ArgumentNullException.ThrowIfNull(summary);
+
+        string? directory = Path.GetDirectoryName(fullPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllLines(fullPath, BuildProfileLogLines(summary));
+    }
+
+    private static IReadOnlyList<string> BuildProfileLogLines(MultiplayerDemoSummary summary)
+    {
+        var lines = new List<string>(summary.ClientStats.Count + 3)
+        {
+            string.Format(
+                CultureInfo.InvariantCulture,
+                "seed={0} proceduralSeed={1} fixedDt={2:F6} tickRateHz={3} simulatedTicks={4} synchronized={5}",
+                summary.Seed,
+                summary.ProceduralSeed,
+                summary.FixedDeltaSeconds,
+                summary.TickRateHz,
+                summary.SimulatedTicks,
+                summary.Synchronized),
+            FormatStatsLine("server", summary.ServerStats)
+        };
+
+        foreach (MultiplayerDemoClientStats client in summary.ClientStats.OrderBy(static x => x.ClientId))
+        {
+            lines.Add(FormatStatsLine(
+                string.Format(CultureInfo.InvariantCulture, "client-{0}", client.ClientId),
+                client.Stats));
+        }
+
+        return lines;
+    }
+
+    private static string FormatStatsLine(string scope, MultiplayerDemoStats stats)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scope);
+        ArgumentNullException.ThrowIfNull(stats);
+
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0} bytesSent={1} bytesReceived={2} messagesSent={3} messagesReceived={4} dropped={5} rttMs={6:F3} lossPercent={7:F3} sendKbps={8:F3} receiveKbps={9:F3}",
+            scope,
+            stats.BytesSent,
+            stats.BytesReceived,
+            stats.MessagesSent,
+            stats.MessagesReceived,
+            stats.MessagesDropped,
+            stats.RoundTripTimeMs,
+            stats.LossPercent,
+            stats.AverageSendBandwidthKbps,
+            stats.AverageReceiveBandwidthKbps);
     }
 
     private static string NormalizePath(string path)

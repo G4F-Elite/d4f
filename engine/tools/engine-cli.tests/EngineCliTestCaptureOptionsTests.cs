@@ -37,7 +37,9 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "depth-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "shadow-0012.png")));
             string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
+            string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
             Assert.True(File.Exists(multiplayerPath));
+            Assert.True(File.Exists(profileLogPath));
 
             string replayPath = Path.Combine(artifactsRoot, "replay", "recording.json");
             Assert.True(File.Exists(replayPath));
@@ -71,6 +73,14 @@ public sealed class EngineCliTestCaptureOptionsTests
                 Assert.True(stats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
             }
 
+            string profileLog = File.ReadAllText(profileLogPath);
+            Assert.Contains("server bytesSent=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("rttMs=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("lossPercent=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("sendKbps=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("receiveKbps=", profileLog, StringComparison.Ordinal);
+            Assert.Contains("client-", profileLog, StringComparison.Ordinal);
+
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
             using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
             JsonElement artifacts = manifestJson.RootElement.GetProperty("artifacts");
@@ -80,6 +90,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "multiplayer-demo",
                     StringComparison.Ordinal));
             Assert.True(hasMultiplayerEntry);
+            bool hasNetProfileLog = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "net-profile-log",
+                    StringComparison.Ordinal));
+            Assert.True(hasNetProfileLog);
         }
         finally
         {

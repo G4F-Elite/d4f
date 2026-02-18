@@ -142,15 +142,20 @@ internal static class TestArtifactGenerator
                 RelativePath: NormalizePath(replayRelativePath),
                 Description: "Record/replay metadata."));
 
-        string multiplayerRelativePath = MultiplayerDemoArtifactGenerator.Generate(
+        MultiplayerDemoArtifactOutput multiplayerArtifacts = MultiplayerDemoArtifactGenerator.Generate(
             outputDirectory,
             options.ReplaySeed,
             options.FixedDeltaSeconds);
         manifestEntries.Add(
             new TestingArtifactEntry(
                 Kind: "multiplayer-demo",
-                RelativePath: multiplayerRelativePath,
+                RelativePath: multiplayerArtifacts.SummaryRelativePath,
                 Description: "Authoritative server + 2 clients procedural replication summary with network metrics."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
+                Kind: "net-profile-log",
+                RelativePath: multiplayerArtifacts.ProfileLogRelativePath,
+                Description: "Network profiling log with RTT/loss/bandwidth counters for server and clients."));
 
         string manifestPath = ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
         return new TestArtifactsOutput(manifestPath, captures);
