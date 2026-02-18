@@ -63,6 +63,8 @@ class RendererState {
   engine_native_status_t DestroyResource(engine_native_resource_handle_t handle);
   engine_native_status_t GetLastFrameStats(
       engine_native_renderer_frame_stats_t* out_stats) const;
+  void LoadPipelineCacheFromDisk(const char* file_path);
+  void SavePipelineCacheToDisk(const char* file_path) const;
 
   bool is_frame_open() const { return frame_open_; }
   uint32_t submitted_draw_count() const { return submitted_draw_count_; }
@@ -227,6 +229,7 @@ class AudioState {
 
 struct EngineState {
   EngineState();
+  ~EngineState();
 
   platform::PlatformState platform;
   content::ContentRuntime content;

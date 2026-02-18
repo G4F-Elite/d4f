@@ -18,6 +18,8 @@ class PipelineStateCache {
   explicit PipelineStateCache(size_t capacity = 256u) : capacity_(capacity) {}
 
   const PipelineStateRecord& GetOrCreate(uint64_t key);
+  bool LoadFromFile(const char* file_path);
+  bool SaveToFile(const char* file_path) const;
 
   void Clear();
 

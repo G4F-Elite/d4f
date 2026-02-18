@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <new>
@@ -33,6 +34,7 @@ constexpr uint32_t kMeshIndexFormatU32 = 2u;
 constexpr size_t kMeshBlobIndexFormatOffset = sizeof(uint32_t) * 4u;
 constexpr size_t kMeshBlobIndexDataSizeOffset = sizeof(uint32_t) * 5u;
 constexpr size_t kMeshCpuIndexCountOffset = sizeof(uint32_t) * 2u;
+constexpr const char* kPipelineCachePathEnv = "DFF_PIPELINE_CACHE_PATH";
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
@@ -96,6 +98,15 @@ bool HasValidUiScissor(const engine_native_ui_draw_item_t& item) {
          IsFiniteNonNegative(item.scissor_y) &&
          IsFiniteNonNegative(item.scissor_width) &&
          IsFiniteNonNegative(item.scissor_height);
+}
+
+const char* ResolvePipelineCachePath() {
+  const char* path = std::getenv(kPipelineCachePathEnv);
+  if (path == nullptr || path[0] == '\0') {
+    return nullptr;
+  }
+
+  return path;
 }
 
 bool IsSupportedDebugViewMode(uint8_t mode) {
@@ -272,6 +283,17 @@ bool IsValidResourceBlob(RendererState::ResourceKind kind,
 
 EngineState::EngineState() {
   renderer.AttachDevice(&rhi_device);
+  if (const char* cache_path = ResolvePipelineCachePath();
+      cache_path != nullptr) {
+    renderer.LoadPipelineCacheFromDisk(cache_path);
+  }
+}
+
+EngineState::~EngineState() {
+  if (const char* cache_path = ResolvePipelineCachePath();
+      cache_path != nullptr) {
+    renderer.SavePipelineCacheToDisk(cache_path);
+  }
 }
 
 bool RendererState::IsPowerOfTwo(size_t value) {
@@ -804,6 +826,14 @@ engine_native_status_t RendererState::GetLastFrameStats(
 
   *out_stats = last_frame_stats_;
   return ENGINE_NATIVE_STATUS_OK;
+}
+
+void RendererState::LoadPipelineCacheFromDisk(const char* file_path) {
+  static_cast<void>(pipeline_cache_.LoadFromFile(file_path));
+}
+
+void RendererState::SavePipelineCacheToDisk(const char* file_path) const {
+  static_cast<void>(pipeline_cache_.SaveToFile(file_path));
 }
 
 void RendererState::ResetFrameState() {

@@ -1,6 +1,27 @@
 #include "rhi/pipeline_state_cache.h"
 
+#include <fstream>
+#include <limits>
+
 namespace dff::native::rhi {
+
+namespace {
+
+constexpr uint32_t kPipelineCacheDiskMagic = 0x43465044u;    // DPFC
+constexpr uint32_t kPipelineCacheDiskVersion = 1u;
+
+struct PipelineCacheDiskHeader {
+  uint32_t magic = 0u;
+  uint32_t version = 0u;
+  uint32_t key_count = 0u;
+  uint32_t reserved0 = 0u;
+};
+
+bool IsFilePathValid(const char* file_path) {
+  return file_path != nullptr && file_path[0] != '\0';
+}
+
+}  // namespace
 
 const PipelineStateRecord& PipelineStateCache::GetOrCreate(uint64_t key) {
   auto entry_it = entries_.find(key);
@@ -25,6 +46,84 @@ const PipelineStateRecord& PipelineStateCache::GetOrCreate(uint64_t key) {
 
   const auto [inserted_it, _] = entries_.emplace(key, entry);
   return inserted_it->second.record;
+}
+
+bool PipelineStateCache::LoadFromFile(const char* file_path) {
+  if (!IsFilePathValid(file_path)) {
+    return false;
+  }
+
+  std::ifstream stream(file_path, std::ios::binary);
+  if (!stream.is_open()) {
+    return false;
+  }
+
+  PipelineCacheDiskHeader header{};
+  stream.read(reinterpret_cast<char*>(&header), sizeof(header));
+  if (!stream.good()) {
+    return false;
+  }
+  if (header.magic != kPipelineCacheDiskMagic ||
+      header.version != kPipelineCacheDiskVersion) {
+    return false;
+  }
+
+  if (header.key_count >
+      static_cast<uint32_t>(std::numeric_limits<size_t>::max())) {
+    return false;
+  }
+
+  Clear();
+  for (uint32_t i = 0u; i < header.key_count; ++i) {
+    uint64_t key = 0u;
+    stream.read(reinterpret_cast<char*>(&key), sizeof(key));
+    if (!stream.good()) {
+      Clear();
+      return false;
+    }
+
+    static_cast<void>(GetOrCreate(key));
+  }
+
+  hit_count_ = 0u;
+  miss_count_ = 0u;
+  return true;
+}
+
+bool PipelineStateCache::SaveToFile(const char* file_path) const {
+  if (!IsFilePathValid(file_path)) {
+    return false;
+  }
+
+  std::ofstream stream(file_path, std::ios::binary | std::ios::trunc);
+  if (!stream.is_open()) {
+    return false;
+  }
+
+  if (entries_.size() >
+      static_cast<size_t>(std::numeric_limits<uint32_t>::max())) {
+    return false;
+  }
+
+  PipelineCacheDiskHeader header{
+      .magic = kPipelineCacheDiskMagic,
+      .version = kPipelineCacheDiskVersion,
+      .key_count = static_cast<uint32_t>(entries_.size()),
+      .reserved0 = 0u,
+  };
+  stream.write(reinterpret_cast<const char*>(&header), sizeof(header));
+  if (!stream.good()) {
+    return false;
+  }
+
+  for (uint64_t key : lru_keys_) {
+    stream.write(reinterpret_cast<const char*>(&key), sizeof(key));
+    if (!stream.good()) {
+      return false;
+    }
+  }
+
+  return true;
 }
 
 void PipelineStateCache::Clear() {
