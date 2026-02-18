@@ -56,6 +56,18 @@ public static class PackagedRuntimeNativeBootstrap
         Environment.SetEnvironmentVariable(NativeLibrarySearchPathEnvironmentVariable, resolvedSearchPath);
     }
 
+    public static void ApplyConfiguredSearchPathForCurrentPlatform()
+    {
+        string? loaderVariable = GetNativeLoaderSearchPathVariable();
+        if (loaderVariable is null)
+        {
+            return;
+        }
+
+        bool ignoreCase = OperatingSystem.IsWindows();
+        ApplyConfiguredSearchPath(loaderVariable, ignoreCase);
+    }
+
     private static RuntimeNativeConfig ReadConfig(string runtimeConfigPath)
     {
         JsonDocument document;
@@ -120,6 +132,64 @@ public static class PackagedRuntimeNativeBootstrap
             ?? throw new InvalidDataException($"Runtime native config path is invalid: {runtimeConfigPath}");
         string packageRoot = Path.GetFullPath(Path.Combine(configDirectory, ".."));
         return Path.GetFullPath(Path.Combine(packageRoot, NormalizeRelativePath(configuredSearchPath)));
+    }
+
+    internal static void ApplyConfiguredSearchPath(string loaderVariableName, bool pathComparisonIgnoreCase)
+    {
+        if (string.IsNullOrWhiteSpace(loaderVariableName))
+        {
+            throw new ArgumentException("Loader variable name cannot be empty.", nameof(loaderVariableName));
+        }
+
+        string? configuredSearchPath = Environment.GetEnvironmentVariable(NativeLibrarySearchPathEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configuredSearchPath))
+        {
+            return;
+        }
+
+        string normalizedSearchPath = Path.GetFullPath(configuredSearchPath);
+        if (!Directory.Exists(normalizedSearchPath))
+        {
+            throw new DirectoryNotFoundException(
+                $"Runtime native library search path was not found: {normalizedSearchPath}");
+        }
+
+        string existingValue = Environment.GetEnvironmentVariable(loaderVariableName) ?? string.Empty;
+        var comparer = pathComparisonIgnoreCase ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+        List<string> entries = existingValue
+            .Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(Path.GetFullPath)
+            .Distinct(comparer)
+            .ToList();
+        if (entries.Any(path => comparer.Equals(path, normalizedSearchPath)))
+        {
+            return;
+        }
+
+        string updatedValue = string.IsNullOrWhiteSpace(existingValue)
+            ? normalizedSearchPath
+            : normalizedSearchPath + Path.PathSeparator + existingValue;
+        Environment.SetEnvironmentVariable(loaderVariableName, updatedValue);
+    }
+
+    private static string? GetNativeLoaderSearchPathVariable()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return "PATH";
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return "LD_LIBRARY_PATH";
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return "DYLD_LIBRARY_PATH";
+        }
+
+        return null;
     }
 
     private static string NormalizeRelativePath(string path)

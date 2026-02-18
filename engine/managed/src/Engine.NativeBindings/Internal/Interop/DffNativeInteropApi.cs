@@ -46,6 +46,8 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
                 $"Set '{PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable}' to a valid file path.");
         }
 
+        PackagedRuntimeNativeBootstrap.ApplyConfiguredSearchPathForCurrentPlatform();
+
         if (NativeLibrary.TryLoad(normalizedPath, out IntPtr handle))
         {
             return handle;

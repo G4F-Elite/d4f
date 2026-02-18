@@ -121,6 +121,40 @@ public sealed class PackagedRuntimeNativeBootstrapTests
         }
     }
 
+    [Fact]
+    public void ApplyConfiguredSearchPath_ShouldPrependAndAvoidDuplicates()
+    {
+        string tempRoot = Path.Combine(Path.GetTempPath(), $"engine-native-bootstrap-path-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(tempRoot);
+
+        const string loaderVariableName = "DFF_TEST_NATIVE_LOADER_PATH";
+        string previousSearchPath = Environment.GetEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibrarySearchPathEnvironmentVariable) ?? string.Empty;
+        string previousLoaderPath = Environment.GetEnvironmentVariable(loaderVariableName) ?? string.Empty;
+
+        try
+        {
+            Environment.SetEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibrarySearchPathEnvironmentVariable, tempRoot);
+            Environment.SetEnvironmentVariable(loaderVariableName, "alpha;beta");
+
+            PackagedRuntimeNativeBootstrap.ApplyConfiguredSearchPath(loaderVariableName, pathComparisonIgnoreCase: false);
+            string firstValue = Environment.GetEnvironmentVariable(loaderVariableName)
+                ?? throw new InvalidDataException("Loader variable was not set.");
+            Assert.StartsWith(Path.GetFullPath(tempRoot), firstValue, StringComparison.Ordinal);
+            Assert.EndsWith("alpha;beta", firstValue, StringComparison.Ordinal);
+
+            PackagedRuntimeNativeBootstrap.ApplyConfiguredSearchPath(loaderVariableName, pathComparisonIgnoreCase: false);
+            string secondValue = Environment.GetEnvironmentVariable(loaderVariableName)
+                ?? throw new InvalidDataException("Loader variable was not set.");
+            Assert.Equal(firstValue, secondValue);
+        }
+        finally
+        {
+            RestoreEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibrarySearchPathEnvironmentVariable, previousSearchPath);
+            RestoreEnvironmentVariable(loaderVariableName, previousLoaderPath);
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static string CreateTempPackage(bool createNativeLibraryFile = true)
     {
         string packageRoot = Path.Combine(Path.GetTempPath(), $"engine-native-bootstrap-tests-{Guid.NewGuid():N}");
