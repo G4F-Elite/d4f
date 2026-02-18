@@ -11,7 +11,7 @@ internal static class UiLayoutEngine
 
         foreach (UiElement root in document.Roots)
         {
-            ApplyElementLayout(document, root, 0.0f, 0.0f, null, null, null, null);
+            ApplyElementLayout(document, root, 0.0f, 0.0f, null, null, null, null, null, null);
         }
     }
 
@@ -20,6 +20,8 @@ internal static class UiLayoutEngine
         UiElement element,
         float parentContentX,
         float parentContentY,
+        float? parentContentWidth,
+        float? parentContentHeight,
         float? localX,
         float? localY,
         float? widthOverride,
@@ -37,8 +39,8 @@ internal static class UiLayoutEngine
         float effectiveHeight = heightOverride ?? element.Height;
         float clampedWidth = ClampDimension(effectiveWidth, element.MinWidth, element.MaxWidth);
         float clampedHeight = ClampDimension(effectiveHeight, element.MinHeight, element.MaxHeight);
-        float absoluteX = parentContentX + effectiveX + element.Margin.Left;
-        float absoluteY = parentContentY + effectiveY + element.Margin.Top;
+        float absoluteX = parentContentX + ResolveAnchoredX(element, effectiveX, clampedWidth, parentContentWidth);
+        float absoluteY = parentContentY + ResolveAnchoredY(element, effectiveY, clampedHeight, parentContentHeight);
         var bounds = new RectF(absoluteX, absoluteY, clampedWidth, clampedHeight);
         element.SetLayoutBounds(bounds);
 
@@ -62,7 +64,7 @@ internal static class UiLayoutEngine
             default:
                 foreach (UiElement child in element.Children)
                 {
-                    ApplyElementLayout(document, child, contentX, contentY, null, null, null, null);
+                    ApplyElementLayout(document, child, contentX, contentY, contentWidth, contentHeight, null, null, null, null);
                 }
 
                 return;
@@ -87,7 +89,7 @@ internal static class UiLayoutEngine
             float childX = child.X;
             float childY = cursorY - contentY + child.Y;
 
-            ApplyElementLayout(document, child, contentX, contentY, childX, childY, childWidth, childHeight);
+            ApplyElementLayout(document, child, contentX, contentY, contentWidth, contentHeight, childX, childY, childWidth, childHeight);
 
             if (child.Visible)
             {
@@ -114,7 +116,7 @@ internal static class UiLayoutEngine
             float childX = cursorX - contentX + child.X;
             float childY = child.Y;
 
-            ApplyElementLayout(document, child, contentX, contentY, childX, childY, childWidth, childHeight);
+            ApplyElementLayout(document, child, contentX, contentY, contentWidth, contentHeight, childX, childY, childWidth, childHeight);
 
             if (child.Visible)
             {
@@ -143,7 +145,7 @@ internal static class UiLayoutEngine
         {
             if (!child.Visible)
             {
-                ApplyElementLayout(document, child, contentX, contentY, null, null, null, null);
+                ApplyElementLayout(document, child, contentX, contentY, contentWidth, contentHeight, null, null, null, null);
                 continue;
             }
 
@@ -224,7 +226,7 @@ internal static class UiLayoutEngine
                 float localY = isRow ? localCross + item.Child.Y : localMain + item.Child.Y;
                 float width = isRow ? item.MainSize : crossSize;
                 float height = isRow ? crossSize : item.MainSize;
-                ApplyElementLayout(document, item.Child, contentX, contentY, localX, localY, width, height);
+                ApplyElementLayout(document, item.Child, contentX, contentY, contentWidth, contentHeight, localX, localY, width, height);
 
                 mainCursor += item.TotalMain + spacing;
             }
@@ -339,7 +341,6 @@ internal static class UiLayoutEngine
         {
             return ClampDimension(configured, min, max);
         }
-
         return ClampDimension(Math.Max(0.0f, available), min, max);
     }
 
@@ -350,16 +351,35 @@ internal static class UiLayoutEngine
         {
             clamped = Math.Min(clamped, max.Value);
         }
-
         return clamped;
+    }
+
+    private static float ResolveAnchoredX(UiElement element, float x, float width, float? parentContentWidth)
+    {
+        bool isRightAnchored = (element.Anchors & UiAnchor.Right) != 0;
+        bool isLeftAnchored = (element.Anchors & UiAnchor.Left) != 0;
+        if (!parentContentWidth.HasValue || !isRightAnchored || isLeftAnchored)
+        {
+            return x + element.Margin.Left;
+        }
+        return parentContentWidth.Value - width - x - element.Margin.Right;
+    }
+
+    private static float ResolveAnchoredY(UiElement element, float y, float height, float? parentContentHeight)
+    {
+        bool isBottomAnchored = (element.Anchors & UiAnchor.Bottom) != 0;
+        bool isTopAnchored = (element.Anchors & UiAnchor.Top) != 0;
+        if (!parentContentHeight.HasValue || !isBottomAnchored || isTopAnchored)
+        {
+            return y + element.Margin.Top;
+        }
+        return parentContentHeight.Value - height - y - element.Margin.Bottom;
     }
 
     private sealed class FlexLine
     {
         public List<FlexItem> Items { get; } = [];
-
         public float MainUsed { get; set; }
-
         public float CrossExtent { get; set; }
     }
 
@@ -374,7 +394,6 @@ internal static class UiLayoutEngine
         bool IsCrossAuto)
     {
         public float TotalMain => MainMarginStart + MainSize + MainMarginEnd;
-
         public float TotalCross => CrossMarginStart + CrossSize + CrossMarginEnd;
     }
 }

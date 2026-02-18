@@ -19,6 +19,7 @@ public abstract class UiElement
     private UiFlexDirection _flexDirection;
     private UiJustifyContent _justifyContent;
     private UiAlignItems _alignItems;
+    private UiAnchor _anchors = UiAnchor.Left | UiAnchor.Top;
 
     protected UiElement(string id)
     {
@@ -79,6 +80,25 @@ public abstract class UiElement
     }
 
     public bool Wrap { get; set; }
+
+    public UiAnchor Anchors
+    {
+        get => _anchors;
+        set
+        {
+            const UiAnchor allowed =
+                UiAnchor.Left |
+                UiAnchor.Right |
+                UiAnchor.Top |
+                UiAnchor.Bottom;
+            if ((value & ~allowed) != 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), value, "Unsupported anchor combination.");
+            }
+
+            _anchors = value;
+        }
+    }
 
     public float LayoutGap
     {
