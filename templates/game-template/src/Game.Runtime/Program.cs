@@ -114,6 +114,7 @@ static void TryConfigurePackagedContent(ref NativeFacadeSet? nativeFacades)
         return;
     }
 
+    PackagedRuntimeNativeBootstrap.ConfigureEnvironmentFromRuntimeConfig(runtimeConfigPath);
     nativeFacades = NativeFacadeFactory.CreateNativeFacadeSet();
     PackagedRuntimeContentBootstrap.ConfigureFromRuntimeConfig(
         nativeFacades.Content,

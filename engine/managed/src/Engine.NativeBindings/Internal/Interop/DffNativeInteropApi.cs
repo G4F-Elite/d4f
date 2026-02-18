@@ -1,15 +1,58 @@
 using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Reflection;
 
 namespace Engine.NativeBindings.Internal.Interop;
 
 internal sealed partial class DffNativeInteropApi : INativeInteropApi
 {
+    static DffNativeInteropApi()
+    {
+        NativeLibrary.SetDllImportResolver(typeof(DffNativeInteropApi).Assembly, ResolveNativeLibrary);
+    }
+
     public static DffNativeInteropApi Instance { get; } = new();
 
     private DffNativeInteropApi()
     {
+    }
+
+    private static IntPtr ResolveNativeLibrary(
+        string libraryName,
+        Assembly assembly,
+        DllImportSearchPath? searchPath)
+    {
+        _ = assembly;
+        _ = searchPath;
+
+        if (!string.Equals(libraryName, EngineNativeConstants.LibraryName, StringComparison.Ordinal))
+        {
+            return IntPtr.Zero;
+        }
+
+        string? configuredPath = Environment.GetEnvironmentVariable(
+            PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable);
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return IntPtr.Zero;
+        }
+
+        string normalizedPath = Path.GetFullPath(configuredPath);
+        if (!File.Exists(normalizedPath))
+        {
+            throw new DllNotFoundException(
+                $"Configured native library path '{normalizedPath}' does not exist. " +
+                $"Set '{PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable}' to a valid file path.");
+        }
+
+        if (NativeLibrary.TryLoad(normalizedPath, out IntPtr handle))
+        {
+            return handle;
+        }
+
+        throw new DllNotFoundException(
+            $"Failed to load native library from configured path '{normalizedPath}'.");
     }
 
     public uint EngineGetNativeApiVersion()
