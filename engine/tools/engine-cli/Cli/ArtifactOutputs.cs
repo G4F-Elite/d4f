@@ -162,6 +162,11 @@ internal static class TestArtifactGenerator
                 [
                     $"capture.frame={options.CaptureFrame}",
                     $"net.profile={multiplayerArtifacts.ProfileLogRelativePath}"
+                ],
+                TimedNetworkEvents:
+                [
+                    new ReplayTimedNetworkEvent(0L, $"capture.frame={options.CaptureFrame}"),
+                    new ReplayTimedNetworkEvent(options.CaptureFrame, $"net.profile={multiplayerArtifacts.ProfileLogRelativePath}")
                 ]));
         manifestEntries.Add(
             new TestingArtifactEntry(

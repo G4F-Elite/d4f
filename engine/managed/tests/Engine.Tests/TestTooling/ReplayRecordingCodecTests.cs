@@ -23,6 +23,11 @@ public sealed class ReplayRecordingCodecTests
                 [
                     "spawn:player1",
                     "rpc:jump"
+                ],
+                TimedNetworkEvents:
+                [
+                    new ReplayTimedNetworkEvent(0, "spawn:player1"),
+                    new ReplayTimedNetworkEvent(1, "rpc:jump")
                 ]);
 
             ReplayRecordingCodec.Write(replayPath, replay);
@@ -33,6 +38,7 @@ public sealed class ReplayRecordingCodecTests
             Assert.Equal(replay.Frames.Count, loaded.Frames.Count);
             Assert.Equal(replay.Frames[1], loaded.Frames[1]);
             Assert.Equal(replay.NetworkEvents, loaded.NetworkEvents);
+            Assert.Equal(replay.TimedNetworkEvents, loaded.TimedNetworkEvents);
         }
         finally
         {
@@ -65,6 +71,44 @@ public sealed class ReplayRecordingCodecTests
     {
         string path = Path.Combine(Path.GetTempPath(), $"missing-replay-{Guid.NewGuid():N}.json");
         Assert.Throws<FileNotFoundException>(() => ReplayRecordingCodec.Read(path));
+    }
+
+    [Fact]
+    public void Read_ShouldFail_WhenTimedNetworkEventInvalid()
+    {
+        string root = CreateTempDirectory();
+        try
+        {
+            string replayPath = Path.Combine(root, "bad-timed-events.json");
+            File.WriteAllText(
+                replayPath,
+                """
+                {
+                  "seed": 1,
+                  "fixedDeltaSeconds": 0.0166666667,
+                  "frames": [
+                    {
+                      "tick": 0,
+                      "buttonsMask": 0,
+                      "mouseX": 0.0,
+                      "mouseY": 0.0
+                    }
+                  ],
+                  "timedNetworkEvents": [
+                    {
+                      "tick": -1,
+                      "event": "bad"
+                    }
+                  ]
+                }
+                """);
+
+            Assert.Throws<InvalidDataException>(() => ReplayRecordingCodec.Read(replayPath));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
     }
 
     private static string CreateTempDirectory()

@@ -8,11 +8,16 @@ public sealed record ReplayFrameInput(
     float MouseX,
     float MouseY);
 
+public sealed record ReplayTimedNetworkEvent(
+    long Tick,
+    string Event);
+
 public sealed record ReplayRecording(
     ulong Seed,
     double FixedDeltaSeconds,
     IReadOnlyList<ReplayFrameInput> Frames,
-    IReadOnlyList<string>? NetworkEvents = null);
+    IReadOnlyList<string>? NetworkEvents = null,
+    IReadOnlyList<ReplayTimedNetworkEvent>? TimedNetworkEvents = null);
 
 public static class ReplayRecordingCodec
 {
@@ -67,6 +72,24 @@ public static class ReplayRecordingCodec
         if (replay.Frames is null)
         {
             throw new InvalidDataException("Replay must define frames.");
+        }
+
+        if (replay.TimedNetworkEvents is not null)
+        {
+            for (int i = 0; i < replay.TimedNetworkEvents.Count; i++)
+            {
+                ReplayTimedNetworkEvent evt = replay.TimedNetworkEvents[i]
+                    ?? throw new InvalidDataException($"Replay timed network event at index {i} is null.");
+                if (evt.Tick < 0)
+                {
+                    throw new InvalidDataException($"Replay timed network event tick at index {i} must be non-negative.");
+                }
+
+                if (string.IsNullOrWhiteSpace(evt.Event))
+                {
+                    throw new InvalidDataException($"Replay timed network event payload at index {i} cannot be empty.");
+                }
+            }
         }
 
         return replay;
