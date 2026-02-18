@@ -19,6 +19,12 @@ public sealed partial class RetainedUiFacade
                 case UiInteractionKind.PointerClick:
                     DispatchPointerClick(interaction.PointerX, interaction.PointerY);
                     break;
+                case UiInteractionKind.PointerDown:
+                    DispatchPointerDown(interaction.PointerX, interaction.PointerY);
+                    break;
+                case UiInteractionKind.PointerUp:
+                    DispatchPointerUp(interaction.PointerX, interaction.PointerY);
+                    break;
                 case UiInteractionKind.PointerMove:
                     DispatchPointerMove(interaction.PointerX, interaction.PointerY);
                     break;
@@ -93,6 +99,18 @@ public sealed partial class RetainedUiFacade
                 return;
             }
         }
+    }
+
+    private void DispatchPointerDown(float pointerX, float pointerY)
+    {
+        UiElement? target = FindTopmostElement(pointerX, pointerY);
+        target?.InvokePointerDown(pointerX, pointerY);
+    }
+
+    private void DispatchPointerUp(float pointerX, float pointerY)
+    {
+        UiElement? target = FindTopmostElement(pointerX, pointerY);
+        target?.InvokePointerUp(pointerX, pointerY);
     }
 
     private void DispatchTextInput(string text)

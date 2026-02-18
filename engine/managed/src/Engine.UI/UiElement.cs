@@ -222,6 +222,10 @@ public abstract class UiElement
 
     public Action? OnPointerLeave { get; set; }
 
+    public Action<float, float>? OnPointerDown { get; set; }
+
+    public Action<float, float>? OnPointerUp { get; set; }
+
     public Action<float, float>? OnPointerMove { get; set; }
 
     public RectF LayoutBounds { get; private set; } = RectF.Empty;
@@ -291,5 +295,15 @@ public abstract class UiElement
     internal void InvokePointerMove(float pointerX, float pointerY)
     {
         OnPointerMove?.Invoke(pointerX, pointerY);
+    }
+
+    internal void InvokePointerDown(float pointerX, float pointerY)
+    {
+        OnPointerDown?.Invoke(pointerX, pointerY);
+    }
+
+    internal void InvokePointerUp(float pointerX, float pointerY)
+    {
+        OnPointerUp?.Invoke(pointerX, pointerY);
     }
 }

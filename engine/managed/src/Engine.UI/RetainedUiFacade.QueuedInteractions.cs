@@ -6,10 +6,12 @@ public sealed partial class RetainedUiFacade
     {
         ElementClick = 0,
         PointerClick = 1,
-        PointerMove = 2,
-        PointerScroll = 3,
-        TextInput = 4,
-        Backspace = 5
+        PointerDown = 2,
+        PointerUp = 3,
+        PointerMove = 4,
+        PointerScroll = 5,
+        TextInput = 6,
+        Backspace = 7
     }
 
     private readonly record struct UiQueuedInteraction(
@@ -25,6 +27,12 @@ public sealed partial class RetainedUiFacade
 
         public static UiQueuedInteraction CreatePointerClick(float x, float y) =>
             new(UiInteractionKind.PointerClick, string.Empty, x, y, 0.0f, string.Empty);
+
+        public static UiQueuedInteraction CreatePointerDown(float x, float y) =>
+            new(UiInteractionKind.PointerDown, string.Empty, x, y, 0.0f, string.Empty);
+
+        public static UiQueuedInteraction CreatePointerUp(float x, float y) =>
+            new(UiInteractionKind.PointerUp, string.Empty, x, y, 0.0f, string.Empty);
 
         public static UiQueuedInteraction CreatePointerMove(float x, float y) =>
             new(UiInteractionKind.PointerMove, string.Empty, x, y, 0.0f, string.Empty);

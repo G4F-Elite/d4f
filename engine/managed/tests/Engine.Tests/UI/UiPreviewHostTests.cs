@@ -38,6 +38,8 @@ public sealed class UiPreviewHostTests
     [Fact]
     public void QueueInteractionMethods_ApplyDuringPreviewUpdate()
     {
+        var pointerDownCount = 0;
+        var pointerUpCount = 0;
         var document = new UiDocument();
         var root = new UiPanel("root", new TextureHandle(10))
         {
@@ -49,7 +51,9 @@ public sealed class UiPreviewHostTests
             X = 10,
             Y = 10,
             Width = 20,
-            Height = 20
+            Height = 20,
+            OnPointerDown = (_, _) => pointerDownCount++,
+            OnPointerUp = (_, _) => pointerUpCount++
         };
         var input = new UiInputField("input", new TextureHandle(12), new TextureHandle(13))
         {
@@ -63,6 +67,8 @@ public sealed class UiPreviewHostTests
         document.AddRoot(root);
 
         var host = new UiPreviewHost(document);
+        host.QueuePointerDown(15, 15);
+        host.QueuePointerUp(15, 15);
         host.QueuePointerMove(15, 15);
         host.QueuePointerClick(15, 15);
         host.QueuePointerClick(15, 45);
@@ -74,6 +80,8 @@ public sealed class UiPreviewHostTests
         Assert.Equal("ab", input.Text);
         Assert.True(input.IsFocused);
         Assert.True(toggle.IsHovered);
+        Assert.Equal(1, pointerDownCount);
+        Assert.Equal(1, pointerUpCount);
     }
 
     [Fact]

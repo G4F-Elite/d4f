@@ -64,6 +64,36 @@ public sealed partial class RetainedUiFacade : IUiFacade
         _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerClick(x, y));
     }
 
+    public void QueuePointerDown(float x, float y)
+    {
+        if (!float.IsFinite(x))
+        {
+            throw new ArgumentOutOfRangeException(nameof(x), "Pointer X coordinate must be finite.");
+        }
+
+        if (!float.IsFinite(y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(y), "Pointer Y coordinate must be finite.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerDown(x, y));
+    }
+
+    public void QueuePointerUp(float x, float y)
+    {
+        if (!float.IsFinite(x))
+        {
+            throw new ArgumentOutOfRangeException(nameof(x), "Pointer X coordinate must be finite.");
+        }
+
+        if (!float.IsFinite(y))
+        {
+            throw new ArgumentOutOfRangeException(nameof(y), "Pointer Y coordinate must be finite.");
+        }
+
+        _queuedInteractions.Enqueue(UiQueuedInteraction.CreatePointerUp(x, y));
+    }
+
     public void QueueScroll(float x, float y, float wheelDelta)
     {
         if (!float.IsFinite(x))
