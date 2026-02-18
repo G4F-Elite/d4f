@@ -94,6 +94,23 @@ internal static class PreviewArtifactGenerator
         return ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
     }
 
+    public static string GenerateAudioOnly(string outputDirectory, IReadOnlyList<PakEntry> compiledEntries)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputDirectory);
+        ArgumentNullException.ThrowIfNull(compiledEntries);
+
+        var audioEntries = new List<PakEntry>();
+        foreach (PakEntry entry in compiledEntries)
+        {
+            if (IsAudioKind(entry.Kind))
+            {
+                audioEntries.Add(entry);
+            }
+        }
+
+        return Generate(outputDirectory, audioEntries);
+    }
+
     private static GoldenImageBuffer BuildAssetPreviewImage(PakEntry entry)
     {
         uint seed = ComputeSeed($"{entry.Kind}|{entry.Path}");

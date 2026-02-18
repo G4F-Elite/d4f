@@ -12,7 +12,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, preview dump, test, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, pack, doctor, api dump.",
             result.Error);
     }
 
@@ -91,6 +91,25 @@ public sealed class EngineCliParserTests
         PreviewCommand command = Assert.IsType<PreviewCommand>(result.Command);
         Assert.Equal("assets/manifest.json", command.ManifestPath);
         Assert.Equal(Path.Combine("game", "artifacts", "preview"), command.OutputDirectory);
+    }
+
+    [Fact]
+    public void Parse_ShouldUseDefaultPreviewAudioOptions_WhenOutNotProvided()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["preview", "audio", "--project", "game"]);
+
+        PreviewAudioCommand command = Assert.IsType<PreviewAudioCommand>(result.Command);
+        Assert.Equal("assets/manifest.json", command.ManifestPath);
+        Assert.Equal(Path.Combine("game", "artifacts", "preview-audio"), command.OutputDirectory);
+    }
+
+    [Fact]
+    public void Parse_ShouldFail_WhenPreviewAudioProjectMissing()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["preview", "audio", "--manifest", "assets/manifest.json"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--project' is required for 'preview audio'.", result.Error);
     }
 
     [Fact]

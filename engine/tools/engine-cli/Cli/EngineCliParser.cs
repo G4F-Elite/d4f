@@ -4,7 +4,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview dump, test, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -61,6 +61,19 @@ public static partial class EngineCliParser
             }
 
             return ParsePreviewDump(dumpOptions);
+        }
+
+        if (string.Equals(commandName, "preview", StringComparison.Ordinal) &&
+            args.Length > 1 &&
+            string.Equals(args[1], "audio", StringComparison.OrdinalIgnoreCase))
+        {
+            Dictionary<string, string> audioOptions = ParseOptions(args[2..], out string? audioError);
+            if (audioError is not null)
+            {
+                return EngineCliParseResult.Failure(audioError);
+            }
+
+            return ParsePreviewAudio(audioOptions);
         }
 
         int optionsStartIndex = 1;
@@ -224,6 +237,28 @@ public static partial class EngineCliParser
         }
 
         return EngineCliParseResult.Success(new PreviewCommand(project, manifest, output));
+    }
+
+    private static EngineCliParseResult ParsePreviewAudio(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'preview audio'.");
+        }
+
+        string manifest = options.TryGetValue("manifest", out string? manifestValue)
+            ? manifestValue
+            : "assets/manifest.json";
+        string output = GetOutOrOutputPath(
+            options,
+            defaultValue: Path.Combine(project, "artifacts", "preview-audio"),
+            out string? outError);
+        if (outError is not null)
+        {
+            return EngineCliParseResult.Failure(outError);
+        }
+
+        return EngineCliParseResult.Success(new PreviewAudioCommand(project, manifest, output));
     }
 
     private static EngineCliParseResult ParsePreviewDump(IReadOnlyDictionary<string, string> options)

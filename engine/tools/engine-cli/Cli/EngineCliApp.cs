@@ -43,6 +43,7 @@ public sealed partial class EngineCliApp
                 RunCommand cmd => HandleRun(cmd),
                 BakeCommand cmd => HandleBake(cmd),
                 PreviewCommand cmd => HandlePreview(cmd),
+                PreviewAudioCommand cmd => HandlePreviewAudio(cmd),
                 PreviewDumpCommand cmd => HandlePreviewDump(cmd),
                 TestCommand cmd => HandleTest(cmd),
                 PackCommand cmd => HandlePack(cmd),

@@ -22,6 +22,11 @@ public sealed record PreviewCommand(
     string ManifestPath,
     string OutputDirectory) : EngineCliCommand;
 
+public sealed record PreviewAudioCommand(
+    string ProjectDirectory,
+    string ManifestPath,
+    string OutputDirectory) : EngineCliCommand;
+
 public sealed record PreviewDumpCommand(
     string ProjectDirectory,
     string ManifestPath) : EngineCliCommand;
