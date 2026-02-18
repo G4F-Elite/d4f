@@ -26,6 +26,17 @@ public sealed class InMemoryNetSessionTests
     }
 
     [Fact]
+    public void UpsertServerEntity_ShouldFail_WhenOwnerClientIsNotConnected()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+
+        NetEntityState entity = CreateEntity(1u, ownerClientId: 404u, componentId: "transform", payload: [1, 2]);
+
+        Assert.Throws<KeyNotFoundException>(() => session.UpsertServerEntity(entity));
+    }
+
+    [Fact]
     public void Pump_ShouldReplicateDeterministicSnapshotOrdering()
     {
         InMemoryNetSession session = CreateSession();
@@ -63,6 +74,80 @@ public sealed class InMemoryNetSessionTests
         NetRpcMessage rpc = new(10u, "move", [7], NetworkChannel.ReliableOrdered);
 
         Assert.Throws<InvalidOperationException>(() => session.QueueClientRpc(foreignClientId, rpc));
+    }
+
+    [Fact]
+    public void TrySetEntityOwner_ShouldUpdateSnapshotAndRpcAuthorization()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+
+        uint firstOwnerClientId = session.ConnectClient();
+        uint nextOwnerClientId = session.ConnectClient();
+        uint observerClientId = session.ConnectClient();
+
+        session.UpsertServerEntity(CreateEntity(10u, firstOwnerClientId, "transform", [1]));
+        bool updated = session.TrySetEntityOwner(10u, nextOwnerClientId);
+
+        Assert.True(updated);
+
+        session.Pump();
+        NetSnapshot snapshot = session.GetClientSnapshot(observerClientId);
+        NetEntityState entity = Assert.Single(snapshot.Entities);
+        Assert.Equal(nextOwnerClientId, entity.OwnerClientId);
+
+        NetRpcMessage move = new(10u, "move", [7], NetworkChannel.ReliableOrdered);
+        Assert.Throws<InvalidOperationException>(() => session.QueueClientRpc(firstOwnerClientId, move));
+
+        session.QueueClientRpc(nextOwnerClientId, move);
+        session.Pump();
+
+        NetRpcEnvelope envelope = Assert.Single(session.DrainServerInbox());
+        Assert.Equal(nextOwnerClientId, envelope.SourceClientId);
+        Assert.Equal("move", envelope.Message.RpcName);
+    }
+
+    [Fact]
+    public void TrySetEntityOwner_ShouldReturnFalse_WhenEntityIsUnknown()
+    {
+        InMemoryNetSession session = CreateSession();
+        uint ownerClientId = session.ConnectClient();
+
+        bool changed = session.TrySetEntityOwner(999u, ownerClientId);
+
+        Assert.False(changed);
+    }
+
+    [Fact]
+    public void TrySetEntityOwner_ShouldFail_WhenOwnerClientIsNotConnected()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+
+        uint ownerClientId = session.ConnectClient();
+        session.UpsertServerEntity(CreateEntity(10u, ownerClientId, "transform", [1]));
+
+        Assert.Throws<KeyNotFoundException>(() => session.TrySetEntityOwner(10u, ownerClientId: 1000u));
+    }
+
+    [Fact]
+    public void DisconnectClient_ShouldClearEntityOwnership()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+
+        uint ownerClientId = session.ConnectClient();
+        uint observerClientId = session.ConnectClient();
+        session.UpsertServerEntity(CreateEntity(8u, ownerClientId, "transform", [9]));
+
+        bool disconnected = session.DisconnectClient(ownerClientId);
+
+        Assert.True(disconnected);
+
+        session.Pump();
+        NetSnapshot snapshot = session.GetClientSnapshot(observerClientId);
+        NetEntityState entity = Assert.Single(snapshot.Entities);
+        Assert.Null(entity.OwnerClientId);
     }
 
     [Fact]

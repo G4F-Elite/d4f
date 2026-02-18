@@ -77,7 +77,13 @@ public sealed partial class InMemoryNetSession
             throw new ArgumentOutOfRangeException(nameof(clientId), "Client id must be greater than zero.");
         }
 
-        return _clients.Remove(clientId);
+        if (!_clients.Remove(clientId))
+        {
+            return false;
+        }
+
+        ClearDisconnectedClientOwnership(clientId);
+        return true;
     }
 
     public void UpsertServerEntity(NetEntityState entity)
@@ -135,25 +141,25 @@ public sealed partial class InMemoryNetSession
                 throw new KeyNotFoundException($"Entity '{message.EntityId}' is not available on server.");
             }
 
-        if (entity.OwnerClientId is uint ownerClientId && ownerClientId != sourceClientId)
+            if (entity.OwnerClientId is uint ownerClientId && ownerClientId != sourceClientId)
+            {
+                client.Stats.RecordDropped();
+                throw new InvalidOperationException(
+                    $"Client '{sourceClientId}' cannot send RPC for entity '{message.EntityId}' owned by '{ownerClientId}'.");
+            }
+        }
+
+        client.Stats.RecordSent(message.Payload.Length);
+        if (ShouldDropPacket(TransportPacketKind.ClientRpc, sourceClientId))
         {
             client.Stats.RecordDropped();
-            throw new InvalidOperationException(
-                $"Client '{sourceClientId}' cannot send RPC for entity '{message.EntityId}' owned by '{ownerClientId}'.");
+            _serverStats.RecordDropped();
+            return;
         }
-    }
 
-    client.Stats.RecordSent(message.Payload.Length);
-    if (ShouldDropPacket(TransportPacketKind.ClientRpc, sourceClientId))
-    {
-        client.Stats.RecordDropped();
-        _serverStats.RecordDropped();
-        return;
+        _pendingClientRpcs.Enqueue(new PendingClientRpc(sourceClientId, message));
+        client.QueuedRpcsThisTick++;
     }
-
-    _pendingClientRpcs.Enqueue(new PendingClientRpc(sourceClientId, message));
-    client.QueuedRpcsThisTick++;
-}
 
     public void QueueServerRpc(NetRpcMessage message)
     {
@@ -270,6 +276,8 @@ public sealed partial class InMemoryNetSession
 
     private void ValidateEntity(NetEntityState entity)
     {
+        ValidateOwnerClientIsConnected(entity.OwnerClientId, nameof(entity.OwnerClientId));
+
         if (entity.ProceduralRecipe is not null)
         {
             int metadataSize = EstimateProceduralRecipeSizeBytes(entity.ProceduralRecipe);
