@@ -2,6 +2,7 @@ using System;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
+using Engine.NativeBindings.Internal.Interop;
 using Engine.Physics;
 using Engine.Rendering;
 
@@ -35,6 +36,17 @@ internal interface INativePhysicsApi
 internal interface INativeUiApi
 {
     void Update(World world, in FrameTiming timing);
+}
+
+internal interface INativeAudioApi
+{
+    ulong CreateSoundFromBlob(ReadOnlySpan<byte> blob);
+
+    ulong PlaySound(ulong sound, in EngineNativeAudioPlayDesc playDesc);
+
+    void SetAudioListener(in EngineNativeListenerDesc listenerDesc);
+
+    void SetAudioEmitterParams(ulong emitterId, in EngineNativeEmitterParams emitterParams);
 }
 
 internal interface INativeRenderingApi

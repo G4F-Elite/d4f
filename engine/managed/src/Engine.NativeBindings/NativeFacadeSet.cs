@@ -1,4 +1,5 @@
 using System;
+using Engine.Audio;
 using Engine.Core.Abstractions;
 using Engine.NativeBindings.Internal;
 using Engine.Physics;
@@ -17,6 +18,7 @@ public sealed class NativeFacadeSet : IDisposable
         Platform = NativeFacadeFactory.CreatePlatformFacade(runtime);
         Timing = NativeFacadeFactory.CreateTimingFacade(runtime);
         Physics = NativeFacadeFactory.CreatePhysicsFacade(runtime);
+        Audio = NativeFacadeFactory.CreateAudioFacade(runtime);
         Ui = NativeFacadeFactory.CreateUiFacade(new NativeUiApiStub());
         Rendering = NativeFacadeFactory.CreateRenderingFacade(runtime);
     }
@@ -26,6 +28,8 @@ public sealed class NativeFacadeSet : IDisposable
     public ITimingFacade Timing { get; }
 
     public IPhysicsFacade Physics { get; }
+
+    public IAudioFacade Audio { get; }
 
     public IUiFacade Ui { get; }
 

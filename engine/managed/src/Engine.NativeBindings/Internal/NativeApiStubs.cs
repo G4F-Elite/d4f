@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
 using Engine.ECS;
+using Engine.NativeBindings.Internal.Interop;
 using Engine.Physics;
 using Engine.Rendering;
 
@@ -73,6 +74,61 @@ internal sealed class NativeUiApiStub : INativeUiApi
     public void Update(World world, in FrameTiming timing)
     {
         ArgumentNullException.ThrowIfNull(world);
+    }
+}
+
+internal sealed class NativeAudioApiStub : INativeAudioApi
+{
+    private readonly HashSet<ulong> _sounds = [];
+    private readonly HashSet<ulong> _emitters = [];
+    private ulong _nextSoundHandle = 1u;
+    private ulong _nextEmitterId = 1u;
+
+    public ulong CreateSoundFromBlob(ReadOnlySpan<byte> blob)
+    {
+        if (blob.IsEmpty)
+        {
+            throw new ArgumentException("Sound blob cannot be empty.", nameof(blob));
+        }
+
+        ulong handle = _nextSoundHandle++;
+        _sounds.Add(handle);
+        return handle;
+    }
+
+    public ulong PlaySound(ulong sound, in EngineNativeAudioPlayDesc playDesc)
+    {
+        if (sound == 0u || !_sounds.Contains(sound))
+        {
+            throw new KeyNotFoundException($"Sound handle '{sound}' is not known.");
+        }
+
+        if (playDesc.Pitch <= 0f || playDesc.Volume < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(playDesc), "Play descriptor has invalid scalar values.");
+        }
+
+        ulong emitter = _nextEmitterId++;
+        _emitters.Add(emitter);
+        return emitter;
+    }
+
+    public void SetAudioListener(in EngineNativeListenerDesc listenerDesc)
+    {
+        _ = listenerDesc;
+    }
+
+    public void SetAudioEmitterParams(ulong emitterId, in EngineNativeEmitterParams emitterParams)
+    {
+        if (emitterId == 0u || !_emitters.Contains(emitterId))
+        {
+            throw new KeyNotFoundException($"Emitter id '{emitterId}' is not known.");
+        }
+
+        if (emitterParams.Pitch <= 0f || emitterParams.Volume < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(emitterParams), "Emitter params have invalid scalar values.");
+        }
     }
 }
 

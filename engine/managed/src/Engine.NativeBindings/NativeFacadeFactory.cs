@@ -1,4 +1,5 @@
 using System;
+using Engine.Audio;
 using Engine.Core.Handles;
 using Engine.Core.Abstractions;
 using Engine.Core.Timing;
@@ -22,6 +23,8 @@ public static class NativeFacadeFactory
 
     public static IPhysicsFacade CreatePhysicsFacade() => new NativePhysicsFacade(new NativePhysicsApiStub());
 
+    public static IAudioFacade CreateAudioFacade() => new NativeAudioFacade(new NativeAudioApiStub());
+
     public static IUiFacade CreateUiFacade() => new NativeUiFacade(new NativeUiApiStub());
 
     public static IRenderingFacade CreateRenderingFacade() => new NativeRenderingFacade(new NativeRenderingApiStub());
@@ -31,6 +34,8 @@ public static class NativeFacadeFactory
     internal static ITimingFacade CreateTimingFacade(INativeTimingApi nativeApi) => new NativeTimingFacade(nativeApi);
 
     internal static IPhysicsFacade CreatePhysicsFacade(INativePhysicsApi nativeApi) => new NativePhysicsFacade(nativeApi);
+
+    internal static IAudioFacade CreateAudioFacade(INativeAudioApi nativeApi) => new NativeAudioFacade(nativeApi);
 
     internal static IUiFacade CreateUiFacade(INativeUiApi nativeApi) => new NativeUiFacade(nativeApi);
 
@@ -98,6 +103,155 @@ public static class NativeFacadeFactory
         }
 
         public void Update(World world, in FrameTiming timing) => _nativeApi.Update(world, timing);
+    }
+
+    private sealed class NativeAudioFacade : IAudioFacade
+    {
+        private readonly INativeAudioApi _nativeApi;
+        private readonly Dictionary<ProceduralSoundRecipe, ulong> _soundsByRecipe = new();
+        private readonly HashSet<AudioEmitterHandle> _activeEmitters = new();
+
+        public NativeAudioFacade(INativeAudioApi nativeApi)
+        {
+            _nativeApi = nativeApi ?? throw new ArgumentNullException(nameof(nativeApi));
+        }
+
+        public AudioEmitterHandle Play(ProceduralSoundRecipe recipe, AudioPlayRequest request)
+        {
+            ArgumentNullException.ThrowIfNull(recipe);
+            ArgumentNullException.ThrowIfNull(request);
+            _ = recipe.Validate();
+            _ = request.Validate();
+
+            if (!_soundsByRecipe.TryGetValue(recipe, out ulong soundHandle))
+            {
+                byte[] soundBlob = ProceduralSoundBlobBuilder.BuildMonoPcmBlob(
+                    recipe,
+                    EstimateDurationSeconds(recipe),
+                    request.Loop);
+                soundHandle = _nativeApi.CreateSoundFromBlob(soundBlob);
+                _soundsByRecipe.Add(recipe, soundHandle);
+            }
+
+            AudioEmitterParameters? initialEmitter = request.InitialEmitter;
+            var playDesc = new EngineNativeAudioPlayDesc
+            {
+                Volume = request.Volume,
+                Pitch = request.Pitch,
+                Bus = (byte)MapBus(request.Bus),
+                Loop = request.Loop ? (byte)1 : (byte)0,
+                IsSpatialized = initialEmitter is null ? (byte)0 : (byte)1,
+                Reserved0 = 0,
+                Position0 = initialEmitter?.PositionX ?? 0f,
+                Position1 = initialEmitter?.PositionY ?? 0f,
+                Position2 = initialEmitter?.PositionZ ?? 0f,
+                Velocity0 = 0f,
+                Velocity1 = 0f,
+                Velocity2 = 0f
+            };
+
+            ulong emitterId = _nativeApi.PlaySound(soundHandle, in playDesc);
+            if (emitterId == 0u)
+            {
+                throw new InvalidOperationException("Native audio_play returned an invalid emitter id.");
+            }
+
+            var emitter = new AudioEmitterHandle(emitterId);
+            _activeEmitters.Add(emitter);
+            return emitter;
+        }
+
+        public void Stop(AudioEmitterHandle emitter)
+        {
+            EnsureKnownEmitter(emitter);
+
+            var stopParams = new EngineNativeEmitterParams
+            {
+                Volume = 0f,
+                Pitch = 1f,
+                Position0 = 0f,
+                Position1 = 0f,
+                Position2 = 0f,
+                Velocity0 = 0f,
+                Velocity1 = 0f,
+                Velocity2 = 0f,
+                Lowpass = 1f,
+                ReverbSend = 0f
+            };
+            _nativeApi.SetAudioEmitterParams(emitter.Value, in stopParams);
+            _activeEmitters.Remove(emitter);
+        }
+
+        public void SetListener(in ListenerState listener)
+        {
+            var nativeListener = new EngineNativeListenerDesc
+            {
+                Position0 = listener.PositionX,
+                Position1 = listener.PositionY,
+                Position2 = listener.PositionZ,
+                Forward0 = 0f,
+                Forward1 = 0f,
+                Forward2 = -1f,
+                Up0 = 0f,
+                Up1 = 1f,
+                Up2 = 0f
+            };
+            _nativeApi.SetAudioListener(in nativeListener);
+        }
+
+        public void SetEmitterParameters(AudioEmitterHandle emitter, in AudioEmitterParameters parameters)
+        {
+            EnsureKnownEmitter(emitter);
+            AudioEmitterParameters validated = parameters.Validate();
+
+            var nativeParams = new EngineNativeEmitterParams
+            {
+                Volume = validated.Volume,
+                Pitch = validated.Pitch,
+                Position0 = validated.PositionX,
+                Position1 = validated.PositionY,
+                Position2 = validated.PositionZ,
+                Velocity0 = 0f,
+                Velocity1 = 0f,
+                Velocity2 = 0f,
+                Lowpass = 1f,
+                ReverbSend = 0f
+            };
+            _nativeApi.SetAudioEmitterParams(emitter.Value, in nativeParams);
+        }
+
+        private void EnsureKnownEmitter(AudioEmitterHandle emitter)
+        {
+            if (!emitter.IsValid)
+            {
+                throw new ArgumentException("Emitter handle is invalid.", nameof(emitter));
+            }
+
+            if (!_activeEmitters.Contains(emitter))
+            {
+                throw new KeyNotFoundException($"Emitter '{emitter.Value}' is not active.");
+            }
+        }
+
+        private static EngineNativeAudioBus MapBus(AudioBus bus)
+        {
+            return bus switch
+            {
+                AudioBus.Master => EngineNativeAudioBus.Master,
+                AudioBus.Music => EngineNativeAudioBus.Music,
+                AudioBus.Sfx => EngineNativeAudioBus.Sfx,
+                AudioBus.Ambience => EngineNativeAudioBus.Ambience,
+                _ => throw new InvalidDataException($"Unsupported audio bus value: {bus}.")
+            };
+        }
+
+        private static float EstimateDurationSeconds(ProceduralSoundRecipe recipe)
+        {
+            float envelopeDuration = recipe.Envelope.AttackSeconds +
+                                     recipe.Envelope.DecaySeconds +
+                                     recipe.Envelope.ReleaseSeconds;
+            return MathF.Max(0.25f, envelopeDuration + 0.25f);
+        }
     }
 
     private sealed class NativeRenderingFacade : IRenderingFacade
