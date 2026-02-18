@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.Json;
 using Engine.AssetPipeline;
 using Engine.Core.Handles;
+using Engine.NativeBindings;
 using Engine.Rendering;
 using Engine.Testing;
 
@@ -106,7 +107,25 @@ internal sealed record TestArtifactGenerationOptions(
 
 internal static class TestArtifactGenerator
 {
-    private sealed record CaptureDefinition(string Kind, string RelativeCapturePath, byte PatternSeed);
+    private sealed record CaptureDefinition(string Kind, string RelativeCapturePath);
+
+    private sealed class CaptureRuntimeScope : IDisposable
+    {
+        private readonly NativeFacadeSet? _nativeFacadeSet;
+
+        public CaptureRuntimeScope(IRenderingFacade rendering, NativeFacadeSet? nativeFacadeSet)
+        {
+            Rendering = rendering ?? throw new ArgumentNullException(nameof(rendering));
+            _nativeFacadeSet = nativeFacadeSet;
+        }
+
+        public IRenderingFacade Rendering { get; }
+
+        public void Dispose()
+        {
+            _nativeFacadeSet?.Dispose();
+        }
+    }
 
     private const uint CaptureWidth = 64u;
     private const uint CaptureHeight = 64u;
@@ -127,7 +146,9 @@ internal static class TestArtifactGenerator
         CaptureDefinition[] captureDefinitions = BuildCaptureDefinitions(options.CaptureFrame);
         var manifestEntries = new List<TestingArtifactEntry>(captureDefinitions.Length * 2 + 1);
         var captures = new List<TestCaptureArtifact>(captureDefinitions.Length);
-        IRenderingFacade captureFacade = NoopRenderingFacade.Instance;
+
+        using CaptureRuntimeScope captureScope = CreateCaptureRuntimeScope();
+        IRenderingFacade captureFacade = captureScope.Rendering;
 
         foreach (CaptureDefinition definition in captureDefinitions)
         {
@@ -138,7 +159,7 @@ internal static class TestArtifactGenerator
                 new TestingArtifactEntry(
                     Kind: definition.Kind,
                     RelativePath: NormalizePath(definition.RelativeCapturePath),
-                    Description: "Deterministic runtime capture."));
+                    Description: "Runtime capture generated from current render debug pipeline."));
 
             string relativeBufferPath = Path.ChangeExtension(definition.RelativeCapturePath, ".rgba8.bin")
                 ?? throw new InvalidDataException($"Unable to compute buffer path for '{definition.RelativeCapturePath}'.");
@@ -148,7 +169,7 @@ internal static class TestArtifactGenerator
                 new TestingArtifactEntry(
                     Kind: $"{definition.Kind}-buffer",
                     RelativePath: NormalizePath(relativeBufferPath),
-                    Description: "Deterministic runtime raw capture buffer for golden comparison."));
+                    Description: "Runtime raw capture buffer for golden comparison."));
             captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
         }
 
@@ -203,18 +224,9 @@ internal static class TestArtifactGenerator
 
     private static GoldenImageBuffer CaptureBuffer(IRenderingFacade captureFacade, CaptureDefinition definition)
     {
+        RenderCaptureFrame(captureFacade, definition.Kind);
         byte[] rgba = captureFacade.CaptureFrameRgba8(CaptureWidth, CaptureHeight);
-        byte[] transformed = new byte[rgba.Length];
-        Buffer.BlockCopy(rgba, 0, transformed, 0, rgba.Length);
-
-        // Keep captures deterministic but distinct per artifact kind.
-        for (int i = 0; i < transformed.Length; i += 4)
-        {
-            transformed[i] ^= definition.PatternSeed;
-            transformed[i + 1] = unchecked((byte)(transformed[i + 1] + definition.PatternSeed / 2));
-        }
-
-        return new GoldenImageBuffer(checked((int)CaptureWidth), checked((int)CaptureHeight), transformed);
+        return new GoldenImageBuffer(checked((int)CaptureWidth), checked((int)CaptureHeight), rgba);
     }
 
     private static string NormalizePath(string path)
@@ -227,11 +239,11 @@ internal static class TestArtifactGenerator
         string frameToken = captureFrame.ToString("D4", CultureInfo.InvariantCulture);
         return
         [
-            new("screenshot", Path.Combine("screenshots", $"frame-{frameToken}.png"), 11),
-            new("albedo", Path.Combine("dumps", $"albedo-{frameToken}.png"), 37),
-            new("normals", Path.Combine("dumps", $"normals-{frameToken}.png"), 73),
-            new("depth", Path.Combine("dumps", $"depth-{frameToken}.png"), 101),
-            new("shadow", Path.Combine("dumps", $"shadow-{frameToken}.png"), 151)
+            new("screenshot", Path.Combine("screenshots", $"frame-{frameToken}.png")),
+            new("albedo", Path.Combine("dumps", $"albedo-{frameToken}.png")),
+            new("normals", Path.Combine("dumps", $"normals-{frameToken}.png")),
+            new("depth", Path.Combine("dumps", $"depth-{frameToken}.png")),
+            new("shadow", Path.Combine("dumps", $"shadow-{frameToken}.png"))
         ];
     }
 
@@ -349,11 +361,6 @@ internal static class TestArtifactGenerator
 
     private static RenderStatsArtifact CaptureRenderStats(IRenderingFacade renderingFacade)
     {
-        if (renderingFacade is not NoopRenderingFacade)
-        {
-            return new RenderStatsArtifact(0u, 0u, 0u, 0u, 0u, 0u);
-        }
-
         MeshHandle mesh = default;
         TextureHandle texture = default;
         MaterialHandle material = default;
@@ -370,7 +377,7 @@ internal static class TestArtifactGenerator
                 ],
                 indices: [0u, 1u, 2u, 2u, 1u, 3u]);
             texture = renderingFacade.CreateTextureFromCpu(1u, 1u, [255, 255, 255, 255]);
-            material = renderingFacade.CreateMaterialFromBlob([1]);
+            material = renderingFacade.CreateMaterialFromBlob(BuildMinimalMaterialBlob());
 
             using (renderingFacade.BeginFrame(2048, 64))
             {
@@ -420,6 +427,110 @@ internal static class TestArtifactGenerator
             }
 
             renderingFacade.Present();
+        }
+    }
+
+    private static void RenderCaptureFrame(IRenderingFacade renderingFacade, string captureKind)
+    {
+        ArgumentNullException.ThrowIfNull(renderingFacade);
+        ArgumentException.ThrowIfNullOrWhiteSpace(captureKind);
+
+        MeshHandle mesh = default;
+        TextureHandle texture = default;
+        MaterialHandle material = default;
+        try
+        {
+            mesh = renderingFacade.CreateMeshFromCpu(
+                positions:
+                [
+                    -0.75f, -0.75f, 0f,
+                    0.75f, -0.75f, 0f,
+                    -0.75f, 0.75f, 0f,
+                    0.75f, 0.75f, 0f
+                ],
+                indices: [0u, 1u, 2u, 2u, 1u, 3u]);
+            texture = renderingFacade.CreateTextureFromCpu(1u, 1u, [255, 255, 255, 255]);
+            material = renderingFacade.CreateMaterialFromBlob(BuildMinimalMaterialBlob());
+
+            RenderDebugViewMode debugView = ResolveCaptureDebugViewMode(captureKind);
+            using (renderingFacade.BeginFrame(4096, 64))
+            {
+                var packet = new RenderPacket(
+                    frameNumber: 0,
+                    drawCommands:
+                    [
+                        new DrawCommand(
+                            new EntityId(index: 1, generation: 1u),
+                            mesh,
+                            material,
+                            texture)
+                    ],
+                    uiDrawCommands: Array.Empty<UiDrawCommand>(),
+                    debugViewMode: debugView,
+                    featureFlags: RenderFeatureFlags.None);
+                renderingFacade.Submit(packet);
+            }
+
+            renderingFacade.Present();
+        }
+        finally
+        {
+            if (mesh.IsValid)
+            {
+                renderingFacade.DestroyResource(mesh.Value);
+            }
+
+            if (texture.IsValid)
+            {
+                renderingFacade.DestroyResource(texture.Value);
+            }
+
+            if (material.IsValid)
+            {
+                renderingFacade.DestroyResource(material.Value);
+            }
+        }
+    }
+
+    private static RenderDebugViewMode ResolveCaptureDebugViewMode(string captureKind)
+    {
+        return captureKind.ToLowerInvariant() switch
+        {
+            "depth" => RenderDebugViewMode.Depth,
+            "normals" => RenderDebugViewMode.Normals,
+            "albedo" => RenderDebugViewMode.Albedo,
+            "shadow" => RenderDebugViewMode.AmbientOcclusion,
+            _ => RenderDebugViewMode.None
+        };
+    }
+
+    private static byte[] BuildMinimalMaterialBlob()
+    {
+        const uint materialBlobMagic = 0x424D4144u;
+        const uint materialBlobVersion = 1u;
+        byte[] blob = new byte[8];
+        BitConverter.GetBytes(materialBlobMagic).CopyTo(blob, 0);
+        BitConverter.GetBytes(materialBlobVersion).CopyTo(blob, 4);
+        return blob;
+    }
+
+    private static CaptureRuntimeScope CreateCaptureRuntimeScope()
+    {
+        try
+        {
+            NativeFacadeSet nativeFacadeSet = NativeFacadeFactory.CreateNativeFacadeSet();
+            return new CaptureRuntimeScope(nativeFacadeSet.Rendering, nativeFacadeSet);
+        }
+        catch (Exception ex) when (
+            ex is DllNotFoundException or
+            EntryPointNotFoundException or
+            BadImageFormatException or
+            FileNotFoundException or
+            InvalidDataException or
+            InvalidOperationException or
+            TypeInitializationException)
+        {
+            return new CaptureRuntimeScope(NoopRenderingFacade.Instance, nativeFacadeSet: null);
         }
     }
 
