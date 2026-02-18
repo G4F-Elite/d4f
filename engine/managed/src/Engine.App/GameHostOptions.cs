@@ -18,7 +18,8 @@ public sealed class GameHostOptions
         DefaultFrameArenaAlignment,
         DefaultMaxAccumulatedTime,
         DeterministicModeOptions.Disabled,
-        RenderSettingsValue.Default);
+        RenderSettingsValue.Default,
+        InteropBudgetOptions.ReleaseStrict);
 
     public GameHostOptions(
         TimeSpan fixedDt,
@@ -27,7 +28,8 @@ public sealed class GameHostOptions
         int frameArenaAlignment,
         TimeSpan? maxAccumulatedTime = null,
         DeterministicModeOptions? deterministicMode = null,
-        RenderSettingsValue? renderSettings = null)
+        RenderSettingsValue? renderSettings = null,
+        InteropBudgetOptions? interopBudgets = null)
     {
         if (fixedDt <= TimeSpan.Zero)
         {
@@ -66,6 +68,7 @@ public sealed class GameHostOptions
         MaxAccumulatedTime = resolvedMaxAccumulatedTime;
         DeterministicMode = deterministicMode ?? DeterministicModeOptions.Disabled;
         RenderSettings = renderSettings ?? RenderSettingsValue.Default;
+        InteropBudgets = interopBudgets ?? InteropBudgetOptions.ReleaseStrict;
     }
 
     public TimeSpan FixedDt { get; }
@@ -81,6 +84,8 @@ public sealed class GameHostOptions
     public DeterministicModeOptions DeterministicMode { get; }
 
     public RenderSettingsValue RenderSettings { get; }
+
+    public InteropBudgetOptions InteropBudgets { get; }
 
     private static bool IsPowerOfTwo(int value)
     {

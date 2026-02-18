@@ -148,6 +148,7 @@ public sealed class GameHost
         RenderingFrameStats renderingStats = _renderingFacade.GetLastFrameStats();
         TimeSpan renderCpuTime = Stopwatch.GetElapsedTime(stageStart);
         int physicsInteropCalls = substeps == 0 ? 0 : substeps + 2;
+        ValidateInteropBudgets(timing.FrameNumber, substeps, physicsInteropCalls);
 
         TimeSpan totalCpuTime = Stopwatch.GetElapsedTime(frameStart);
         LastFrameObservability = new FrameObservabilitySnapshot(
@@ -163,6 +164,39 @@ public sealed class GameHost
             physicsInteropCalls,
             RendererInteropCallsPerFrame,
             renderingStats);
+    }
+
+    private void ValidateInteropBudgets(long frameNumber, int physicsSubsteps, int physicsInteropCalls)
+    {
+        InteropBudgetOptions budgets = _options.InteropBudgets;
+        if (!budgets.Enforce)
+        {
+            return;
+        }
+
+        if (RendererInteropCallsPerFrame > budgets.MaxRendererCallsPerFrame)
+        {
+            throw new InvalidOperationException(
+                $"Interop budget exceeded on frame {frameNumber}: renderer calls {RendererInteropCallsPerFrame} > {budgets.MaxRendererCallsPerFrame}.");
+        }
+
+        if (physicsSubsteps <= 0)
+        {
+            if (physicsInteropCalls != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Interop budget accounting error on frame {frameNumber}: physics substeps are zero but call count is {physicsInteropCalls}.");
+            }
+
+            return;
+        }
+
+        long maxAllowedPhysicsCalls = (long)physicsSubsteps * budgets.MaxPhysicsCallsPerTick;
+        if (physicsInteropCalls > maxAllowedPhysicsCalls)
+        {
+            throw new InvalidOperationException(
+                $"Interop budget exceeded on frame {frameNumber}: physics calls {physicsInteropCalls} > {maxAllowedPhysicsCalls} ({budgets.MaxPhysicsCallsPerTick} per tick, {physicsSubsteps} tick(s)).");
+        }
     }
 
     private FrameTiming ResolveFrameTiming(in FrameTiming sourceTiming)

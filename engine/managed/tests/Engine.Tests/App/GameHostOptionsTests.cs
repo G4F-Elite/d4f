@@ -24,7 +24,11 @@ public sealed class GameHostOptionsTests
                 disableJitterEffects: true),
             renderSettings: new RenderSettings(
                 RenderDebugViewMode.Albedo,
-                RenderFeatureFlags.DisableAutoExposure));
+                RenderFeatureFlags.DisableAutoExposure),
+            interopBudgets: new InteropBudgetOptions(
+                enforce: true,
+                maxRendererCallsPerFrame: 3,
+                maxPhysicsCallsPerTick: 2));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
@@ -38,6 +42,9 @@ public sealed class GameHostOptionsTests
         Assert.True(options.DeterministicMode.DisableJitterEffects);
         Assert.Equal(RenderDebugViewMode.Albedo, options.RenderSettings.DebugViewMode);
         Assert.True(options.RenderSettings.DisableAutoExposure);
+        Assert.True(options.InteropBudgets.Enforce);
+        Assert.Equal(3, options.InteropBudgets.MaxRendererCallsPerFrame);
+        Assert.Equal(2, options.InteropBudgets.MaxPhysicsCallsPerTick);
     }
 
     [Fact]
@@ -54,6 +61,9 @@ public sealed class GameHostOptionsTests
         Assert.False(options.DeterministicMode.Enabled);
         Assert.Equal(RenderDebugViewMode.None, options.RenderSettings.DebugViewMode);
         Assert.Equal(RenderFeatureFlags.None, options.RenderSettings.FeatureFlags);
+        Assert.True(options.InteropBudgets.Enforce);
+        Assert.Equal(3, options.InteropBudgets.MaxRendererCallsPerFrame);
+        Assert.Equal(3, options.InteropBudgets.MaxPhysicsCallsPerTick);
     }
 
     [Fact]
@@ -116,5 +126,23 @@ public sealed class GameHostOptionsTests
             fixedDeltaTimeOverride: TimeSpan.Zero,
             disableAutoExposure: true,
             disableJitterEffects: true));
+    }
+
+    [Fact]
+    public void InteropBudgetOptions_RejectsNonPositiveRendererBudget()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InteropBudgetOptions(
+            enforce: true,
+            maxRendererCallsPerFrame: 0,
+            maxPhysicsCallsPerTick: 3));
+    }
+
+    [Fact]
+    public void InteropBudgetOptions_RejectsNonPositivePhysicsBudget()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new InteropBudgetOptions(
+            enforce: true,
+            maxRendererCallsPerFrame: 3,
+            maxPhysicsCallsPerTick: 0));
     }
 }
