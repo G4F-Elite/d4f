@@ -156,11 +156,46 @@ void TestPipelineCacheCorruptedFileIsIgnored() {
   std::filesystem::remove(cache_path, remove_error);
 }
 
+void TestPipelineCachePathIsCapturedAtEngineCreate() {
+  const std::filesystem::path first_path = MakeTempCachePath();
+  const std::filesystem::path second_path = MakeTempCachePath();
+  std::error_code remove_error;
+  std::filesystem::remove(first_path, remove_error);
+  std::filesystem::remove(second_path, remove_error);
+
+  assert(SetPipelineCachePathEnv(first_path));
+
+  engine_native_create_desc_t create_desc{
+      .api_version = ENGINE_NATIVE_API_VERSION,
+      .user_data = nullptr};
+
+  engine_native_engine_t* engine = nullptr;
+  assert(engine_create(&create_desc, &engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(engine != nullptr);
+
+  engine_native_renderer_frame_stats_t stats{};
+  assert(ExecuteSingleDrawFrame(engine, 901u, &stats) == ENGINE_NATIVE_STATUS_OK);
+  assert(stats.pipeline_cache_misses >= 1u);
+
+  // Changing env during runtime must not redirect save target.
+  assert(SetPipelineCachePathEnv(second_path));
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(std::filesystem::exists(first_path));
+  assert(std::filesystem::file_size(first_path) > 0u);
+  assert(!std::filesystem::exists(second_path));
+
+  assert(ClearPipelineCachePathEnv());
+  std::filesystem::remove(first_path, remove_error);
+  std::filesystem::remove(second_path, remove_error);
+}
+
 }  // namespace
 
 void RunEnginePipelineCachePersistenceTests() {
   TestPipelineCachePersistsAcrossEngineLifetime();
   TestPipelineCacheCorruptedFileIsIgnored();
+  TestPipelineCachePathIsCapturedAtEngineCreate();
 }
 
 }  // namespace dff::native::tests

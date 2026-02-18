@@ -238,6 +238,7 @@ struct EngineState {
   RendererState renderer;
   PhysicsState physics;
   AudioState audio;
+  std::string pipeline_cache_path;
 };
 
 }  // namespace dff::native

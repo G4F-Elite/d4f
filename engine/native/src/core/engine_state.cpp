@@ -285,14 +285,14 @@ EngineState::EngineState() {
   renderer.AttachDevice(&rhi_device);
   if (const char* cache_path = ResolvePipelineCachePath();
       cache_path != nullptr) {
-    renderer.LoadPipelineCacheFromDisk(cache_path);
+    pipeline_cache_path = cache_path;
+    renderer.LoadPipelineCacheFromDisk(pipeline_cache_path.c_str());
   }
 }
 
 EngineState::~EngineState() {
-  if (const char* cache_path = ResolvePipelineCachePath();
-      cache_path != nullptr) {
-    renderer.SavePipelineCacheToDisk(cache_path);
+  if (!pipeline_cache_path.empty()) {
+    renderer.SavePipelineCacheToDisk(pipeline_cache_path.c_str());
   }
 }
 
