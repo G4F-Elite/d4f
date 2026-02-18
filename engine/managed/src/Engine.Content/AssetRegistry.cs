@@ -31,7 +31,7 @@ public sealed class AssetRegistry
     {
         ArgumentNullException.ThrowIfNull(assembly);
 
-        foreach (Type type in assembly.GetTypes())
+        foreach (Type type in EnumerateAssemblyTypes(assembly))
         {
             DffAssetAttribute? attribute = type.GetCustomAttribute<DffAssetAttribute>();
             if (attribute is null)
@@ -41,6 +41,27 @@ public sealed class AssetRegistry
 
             Register(type, attribute);
         }
+    }
+
+    public void RegisterAssemblies(IEnumerable<Assembly> assemblies)
+    {
+        ArgumentNullException.ThrowIfNull(assemblies);
+
+        foreach (Assembly assembly in assemblies)
+        {
+            if (assembly is null)
+            {
+                throw new ArgumentException("Assemblies collection cannot contain null entries.", nameof(assemblies));
+            }
+
+            RegisterAssembly(assembly);
+        }
+    }
+
+    public void RegisterAssemblies(params Assembly[] assemblies)
+    {
+        ArgumentNullException.ThrowIfNull(assemblies);
+        RegisterAssemblies((IEnumerable<Assembly>)assemblies);
     }
 
     public bool TryGet(string path, out AssetDescriptor descriptor)
@@ -136,5 +157,28 @@ public sealed class AssetRegistry
         }
 
         return normalized.OrderBy(static x => x, StringComparer.Ordinal).ToArray();
+    }
+
+    private static IEnumerable<Type> EnumerateAssemblyTypes(Assembly assembly)
+    {
+        try
+        {
+            return assembly.GetTypes();
+        }
+        catch (ReflectionTypeLoadException ex)
+        {
+            Type[] resolvedTypes = ex.Types
+                .Where(static type => type is not null)
+                .Cast<Type>()
+                .ToArray();
+            if (resolvedTypes.Length == 0)
+            {
+                throw new InvalidDataException(
+                    $"Assembly '{assembly.FullName}' could not be scanned for asset types.",
+                    ex);
+            }
+
+            return resolvedTypes;
+        }
     }
 }

@@ -32,6 +32,29 @@ public sealed class AssetRegistryTests
     }
 
     [Fact]
+    public void RegisterAssemblies_ShouldCollectAssetsFromMultipleAssemblies()
+    {
+        var registry = new AssetRegistry();
+        Assembly first = BuildAssemblyWithSingleAsset("Dynamic/Multi/One");
+        Assembly second = BuildAssemblyWithSingleAsset("Dynamic/Multi/Two");
+
+        registry.RegisterAssemblies(first, second);
+
+        Assert.True(registry.TryGet("Dynamic/Multi/One", out _));
+        Assert.True(registry.TryGet("Dynamic/Multi/Two", out _));
+    }
+
+    [Fact]
+    public void RegisterAssemblies_ShouldFail_WhenCollectionContainsNullAssembly()
+    {
+        var registry = new AssetRegistry();
+
+        ArgumentException exception = Assert.Throws<ArgumentException>(() =>
+            registry.RegisterAssemblies([BuildAssemblyWithSingleAsset("Dynamic/Only"), null!]));
+        Assert.Contains("cannot contain null entries", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Register_ShouldFail_WhenTypeHasNoAttribute()
     {
         var registry = new AssetRegistry();
@@ -93,6 +116,22 @@ public sealed class AssetRegistryTests
         secondAsset.SetCustomAttribute(CreateAssetAttribute("Dynamic/Two"));
         _ = secondAsset.CreateType();
 
+        return assemblyBuilder;
+    }
+
+    private static Assembly BuildAssemblyWithSingleAsset(string path)
+    {
+        string assemblyName = $"Engine.Tests.Content.DynamicAsset.Single.{Guid.NewGuid():N}";
+        AssemblyBuilder assemblyBuilder = AssemblyBuilder.DefineDynamicAssembly(
+            new AssemblyName(assemblyName),
+            AssemblyBuilderAccess.Run);
+        ModuleBuilder moduleBuilder = assemblyBuilder.DefineDynamicModule("Main");
+
+        TypeBuilder asset = moduleBuilder.DefineType(
+            $"DynamicAsset_{Guid.NewGuid():N}",
+            TypeAttributes.Public | TypeAttributes.Class | TypeAttributes.Sealed);
+        asset.SetCustomAttribute(CreateAssetAttribute(path));
+        _ = asset.CreateType();
         return assemblyBuilder;
     }
 
