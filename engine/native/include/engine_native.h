@@ -143,6 +143,13 @@ typedef enum engine_native_capture_format {
   ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM = 1
 } engine_native_capture_format_t;
 
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_COLOR 0u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_DEPTH 1u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_NORMALS 2u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_ALBEDO 3u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_SHADOW 4u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_AMBIENT_OCCLUSION 5u
+
 typedef struct engine_native_capture_request {
   uint32_t width;
   uint32_t height;

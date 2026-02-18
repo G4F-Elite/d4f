@@ -84,6 +84,14 @@ void TestCaptureFlowAndValidation() {
   invalid_request.include_alpha = 3u;
   assert(capture_request(renderer, &invalid_request, &request_id) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  invalid_request = request;
+  invalid_request.reserved0 = 6u;
+  assert(capture_request(renderer, &invalid_request, &request_id) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  invalid_request = request;
+  invalid_request.reserved1 = 1u;
+  assert(capture_request(renderer, &invalid_request, &request_id) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
