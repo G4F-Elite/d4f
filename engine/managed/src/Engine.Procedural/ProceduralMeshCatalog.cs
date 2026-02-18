@@ -8,31 +8,30 @@ public static class ProceduralMeshCatalog
     {
         ArgumentNullException.ThrowIfNull(chunk);
         LevelChunkTag parsedTag = LevelChunkTag.Parse(chunk.MeshTag);
+        string baseMaterialTag = $"chunk/{parsedTag.TypeTag}";
+        string accentMaterialTag = $"{baseMaterialTag}/accent";
 
         var builder = new MeshBuilder();
-        builder.BeginSubmesh($"chunk/{parsedTag.TypeTag}");
         switch (parsedTag.NodeType)
         {
             case LevelNodeType.Room:
-                BuildRoomMesh(builder, chunk.NodeId, parsedTag.Variant, seed);
+                BuildRoomMesh(builder, chunk.NodeId, parsedTag.Variant, seed, baseMaterialTag, accentMaterialTag);
                 break;
             case LevelNodeType.Corridor:
-                BuildCorridorMesh(builder, chunk.NodeId, parsedTag.Variant, seed);
+                BuildCorridorMesh(builder, chunk.NodeId, parsedTag.Variant, seed, baseMaterialTag, accentMaterialTag);
                 break;
             case LevelNodeType.Junction:
-                BuildJunctionMesh(builder, chunk.NodeId, parsedTag.Variant, seed);
+                BuildJunctionMesh(builder, chunk.NodeId, parsedTag.Variant, seed, baseMaterialTag, accentMaterialTag);
                 break;
             case LevelNodeType.DeadEnd:
-                BuildDeadEndMesh(builder, chunk.NodeId, parsedTag.Variant, seed);
+                BuildDeadEndMesh(builder, chunk.NodeId, parsedTag.Variant, seed, baseMaterialTag, accentMaterialTag);
                 break;
             case LevelNodeType.Shaft:
-                BuildShaftMesh(builder, chunk.NodeId, parsedTag.Variant, seed);
+                BuildShaftMesh(builder, chunk.NodeId, parsedTag.Variant, seed, baseMaterialTag, accentMaterialTag);
                 break;
             default:
                 throw new InvalidDataException($"Unsupported node type '{parsedTag.NodeType}' in mesh tag '{chunk.MeshTag}'.");
         }
-
-        builder.EndSubmesh();
 
         float uvScale = 1.2f + SampleRange(seed, chunk.NodeId, parsedTag.Variant, salt: 31u, min: 0.0f, max: 0.8f);
         builder.GenerateUv(UvProjection.Box, uvScale);
@@ -40,76 +39,136 @@ public static class ProceduralMeshCatalog
         return builder.Build();
     }
 
-    private static void BuildRoomMesh(MeshBuilder builder, int nodeId, int variant, uint seed)
+    private static void BuildRoomMesh(
+        MeshBuilder builder,
+        int nodeId,
+        int variant,
+        uint seed,
+        string baseMaterialTag,
+        string accentMaterialTag)
     {
         float width = SampleRange(seed, nodeId, variant, salt: 1u, min: 5.5f, max: 8.5f);
         float height = SampleRange(seed, nodeId, variant, salt: 2u, min: 2.8f, max: 4.2f);
         float depth = SampleRange(seed, nodeId, variant, salt: 3u, min: 5.5f, max: 8.5f);
-        AppendBox(builder, Vector3.Zero, new Vector3(width, height, depth));
+        AppendBoxInSubmesh(builder, baseMaterialTag, Vector3.Zero, new Vector3(width, height, depth));
 
         if ((variant & 1) != 0)
         {
             float pillarHeight = height * 0.85f;
-            AppendBox(builder, new Vector3(0f, -(height - pillarHeight) * 0.5f, 0f), new Vector3(0.8f, pillarHeight, 0.8f));
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(0f, -(height - pillarHeight) * 0.5f, 0f),
+                new Vector3(0.8f, pillarHeight, 0.8f));
         }
     }
 
-    private static void BuildCorridorMesh(MeshBuilder builder, int nodeId, int variant, uint seed)
+    private static void BuildCorridorMesh(
+        MeshBuilder builder,
+        int nodeId,
+        int variant,
+        uint seed,
+        string baseMaterialTag,
+        string accentMaterialTag)
     {
         float width = SampleRange(seed, nodeId, variant, salt: 4u, min: 2.0f, max: 3.2f);
         float height = SampleRange(seed, nodeId, variant, salt: 5u, min: 2.2f, max: 3.0f);
         float depth = SampleRange(seed, nodeId, variant, salt: 6u, min: 7.0f, max: 12.5f);
-        AppendBox(builder, Vector3.Zero, new Vector3(width, height, depth));
+        AppendBoxInSubmesh(builder, baseMaterialTag, Vector3.Zero, new Vector3(width, height, depth));
 
         if (variant >= 2)
         {
             float nicheOffset = width * 0.65f;
             float nicheDepth = depth * 0.2f;
-            AppendBox(builder, new Vector3(nicheOffset, 0f, -depth * 0.2f), new Vector3(width * 0.35f, height * 0.7f, nicheDepth));
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(nicheOffset, 0f, -depth * 0.2f),
+                new Vector3(width * 0.35f, height * 0.7f, nicheDepth));
         }
     }
 
-    private static void BuildJunctionMesh(MeshBuilder builder, int nodeId, int variant, uint seed)
+    private static void BuildJunctionMesh(
+        MeshBuilder builder,
+        int nodeId,
+        int variant,
+        uint seed,
+        string baseMaterialTag,
+        string accentMaterialTag)
     {
         float width = SampleRange(seed, nodeId, variant, salt: 7u, min: 2.4f, max: 3.4f);
         float height = SampleRange(seed, nodeId, variant, salt: 8u, min: 2.4f, max: 3.2f);
         float armLength = SampleRange(seed, nodeId, variant, salt: 9u, min: 5.0f, max: 8.0f);
 
+        builder.BeginSubmesh(baseMaterialTag);
         AppendBox(builder, Vector3.Zero, new Vector3(width, height, armLength));
         AppendBox(builder, Vector3.Zero, new Vector3(armLength, height, width));
+        builder.EndSubmesh();
 
         if ((variant & 1) == 0)
         {
-            AppendBox(builder, new Vector3(0f, -height * 0.25f, 0f), new Vector3(width * 0.5f, height * 0.5f, width * 0.5f));
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(0f, -height * 0.25f, 0f),
+                new Vector3(width * 0.5f, height * 0.5f, width * 0.5f));
         }
     }
 
-    private static void BuildDeadEndMesh(MeshBuilder builder, int nodeId, int variant, uint seed)
+    private static void BuildDeadEndMesh(
+        MeshBuilder builder,
+        int nodeId,
+        int variant,
+        uint seed,
+        string baseMaterialTag,
+        string accentMaterialTag)
     {
         float width = SampleRange(seed, nodeId, variant, salt: 10u, min: 2.2f, max: 3.0f);
         float height = SampleRange(seed, nodeId, variant, salt: 11u, min: 2.3f, max: 3.1f);
         float depth = SampleRange(seed, nodeId, variant, salt: 12u, min: 6.0f, max: 9.0f);
-        AppendBox(builder, Vector3.Zero, new Vector3(width, height, depth));
+        AppendBoxInSubmesh(builder, baseMaterialTag, Vector3.Zero, new Vector3(width, height, depth));
 
         float capThickness = SampleRange(seed, nodeId, variant, salt: 13u, min: 0.3f, max: 0.8f);
-        AppendBox(
+        AppendBoxInSubmesh(
             builder,
+            accentMaterialTag,
             new Vector3(0f, 0f, depth * 0.5f + capThickness * 0.5f),
             new Vector3(width * 0.98f, height * 0.98f, capThickness));
     }
 
-    private static void BuildShaftMesh(MeshBuilder builder, int nodeId, int variant, uint seed)
+    private static void BuildShaftMesh(
+        MeshBuilder builder,
+        int nodeId,
+        int variant,
+        uint seed,
+        string baseMaterialTag,
+        string accentMaterialTag)
     {
         float width = SampleRange(seed, nodeId, variant, salt: 14u, min: 1.8f, max: 2.8f);
         float height = SampleRange(seed, nodeId, variant, salt: 15u, min: 7.0f, max: 12.0f);
         float depth = SampleRange(seed, nodeId, variant, salt: 16u, min: 1.8f, max: 2.8f);
-        AppendBox(builder, Vector3.Zero, new Vector3(width, height, depth));
+        AppendBoxInSubmesh(builder, baseMaterialTag, Vector3.Zero, new Vector3(width, height, depth));
 
         if (variant >= 1)
         {
             float platformY = height * 0.2f;
-            AppendBox(builder, new Vector3(width * 0.45f, platformY, 0f), new Vector3(width * 0.5f, 0.35f, depth * 0.9f));
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(width * 0.45f, platformY, 0f),
+                new Vector3(width * 0.5f, 0.35f, depth * 0.9f));
         }
+    }
+
+    private static void AppendBoxInSubmesh(
+        MeshBuilder builder,
+        string materialTag,
+        Vector3 center,
+        Vector3 size)
+    {
+        builder.BeginSubmesh(materialTag);
+        AppendBox(builder, center, size);
+        builder.EndSubmesh();
     }
 
     private static void AppendBox(MeshBuilder builder, Vector3 center, Vector3 size)

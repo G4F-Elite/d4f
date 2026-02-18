@@ -62,6 +62,23 @@ public sealed class ProceduralMeshCatalogTests
         Assert.NotEqual(bySeedA.Bounds, byVariant.Bounds);
     }
 
+    [Theory]
+    [InlineData("chunk/room/v1", true)]
+    [InlineData("chunk/corridor/v2", true)]
+    [InlineData("chunk/junction/v1", false)]
+    [InlineData("chunk/deadend/v0", true)]
+    [InlineData("chunk/shaft/v0", false)]
+    [InlineData("chunk/shaft/v2", true)]
+    public void BuildChunkMesh_ShouldUseAccentSubmeshForDecoratedVariants(string meshTag, bool expectAccentSubmesh)
+    {
+        LevelMeshChunk chunk = new(NodeId: 4, MeshTag: meshTag);
+
+        ProcMeshData mesh = ProceduralMeshCatalog.BuildChunkMesh(chunk, seed: 77u);
+
+        bool hasAccentSubmesh = mesh.Submeshes.Any(static x => x.MaterialTag.EndsWith("/accent", StringComparison.Ordinal));
+        Assert.Equal(expectAccentSubmesh, hasAccentSubmesh);
+    }
+
     [Fact]
     public void BuildChunkMesh_ShouldRejectInvalidTag()
     {
