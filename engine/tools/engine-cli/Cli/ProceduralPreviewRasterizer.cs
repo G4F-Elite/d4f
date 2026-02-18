@@ -37,8 +37,8 @@ internal static partial class ProceduralPreviewRasterizer
         ProceduralChunkContent content = ProceduralChunkContentFactory.Build(
             chunk,
             seed,
-            surfaceWidth: 64,
-            surfaceHeight: 64);
+            surfaceWidth: Math.Max(width * 2, 128),
+            surfaceHeight: Math.Max(height * 2, 128));
         TexturePayload albedo = ResolveTextureBySuffix(content.MaterialBundle, ".albedo");
         TexturePayload normal = ResolveTextureBySuffix(content.MaterialBundle, ".normal");
         TexturePayload roughness = ResolveTextureBySuffix(content.MaterialBundle, ".roughness");
@@ -62,8 +62,8 @@ internal static partial class ProceduralPreviewRasterizer
         ProceduralChunkContent content = ProceduralChunkContentFactory.Build(
             chunk,
             seed,
-            surfaceWidth: Math.Max(width, 64),
-            surfaceHeight: Math.Max(height, 64));
+            surfaceWidth: Math.Max(width * 2, 128),
+            surfaceHeight: Math.Max(height * 2, 128));
         TexturePayload albedo = ResolveTextureBySuffix(content.MaterialBundle, ".albedo");
         TexturePayload normal = ResolveTextureBySuffix(content.MaterialBundle, ".normal");
         TexturePayload roughness = ResolveTextureBySuffix(content.MaterialBundle, ".roughness");
