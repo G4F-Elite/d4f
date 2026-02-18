@@ -8,7 +8,8 @@ public static class ProceduralChunkSurfaceCatalog
         LevelMeshChunk chunk,
         uint seed,
         int width = 128,
-        int height = 128)
+        int height = 128,
+        bool enableDomainWarp = true)
     {
         ArgumentNullException.ThrowIfNull(chunk);
         if (width <= 0)
@@ -22,7 +23,7 @@ public static class ProceduralChunkSurfaceCatalog
         }
 
         LevelChunkTag tag = LevelChunkTag.Parse(chunk.MeshTag);
-        ProceduralTextureRecipe recipe = BuildRecipe(tag, chunk.NodeId, seed, width, height);
+        ProceduralTextureRecipe recipe = BuildRecipe(tag, chunk.NodeId, seed, width, height, enableDomainWarp);
         (float normalStrength, float roughnessContrast, int aoRadius, float aoStrength) =
             SelectDerivedMapSettings(tag);
         ProceduralTextureSurface baseSurface = TextureBuilder.GenerateSurfaceMaps(
@@ -39,12 +40,16 @@ public static class ProceduralChunkSurfaceCatalog
         int nodeId,
         uint seed,
         int width,
-        int height)
+        int height,
+        bool enableDomainWarp)
     {
         uint recipeSeed = seed
             ^ ((uint)nodeId * 0x9E3779B9u)
             ^ ((uint)tag.Variant * 0x85EBCA6Bu)
             ^ ((uint)tag.NodeType * 0xC2B2AE35u);
+        (float domainWarpStrength, float domainWarpFrequency) = enableDomainWarp
+            ? SelectDomainWarpSettings(tag, seed, nodeId)
+            : (0f, 8f);
 
         return new ProceduralTextureRecipe(
             Kind: SelectTextureKind(tag),
@@ -52,7 +57,9 @@ public static class ProceduralChunkSurfaceCatalog
             Height: height,
             Seed: recipeSeed,
             FbmOctaves: SelectOctaves(tag, seed, nodeId),
-            Frequency: SelectFrequency(tag, seed, nodeId));
+            Frequency: SelectFrequency(tag, seed, nodeId),
+            DomainWarpStrength: domainWarpStrength,
+            DomainWarpFrequency: domainWarpFrequency);
     }
 
     private static ProceduralTextureKind SelectTextureKind(LevelChunkTag tag)
@@ -136,6 +143,35 @@ public static class ProceduralChunkSurfaceCatalog
         };
         float noiseScale = 0.85f + Sample01(seed, nodeId, tag.Variant, 103u) * 0.4f;
         return MathF.Max(1f, baseFrequency * variantBias * noiseScale);
+    }
+
+    private static (float Strength, float Frequency) SelectDomainWarpSettings(LevelChunkTag tag, uint seed, int nodeId)
+    {
+        float baseStrength = tag.NodeType switch
+        {
+            LevelNodeType.Room => 0.012f,
+            LevelNodeType.Corridor => 0.020f,
+            LevelNodeType.Junction => 0.018f,
+            LevelNodeType.DeadEnd => 0.026f,
+            LevelNodeType.Shaft => 0.028f,
+            _ => 0.015f
+        };
+        float variantBoost = tag.Variant * 0.005f;
+        float strengthJitter = Sample01(seed, nodeId, tag.Variant, 105u) * 0.012f;
+        float strength = Math.Clamp(baseStrength + variantBoost + strengthJitter, 0f, 0.085f);
+
+        float baseFrequency = tag.NodeType switch
+        {
+            LevelNodeType.Room => 8.0f,
+            LevelNodeType.Corridor => 10.0f,
+            LevelNodeType.Junction => 9.0f,
+            LevelNodeType.DeadEnd => 11.0f,
+            LevelNodeType.Shaft => 12.0f,
+            _ => 8.0f
+        };
+        float frequencyScale = 0.90f + Sample01(seed, nodeId, tag.Variant, 107u) * 0.45f;
+        float frequency = MathF.Max(1f, baseFrequency * frequencyScale);
+        return (strength, frequency);
     }
 
     private static (float NormalStrength, float RoughnessContrast, int AoRadius, float AoStrength) SelectDerivedMapSettings(

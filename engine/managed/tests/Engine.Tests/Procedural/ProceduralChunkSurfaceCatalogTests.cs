@@ -66,6 +66,53 @@ public sealed class ProceduralChunkSurfaceCatalogTests
     }
 
     [Fact]
+    public void BuildChunkSurface_ShouldApplyDomainWarp_WhenEnabled()
+    {
+        LevelMeshChunk chunk = new(NodeId: 9, MeshTag: "chunk/deadend/v3");
+
+        ProceduralTextureSurface withoutWarp = ProceduralChunkSurfaceCatalog.BuildChunkSurface(
+            chunk,
+            seed: 91u,
+            width: 48,
+            height: 48,
+            enableDomainWarp: false);
+        ProceduralTextureSurface withWarp = ProceduralChunkSurfaceCatalog.BuildChunkSurface(
+            chunk,
+            seed: 91u,
+            width: 48,
+            height: 48,
+            enableDomainWarp: true);
+
+        Assert.NotEqual(withoutWarp.HeightMap, withWarp.HeightMap);
+        Assert.NotEqual(withoutWarp.AlbedoRgba8, withWarp.AlbedoRgba8);
+    }
+
+    [Fact]
+    public void BuildChunkSurface_ShouldBeDeterministic_WhenDomainWarpDisabled()
+    {
+        LevelMeshChunk chunk = new(NodeId: 13, MeshTag: "chunk/shaft/v2");
+
+        ProceduralTextureSurface first = ProceduralChunkSurfaceCatalog.BuildChunkSurface(
+            chunk,
+            seed: 1234u,
+            width: 40,
+            height: 40,
+            enableDomainWarp: false);
+        ProceduralTextureSurface second = ProceduralChunkSurfaceCatalog.BuildChunkSurface(
+            chunk,
+            seed: 1234u,
+            width: 40,
+            height: 40,
+            enableDomainWarp: false);
+
+        Assert.Equal(first.HeightMap, second.HeightMap);
+        Assert.Equal(first.AlbedoRgba8, second.AlbedoRgba8);
+        Assert.Equal(first.NormalRgba8, second.NormalRgba8);
+        Assert.Equal(first.RoughnessRgba8, second.RoughnessRgba8);
+        Assert.Equal(first.AmbientOcclusionRgba8, second.AmbientOcclusionRgba8);
+    }
+
+    [Fact]
     public void BuildChunkSurface_ShouldGenerateColoredAlbedo()
     {
         LevelMeshChunk chunk = new(NodeId: 6, MeshTag: "chunk/shaft/v1");
