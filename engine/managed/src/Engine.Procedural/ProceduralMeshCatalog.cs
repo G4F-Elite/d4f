@@ -36,8 +36,7 @@ public static class ProceduralMeshCatalog
 
         float uvScale = 1.2f + SampleRange(seed, chunk.NodeId, parsedTag.Variant, salt: 31u, min: 0.0f, max: 0.8f);
         builder.GenerateUv(SelectUvProjection(parsedTag), uvScale);
-        builder.GenerateLod(screenCoverage: 0.55f);
-        builder.GenerateLod(screenCoverage: 0.30f);
+        builder.GenerateLodChain(0.55f, 0.30f);
         return builder.Build();
     }
 

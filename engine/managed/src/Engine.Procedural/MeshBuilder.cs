@@ -171,6 +171,32 @@ public sealed class MeshBuilder
         _lods.Add(new ProcMeshLod(screenCoverage, lodIndices.ToArray()));
     }
 
+    public void GenerateLodChain(params float[] screenCoverages)
+    {
+        ArgumentNullException.ThrowIfNull(screenCoverages);
+        if (screenCoverages.Length == 0)
+        {
+            throw new ArgumentException("LOD coverage chain cannot be empty.", nameof(screenCoverages));
+        }
+
+        float previousCoverage = 1f;
+        foreach (float coverage in screenCoverages)
+        {
+            if (!float.IsFinite(coverage))
+            {
+                throw new ArgumentOutOfRangeException(nameof(screenCoverages), "LOD coverage values must be finite.");
+            }
+
+            if (coverage >= previousCoverage)
+            {
+                throw new InvalidDataException("LOD coverage chain must be strictly descending.");
+            }
+
+            GenerateLod(coverage);
+            previousCoverage = coverage;
+        }
+    }
+
     public ProcMeshData Build()
     {
         EndSubmesh();
