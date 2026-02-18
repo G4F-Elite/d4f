@@ -68,6 +68,17 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(multiplayerRoot.GetProperty("serverEntityCount").GetInt32() > 0);
             Assert.True(multiplayerRoot.GetProperty("synchronized").GetBoolean());
             Assert.Equal(2, multiplayerRoot.GetProperty("clientStats").GetArrayLength());
+            JsonElement ownershipStats = multiplayerRoot.GetProperty("ownershipStats");
+            Assert.Equal(2, ownershipStats.GetArrayLength());
+            int ownedTotal = 0;
+            foreach (JsonElement ownership in ownershipStats.EnumerateArray())
+            {
+                int ownedCount = ownership.GetProperty("ownedEntityCount").GetInt32();
+                Assert.True(ownedCount >= 0);
+                ownedTotal += ownedCount;
+            }
+
+            Assert.Equal(multiplayerRoot.GetProperty("serverEntityCount").GetInt32(), ownedTotal);
             JsonElement serverStats = multiplayerRoot.GetProperty("serverStats");
             Assert.True(serverStats.GetProperty("messagesSent").GetInt32() > 0);
             Assert.True(serverStats.GetProperty("averageSendBandwidthKbps").GetDouble() > 0.0);

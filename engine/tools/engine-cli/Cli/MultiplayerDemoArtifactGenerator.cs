@@ -23,6 +23,10 @@ internal sealed record MultiplayerDemoClientStats(
     uint ClientId,
     MultiplayerDemoStats Stats);
 
+internal sealed record MultiplayerDemoOwnershipStats(
+    uint ClientId,
+    int OwnedEntityCount);
+
 internal sealed record MultiplayerDemoArtifactOutput(
     string SummaryRelativePath,
     string ProfileLogRelativePath);
@@ -39,7 +43,8 @@ internal sealed record MultiplayerDemoSummary(
     bool Synchronized,
     IReadOnlyList<string> SampleAssetKeys,
     MultiplayerDemoStats ServerStats,
-    IReadOnlyList<MultiplayerDemoClientStats> ClientStats);
+    IReadOnlyList<MultiplayerDemoClientStats> ClientStats,
+    IReadOnlyList<MultiplayerDemoOwnershipStats> OwnershipStats);
 
 internal static class MultiplayerDemoArtifactGenerator
 {
@@ -99,17 +104,21 @@ internal static class MultiplayerDemoArtifactGenerator
         var secondReplicator = new NetProceduralChunkReplicator(NoopRenderingFacade.Instance);
         NetProceduralChunkApplyResult firstResult;
         NetProceduralChunkApplyResult secondResult;
+        NetSnapshot firstSnapshot = default!;
+        NetSnapshot secondSnapshot = default!;
         try
         {
-            UpsertProceduralEntities(session, chunks, proceduralSeed);
+            UpsertProceduralEntities(session, chunks, proceduralSeed, firstClientId, secondClientId);
 
             firstResult = default!;
             secondResult = default!;
             for (int tick = 0; tick < SimulatedTickCount; tick++)
             {
                 session.Pump();
-                firstResult = firstReplicator.Apply(session.GetClientSnapshot(firstClientId));
-                secondResult = secondReplicator.Apply(session.GetClientSnapshot(secondClientId));
+                firstSnapshot = session.GetClientSnapshot(firstClientId);
+                secondSnapshot = session.GetClientSnapshot(secondClientId);
+                firstResult = firstReplicator.Apply(firstSnapshot);
+                secondResult = secondReplicator.Apply(secondSnapshot);
             }
         }
         finally
@@ -118,7 +127,8 @@ internal static class MultiplayerDemoArtifactGenerator
             secondReplicator.Dispose();
         }
 
-        bool synchronized = AreSnapshotsEquivalent(firstResult.ActiveEntities, secondResult.ActiveEntities);
+        bool synchronized = AreProceduralSnapshotsEquivalent(firstResult.ActiveEntities, secondResult.ActiveEntities)
+            && AreNetSnapshotsEquivalent(firstSnapshot, secondSnapshot);
         if (!synchronized)
         {
             throw new InvalidDataException("Multiplayer demo produced divergent client snapshots.");
@@ -146,7 +156,8 @@ internal static class MultiplayerDemoArtifactGenerator
             [
                 new MultiplayerDemoClientStats(firstClientId, ToStats(session.GetClientStats(firstClientId))),
                 new MultiplayerDemoClientStats(secondClientId, ToStats(session.GetClientStats(secondClientId)))
-            ]);
+            ],
+            OwnershipStats: BuildOwnershipStats(firstSnapshot, [firstClientId, secondClientId]));
     }
 
     private static InMemoryNetSession CreateSession(int tickRate)
@@ -164,7 +175,9 @@ internal static class MultiplayerDemoArtifactGenerator
     private static void UpsertProceduralEntities(
         InMemoryNetSession session,
         IReadOnlyList<LevelMeshChunk> chunks,
-        uint proceduralSeed)
+        uint proceduralSeed,
+        uint firstClientId,
+        uint secondClientId)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(chunks);
@@ -175,9 +188,10 @@ internal static class MultiplayerDemoArtifactGenerator
             NetProceduralRecipeRef recipe = BuildRecipe(chunk);
             string assetKey = BuildAssetKey(chunk, recipe);
             byte[] payload = BuildTransformPayload(chunk, i);
+            uint ownerClientId = (i & 1) == 0 ? firstClientId : secondClientId;
             var entity = new NetEntityState(
                 entityId: checked((uint)(i + 1)),
-                ownerClientId: null,
+                ownerClientId: ownerClientId,
                 proceduralSeed: proceduralSeed,
                 assetKey: assetKey,
                 components: [new NetComponentState(ComponentId, payload)],
@@ -252,7 +266,7 @@ internal static class MultiplayerDemoArtifactGenerator
         return Math.Clamp(tickRate, 10, 240);
     }
 
-    private static bool AreSnapshotsEquivalent(
+    private static bool AreProceduralSnapshotsEquivalent(
         IReadOnlyList<NetProceduralChunkEntityBinding> first,
         IReadOnlyList<NetProceduralChunkEntityBinding> second)
     {
@@ -274,6 +288,59 @@ internal static class MultiplayerDemoArtifactGenerator
         }
 
         return true;
+    }
+
+    private static bool AreNetSnapshotsEquivalent(NetSnapshot first, NetSnapshot second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+        if (first.Tick != second.Tick || first.Entities.Count != second.Entities.Count)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < first.Entities.Count; i++)
+        {
+            NetEntityState left = first.Entities[i];
+            NetEntityState right = second.Entities[i];
+            if (left.EntityId != right.EntityId ||
+                left.OwnerClientId != right.OwnerClientId ||
+                left.ProceduralSeed != right.ProceduralSeed ||
+                !string.Equals(left.AssetKey, right.AssetKey, StringComparison.Ordinal))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static IReadOnlyList<MultiplayerDemoOwnershipStats> BuildOwnershipStats(
+        NetSnapshot snapshot,
+        IReadOnlyList<uint> clientIds)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        ArgumentNullException.ThrowIfNull(clientIds);
+
+        var countsByClientId = new SortedDictionary<uint, int>();
+        foreach (uint clientId in clientIds)
+        {
+            countsByClientId[clientId] = 0;
+        }
+
+        foreach (NetEntityState entity in snapshot.Entities)
+        {
+            if (entity.OwnerClientId is not uint ownerClientId || !countsByClientId.ContainsKey(ownerClientId))
+            {
+                continue;
+            }
+
+            countsByClientId[ownerClientId] = checked(countsByClientId[ownerClientId] + 1);
+        }
+
+        return countsByClientId
+            .Select(static pair => new MultiplayerDemoOwnershipStats(pair.Key, pair.Value))
+            .ToArray();
     }
 
     private static MultiplayerDemoStats ToStats(NetPeerStats stats)
