@@ -23,6 +23,17 @@ internal interface INativeInteropApi
 
     EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net);
 
+    EngineNativeStatus ContentMountPak(IntPtr engine, string pakPath);
+
+    EngineNativeStatus ContentMountDirectory(IntPtr engine, string directoryPath);
+
+    EngineNativeStatus ContentReadFile(
+        IntPtr engine,
+        string assetPath,
+        IntPtr buffer,
+        nuint bufferSize,
+        out nuint outSize);
+
     EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,

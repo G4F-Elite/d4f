@@ -39,6 +39,20 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus EngineGetNet(IntPtr engine, out IntPtr net)
         => NativeMethods.EngineGetNet(engine, out net);
 
+    public EngineNativeStatus ContentMountPak(IntPtr engine, string pakPath)
+        => NativeMethods.ContentMountPak(engine, pakPath);
+
+    public EngineNativeStatus ContentMountDirectory(IntPtr engine, string directoryPath)
+        => NativeMethods.ContentMountDirectory(engine, directoryPath);
+
+    public EngineNativeStatus ContentReadFile(
+        IntPtr engine,
+        string assetPath,
+        IntPtr buffer,
+        nuint bufferSize,
+        out nuint outSize)
+        => NativeMethods.ContentReadFile(engine, assetPath, buffer, bufferSize, out outSize);
+
     public EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
         nuint requestedBytes,
@@ -222,6 +236,36 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus EngineGetNet(
             IntPtr engine,
             out IntPtr outNet);
+
+        [LibraryImport(
+            EngineNativeConstants.LibraryName,
+            EntryPoint = "content_mount_pak",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus ContentMountPak(
+            IntPtr engine,
+            string pakPath);
+
+        [LibraryImport(
+            EngineNativeConstants.LibraryName,
+            EntryPoint = "content_mount_directory",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus ContentMountDirectory(
+            IntPtr engine,
+            string directoryPath);
+
+        [LibraryImport(
+            EngineNativeConstants.LibraryName,
+            EntryPoint = "content_read_file",
+            StringMarshalling = StringMarshalling.Utf8)]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus ContentReadFile(
+            IntPtr engine,
+            string assetPath,
+            IntPtr buffer,
+            nuint bufferSize,
+            out nuint outSize);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_begin_frame")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

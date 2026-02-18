@@ -57,6 +57,14 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus EngineGetNetStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus ContentMountPakStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus ContentMountDirectoryStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus ContentReadFileStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public Dictionary<string, byte[]> ContentFilesToReturn { get; } = new(StringComparer.Ordinal);
+
     public EngineNativeStatus RendererBeginFrameStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus RendererSubmitStatus { get; set; } = EngineNativeStatus.Ok;
@@ -143,6 +151,10 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeEmitterParams? LastAudioEmitterParams { get; private set; }
 
+    public string? LastMountedPakPath { get; private set; }
+
+    public string? LastMountedDirectoryPath { get; private set; }
+
     public EngineNativeStatus PhysicsStepStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus PhysicsSyncFromWorldStatus { get; set; } = EngineNativeStatus.Ok;
@@ -225,6 +237,57 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         Calls.Add("engine_get_net");
         net = EngineGetNetStatus == EngineNativeStatus.Ok ? _netHandle : IntPtr.Zero;
         return EngineGetNetStatus;
+    }
+
+    public EngineNativeStatus ContentMountPak(IntPtr engine, string pakPath)
+    {
+        Calls.Add("content_mount_pak");
+        LastMountedPakPath = pakPath;
+        return ContentMountPakStatus;
+    }
+
+    public EngineNativeStatus ContentMountDirectory(IntPtr engine, string directoryPath)
+    {
+        Calls.Add("content_mount_directory");
+        LastMountedDirectoryPath = directoryPath;
+        return ContentMountDirectoryStatus;
+    }
+
+    public EngineNativeStatus ContentReadFile(
+        IntPtr engine,
+        string assetPath,
+        IntPtr buffer,
+        nuint bufferSize,
+        out nuint outSize)
+    {
+        Calls.Add("content_read_file");
+        outSize = 0u;
+
+        if (ContentReadFileStatus != EngineNativeStatus.Ok)
+        {
+            return ContentReadFileStatus;
+        }
+
+        if (!ContentFilesToReturn.TryGetValue(assetPath, out byte[]? bytes))
+        {
+            return EngineNativeStatus.NotFound;
+        }
+
+        outSize = checked((nuint)bytes.Length);
+        if (buffer == IntPtr.Zero)
+        {
+            return bufferSize == 0u
+                ? EngineNativeStatus.Ok
+                : EngineNativeStatus.InvalidArgument;
+        }
+
+        if (bufferSize < outSize)
+        {
+            return EngineNativeStatus.InvalidArgument;
+        }
+
+        Marshal.Copy(bytes, 0, buffer, bytes.Length);
+        return EngineNativeStatus.Ok;
     }
 
     public EngineNativeStatus RendererBeginFrame(
