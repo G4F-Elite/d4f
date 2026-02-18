@@ -59,6 +59,28 @@ public sealed partial class World
         }
     }
 
+    public void QueryNonAlloc<T>(List<(EntityId Entity, T Component)> destination)
+        where T : struct
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        destination.Clear();
+
+        if (!_componentStorage.TryGetPool<T>(out var pool))
+        {
+            return;
+        }
+
+        foreach (ComponentEntry<T> entry in pool.EnumerateEntriesNoAlloc())
+        {
+            if (!TryCreateAliveEntity(entry.EntityIndex, entry.Generation, out EntityId entity))
+            {
+                continue;
+            }
+
+            destination.Add((entity, entry.Value));
+        }
+    }
+
     public IEnumerable<(EntityId Entity, T1 Component1, T2 Component2)> Query<T1, T2>()
         where T1 : struct
         where T2 : struct

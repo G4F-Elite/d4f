@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Engine.Core.Timing;
 using Engine.Core.Handles;
 using Engine.ECS;
@@ -8,6 +9,10 @@ namespace Engine.Rendering;
 public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 {
     public static DefaultRenderPacketBuilder Instance { get; } = new();
+    private readonly List<(EntityId Entity, RenderMeshInstance Component)> _renderMeshInstances = new(128);
+    private readonly List<DrawCommand> _drawCommands = new(128);
+    private readonly List<(EntityId Entity, UiRenderBatch Batch)> _uiBatches = new(64);
+    private readonly List<UiDrawCommand> _uiCommands = new(256);
 
     private DefaultRenderPacketBuilder()
     {
@@ -34,45 +39,67 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             renderSettings.FeatureFlags);
     }
 
-    private static IReadOnlyList<DrawCommand> CollectDrawCommands(World world)
+    private IReadOnlyList<DrawCommand> CollectDrawCommands(World world)
     {
-        List<DrawCommand>? drawCommands = null;
-        foreach (var (entity, instance) in world.Query<RenderMeshInstance>())
+        _renderMeshInstances.Clear();
+        world.QueryNonAlloc(_renderMeshInstances);
+
+        _drawCommands.Clear();
+        for (int i = 0; i < _renderMeshInstances.Count; i++)
         {
+            (EntityId entity, RenderMeshInstance instance) = _renderMeshInstances[i];
             if (!TryCreateDrawCommand(entity, in instance, out DrawCommand drawCommand))
             {
                 continue;
             }
 
-            drawCommands ??= new List<DrawCommand>();
-            drawCommands.Add(drawCommand);
+            _drawCommands.Add(drawCommand);
         }
 
-        return drawCommands is null || drawCommands.Count == 0
-            ? Array.Empty<DrawCommand>()
-            : drawCommands;
+        return _drawCommands;
     }
 
-    private static IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)
+    private IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)
     {
-        List<(EntityId Entity, UiRenderBatch Batch)>? batches = null;
-        foreach (var (entity, batch) in world.Query<UiRenderBatch>())
+        _uiBatches.Clear();
+        world.QueryNonAlloc(_uiBatches);
+
+        if (_uiBatches.Count == 0)
         {
+            _uiCommands.Clear();
+            return _uiCommands;
+        }
+
+        int writeIndex = 0;
+        for (int i = 0; i < _uiBatches.Count; i++)
+        {
+            (EntityId entity, UiRenderBatch batch) = _uiBatches[i];
             if (batch.Commands.Count == 0)
             {
                 continue;
             }
 
-            batches ??= new List<(EntityId Entity, UiRenderBatch Batch)>();
-            batches.Add((entity, batch));
+            if (writeIndex != i)
+            {
+                _uiBatches[writeIndex] = (entity, batch);
+            }
+
+            writeIndex++;
         }
 
-        if (batches is null || batches.Count == 0)
+        if (writeIndex == 0)
         {
-            return Array.Empty<UiDrawCommand>();
+            _uiBatches.Clear();
+            _uiCommands.Clear();
+            return _uiCommands;
         }
 
-        batches.Sort(static (left, right) =>
+        if (writeIndex < _uiBatches.Count)
+        {
+            _uiBatches.RemoveRange(writeIndex, _uiBatches.Count - writeIndex);
+        }
+
+        _uiBatches.Sort(static (left, right) =>
         {
             int byIndex = left.Entity.Index.CompareTo(right.Entity.Index);
             if (byIndex != 0)
@@ -83,16 +110,13 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             return left.Entity.Generation.CompareTo(right.Entity.Generation);
         });
 
-        List<UiDrawCommand>? aggregate = null;
-        foreach (var (_, batch) in batches)
+        _uiCommands.Clear();
+        for (int i = 0; i < _uiBatches.Count; i++)
         {
-            aggregate ??= new List<UiDrawCommand>(batch.Commands.Count);
-            aggregate.AddRange(batch.Commands);
+            _uiCommands.AddRange(_uiBatches[i].Batch.Commands);
         }
 
-        return aggregate is null
-            ? Array.Empty<UiDrawCommand>()
-            : aggregate;
+        return _uiCommands;
     }
 
     private static bool TryCreateDrawCommand(

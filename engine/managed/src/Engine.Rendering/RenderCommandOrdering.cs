@@ -4,6 +4,8 @@ namespace Engine.Rendering;
 
 internal static class RenderCommandOrdering
 {
+    private static readonly DrawCommandComparer Comparer = new();
+
     public static IReadOnlyList<DrawCommand> OrderDrawCommands(IReadOnlyList<DrawCommand> drawCommands)
     {
         ArgumentNullException.ThrowIfNull(drawCommands);
@@ -12,8 +14,20 @@ internal static class RenderCommandOrdering
             return drawCommands;
         }
 
+        if (drawCommands is List<DrawCommand> mutableList)
+        {
+            mutableList.Sort(Comparer);
+            return mutableList;
+        }
+
         DrawCommand[] ordered = drawCommands.ToArray();
-        Array.Sort(ordered, static (left, right) =>
+        Array.Sort(ordered, Comparer);
+        return ordered;
+    }
+
+    private sealed class DrawCommandComparer : IComparer<DrawCommand>
+    {
+        public int Compare(DrawCommand left, DrawCommand right)
         {
             int byHigh = left.SortKeyHigh.CompareTo(right.SortKeyHigh);
             if (byHigh != 0)
@@ -52,7 +66,6 @@ internal static class RenderCommandOrdering
             }
 
             return left.EntityId.Generation.CompareTo(right.EntityId.Generation);
-        });
-        return ordered;
+        }
     }
 }

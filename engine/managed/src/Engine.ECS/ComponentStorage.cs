@@ -139,10 +139,54 @@ internal sealed class ComponentPool<T> : IComponentPool
         }
     }
 
+    public EntryEnumerable EnumerateEntriesNoAlloc()
+    {
+        return new EntryEnumerable(_components);
+    }
+
     public void RemoveEntity(int entityIndex)
     {
         _components.Remove(entityIndex);
     }
 
-    private readonly record struct ComponentRecord(T Value, uint Generation);
+    public readonly struct EntryEnumerable
+    {
+        private readonly Dictionary<int, ComponentRecord> _components;
+
+        internal EntryEnumerable(Dictionary<int, ComponentRecord> components)
+        {
+            _components = components ?? throw new ArgumentNullException(nameof(components));
+        }
+
+        public Enumerator GetEnumerator()
+        {
+            return new Enumerator(_components.GetEnumerator());
+        }
+    }
+
+    public struct Enumerator
+    {
+        private Dictionary<int, ComponentRecord>.Enumerator _enumerator;
+
+        internal Enumerator(Dictionary<int, ComponentRecord>.Enumerator enumerator)
+        {
+            _enumerator = enumerator;
+        }
+
+        public ComponentEntry<T> Current
+        {
+            get
+            {
+                KeyValuePair<int, ComponentRecord> current = _enumerator.Current;
+                return new ComponentEntry<T>(current.Key, current.Value.Generation, current.Value.Value);
+            }
+        }
+
+        public bool MoveNext()
+        {
+            return _enumerator.MoveNext();
+        }
+    }
+
+    internal readonly record struct ComponentRecord(T Value, uint Generation);
 }

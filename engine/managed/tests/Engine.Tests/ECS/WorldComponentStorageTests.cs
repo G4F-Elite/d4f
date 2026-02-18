@@ -186,6 +186,36 @@ public sealed class WorldComponentStorageTests
         Assert.Equal(new Position(8, 9), item.Component2);
     }
 
+    [Fact]
+    public void QueryNonAlloc_ReturnsAliveEntitiesAndClearsDestination()
+    {
+        var world = new World();
+        EntityId first = world.CreateEntity();
+        EntityId second = world.CreateEntity();
+        world.AddComponent(first, new Position(1, 1));
+        world.AddComponent(second, new Position(2, 2));
+        world.DestroyEntity(first);
+
+        var destination = new List<(EntityId Entity, Position Component)>
+        {
+            (EntityId.Invalid, new Position(-1, -1))
+        };
+
+        world.QueryNonAlloc(destination);
+
+        var item = Assert.Single(destination);
+        Assert.Equal(second, item.Entity);
+        Assert.Equal(new Position(2, 2), item.Component);
+    }
+
+    [Fact]
+    public void QueryNonAlloc_RejectsNullDestination()
+    {
+        var world = new World();
+
+        Assert.Throws<ArgumentNullException>(() => world.QueryNonAlloc<Position>(null!));
+    }
+
     private readonly record struct Position(int X, int Y);
     private readonly record struct Velocity(int X, int Y);
 }

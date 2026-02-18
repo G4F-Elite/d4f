@@ -186,6 +186,40 @@ public sealed class DefaultRenderPacketBuilderTests
         Assert.Equal((ulong)10, packet.NativeDrawItems[0].Mesh);
     }
 
+    [Fact]
+    public void Build_ClearsReusableBuffersBetweenCalls()
+    {
+        var world = new World();
+        EntityId renderEntity = world.CreateEntity();
+        EntityId uiEntity = world.CreateEntity();
+        world.AddComponent(renderEntity, new RenderMeshInstance(
+            new MeshHandle(7),
+            new MaterialHandle(8),
+            new TextureHandle(9)));
+        world.AddComponent(uiEntity, new UiRenderBatch([
+            new UiDrawCommand(texture: 15, vertexOffset: 0, vertexCount: 4, indexOffset: 0, indexCount: 6)
+        ]));
+
+        using var firstArena = new FrameArena(1024, 64);
+        RenderPacket first = DefaultRenderPacketBuilder.Instance.Build(
+            world,
+            new FrameTiming(1, TimeSpan.Zero, TimeSpan.Zero),
+            firstArena);
+        Assert.Equal(1, first.NativeDrawItemCount);
+        Assert.Equal(1, first.NativeUiDrawItemCount);
+
+        Assert.True(world.RemoveComponent<RenderMeshInstance>(renderEntity));
+        Assert.True(world.RemoveComponent<UiRenderBatch>(uiEntity));
+
+        using var secondArena = new FrameArena(1024, 64);
+        RenderPacket second = DefaultRenderPacketBuilder.Instance.Build(
+            world,
+            new FrameTiming(2, TimeSpan.Zero, TimeSpan.Zero),
+            secondArena);
+        Assert.Equal(0, second.NativeDrawItemCount);
+        Assert.Equal(0, second.NativeUiDrawItemCount);
+    }
+
     private static Matrix4x4 CreateWorldMatrix(float start)
         => new(
             start + 1.0f, start + 2.0f, start + 3.0f, start + 4.0f,
