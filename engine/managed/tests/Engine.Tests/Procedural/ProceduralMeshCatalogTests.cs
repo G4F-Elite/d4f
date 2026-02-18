@@ -126,6 +126,26 @@ public sealed class ProceduralMeshCatalogTests
     }
 
     [Fact]
+    public void BuildChunkMesh_ShouldIncreaseGeometryDetail_ForHighVariants()
+    {
+        LevelMeshChunk roomLow = new(NodeId: 12, MeshTag: "chunk/room/v0");
+        LevelMeshChunk roomHigh = new(NodeId: 12, MeshTag: "chunk/room/v3");
+        ProcMeshData roomLowMesh = ProceduralMeshCatalog.BuildChunkMesh(roomLow, seed: 515u);
+        ProcMeshData roomHighMesh = ProceduralMeshCatalog.BuildChunkMesh(roomHigh, seed: 515u);
+
+        Assert.True(roomHighMesh.Vertices.Count > roomLowMesh.Vertices.Count);
+        Assert.True(roomHighMesh.Indices.Count > roomLowMesh.Indices.Count);
+
+        LevelMeshChunk corridorLow = new(NodeId: 9, MeshTag: "chunk/corridor/v0");
+        LevelMeshChunk corridorHigh = new(NodeId: 9, MeshTag: "chunk/corridor/v3");
+        ProcMeshData corridorLowMesh = ProceduralMeshCatalog.BuildChunkMesh(corridorLow, seed: 515u);
+        ProcMeshData corridorHighMesh = ProceduralMeshCatalog.BuildChunkMesh(corridorHigh, seed: 515u);
+
+        Assert.True(corridorHighMesh.Vertices.Count > corridorLowMesh.Vertices.Count);
+        Assert.True(corridorHighMesh.Indices.Count > corridorLowMesh.Indices.Count);
+    }
+
+    [Fact]
     public void BuildChunkMesh_ShouldRejectInvalidTag()
     {
         Assert.Throws<ArgumentNullException>(() => ProceduralMeshCatalog.BuildChunkMesh(null!, seed: 1u));

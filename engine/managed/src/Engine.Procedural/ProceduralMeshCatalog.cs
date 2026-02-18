@@ -78,6 +78,27 @@ public static class ProceduralMeshCatalog
                 new Vector3(0.8f, pillarHeight, 0.8f),
                 accentColor);
         }
+
+        if (variant >= 2)
+        {
+            float trimHeight = MathF.Max(0.10f, height * 0.08f);
+            float trimWidth = width * 0.94f;
+            float trimDepth = depth * 0.94f;
+            float topY = (height * 0.5f) - (trimHeight * 0.5f);
+            float bottomY = (-height * 0.5f) + (trimHeight * 0.5f);
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(0f, topY, 0f),
+                new Vector3(trimWidth, trimHeight, trimDepth),
+                accentColor);
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(0f, bottomY, 0f),
+                new Vector3(trimWidth, trimHeight, trimDepth),
+                accentColor);
+        }
     }
 
     private static void BuildCorridorMesh(
@@ -104,6 +125,27 @@ public static class ProceduralMeshCatalog
                 accentMaterialTag,
                 new Vector3(nicheOffset, 0f, -depth * 0.2f),
                 new Vector3(width * 0.35f, height * 0.7f, nicheDepth),
+                accentColor);
+        }
+
+        if (variant >= 3)
+        {
+            float railWidth = MathF.Max(0.12f, width * 0.14f);
+            float railHeight = MathF.Max(0.16f, height * 0.10f);
+            float railDepth = depth * 0.92f;
+            float railY = (-height * 0.5f) + (railHeight * 0.5f);
+            float railOffsetX = (width * 0.5f) - (railWidth * 0.5f);
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(railOffsetX, railY, 0f),
+                new Vector3(railWidth, railHeight, railDepth),
+                accentColor);
+            AppendBoxInSubmesh(
+                builder,
+                accentMaterialTag,
+                new Vector3(-railOffsetX, railY, 0f),
+                new Vector3(railWidth, railHeight, railDepth),
                 accentColor);
         }
     }
