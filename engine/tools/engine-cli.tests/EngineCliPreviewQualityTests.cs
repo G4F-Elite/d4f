@@ -80,6 +80,40 @@ public sealed class EngineCliPreviewQualityTests
         }
     }
 
+    [Fact]
+    public void Run_Preview_ShouldProduceBalancedMeshHighlightsAndShadows()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDefaultManifest(tempRoot);
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(
+            [
+                "preview",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--out", "artifacts/preview"
+            ]);
+
+            Assert.Equal(0, code);
+            byte[] meshRgba = DecodePngRgba(
+                Path.Combine(tempRoot, "artifacts", "preview", "meshes", "mesh_cube.png"),
+                out _,
+                out _);
+
+            (double brightFraction, _) = ComputeBrightnessFractions(meshRgba);
+            Assert.InRange(brightFraction, 0.01, 0.45);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDefaultManifest(string rootPath)
     {
         string assetsDirectory = Path.Combine(rootPath, "assets");
@@ -172,6 +206,33 @@ public sealed class EngineCliPreviewQualityTests
         double mean = sum / count;
         double variance = Math.Max(0.0, (sumSquares / count) - (mean * mean));
         return variance > 0.0005;
+    }
+
+    private static (double BrightFraction, double DarkFraction) ComputeBrightnessFractions(byte[] rgba)
+    {
+        int pixelCount = rgba.Length / 4;
+        if (pixelCount == 0)
+        {
+            return (0.0, 0.0);
+        }
+
+        int bright = 0;
+        int dark = 0;
+        for (int i = 0; i < rgba.Length; i += 4)
+        {
+            double luma = (0.2126 * rgba[i] + 0.7152 * rgba[i + 1] + 0.0722 * rgba[i + 2]) / 255.0;
+            if (luma >= 0.72)
+            {
+                bright++;
+            }
+
+            if (luma <= 0.18)
+            {
+                dark++;
+            }
+        }
+
+        return (bright / (double)pixelCount, dark / (double)pixelCount);
     }
 
     private static byte[] DecodePngRgba(string path, out int width, out int height)

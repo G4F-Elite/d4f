@@ -40,7 +40,10 @@ internal static partial class ProceduralPreviewRasterizer
             surfaceWidth: 64,
             surfaceHeight: 64);
         TexturePayload albedo = ResolveTextureBySuffix(content.MaterialBundle, ".albedo");
-        return RasterizeMesh(content.Mesh, albedo.Rgba8, albedo.Width, albedo.Height, width, height, seed);
+        TexturePayload normal = ResolveTextureBySuffix(content.MaterialBundle, ".normal");
+        TexturePayload roughness = ResolveTextureBySuffix(content.MaterialBundle, ".roughness");
+        TexturePayload ao = ResolveTextureBySuffix(content.MaterialBundle, ".ao");
+        return RasterizeMesh(content.Mesh, albedo, normal, roughness, ao, width, height, seed);
     }
 
     private static GoldenImageBuffer BuildTexturePreview(LevelMeshChunk chunk, uint seed, int width, int height)
@@ -141,9 +144,10 @@ internal static partial class ProceduralPreviewRasterizer
 
     private static GoldenImageBuffer RasterizeMesh(
         ProcMeshData mesh,
-        byte[] albedo,
-        int albedoWidth,
-        int albedoHeight,
+        TexturePayload albedo,
+        TexturePayload normalMap,
+        TexturePayload roughnessMap,
+        TexturePayload aoMap,
         int width,
         int height,
         uint seed)
@@ -185,8 +189,9 @@ internal static partial class ProceduralPreviewRasterizer
             float projection = 1.6f * invZ;
             float sx = (world.X * projection * 0.5f + 0.5f) * (width - 1);
             float sy = (0.5f - world.Y * projection * 0.5f) * (height - 1);
-            Vector3 normal = Vector3.Normalize(Vector3.TransformNormal(src.Normal, rotation));
-            transformed[i] = new MeshRasterVertex(sx, sy, world.Z, normal, src.Uv);
+            Vector3 worldNormal = Vector3.Normalize(Vector3.TransformNormal(src.Normal, rotation));
+            Vector3 vertexColor = Vector3.Clamp(new Vector3(src.Color.X, src.Color.Y, src.Color.Z), Vector3.Zero, Vector3.One);
+            transformed[i] = new MeshRasterVertex(sx, sy, world.Z, worldNormal, src.Uv, vertexColor);
         }
 
         for (int tri = 0; tri < mesh.Indices.Count; tri += 3)
@@ -244,16 +249,35 @@ internal static partial class ProceduralPreviewRasterizer
                     }
 
                     depth[bufferIndex] = z;
-                    Vector3 normal = Vector3.Normalize(
+                    Vector3 geometricNormal = Vector3.Normalize(
                         (v0.Normal * b0) +
                         (v1.Normal * b1) +
                         (v2.Normal * b2));
                     Vector2 uv = (v0.Uv * b0) + (v1.Uv * b1) + (v2.Uv * b2);
-                    Vector3 albedoSample = SampleRgb(albedo, albedoWidth, albedoHeight, uv.X, uv.Y);
+                    Vector3 albedoSample = SampleRgb(albedo, uv.X, uv.Y);
+                    Vector3 sampledNormal = SampleNormal(normalMap, uv.X, uv.Y);
+                    float roughnessSample = SampleGray(roughnessMap, uv.X, uv.Y);
+                    float aoSample = SampleGray(aoMap, uv.X, uv.Y);
+                    Vector3 vertexTint = Vector3.Clamp(
+                        (v0.Color * b0) +
+                        (v1.Color * b1) +
+                        (v2.Color * b2),
+                        Vector3.Zero,
+                        Vector3.One);
 
-                    float ndotl = MathF.Max(0f, Vector3.Dot(normal, lightDir));
-                    float rim = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(normal, viewDir)), 2f) * 0.22f;
-                    Vector3 color = albedoSample * (0.16f + ndotl * 0.84f) + Vector3.One * rim * 0.12f;
+                    Vector3 perturbedNormal = Vector3.Normalize(new Vector3(
+                        geometricNormal.X + sampledNormal.X * 0.22f,
+                        geometricNormal.Y + sampledNormal.Y * 0.22f,
+                        MathF.Max(0.2f, geometricNormal.Z + sampledNormal.Z * 0.16f)));
+                    float ndotl = MathF.Max(0f, Vector3.Dot(perturbedNormal, lightDir));
+                    Vector3 halfway = Vector3.Normalize(lightDir + viewDir);
+                    float specPow = Lerp(72f, 10f, roughnessSample);
+                    float specular = MathF.Pow(MathF.Max(0f, Vector3.Dot(perturbedNormal, halfway)), specPow);
+                    float specIntensity = Lerp(0.04f, 0.22f, 1f - roughnessSample);
+                    float fresnel = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(perturbedNormal, viewDir)), 5f) * 0.18f;
+                    float rim = MathF.Pow(1f - MathF.Max(0f, Vector3.Dot(perturbedNormal, viewDir)), 2f) * 0.16f;
+                    Vector3 color = (albedoSample * vertexTint) * (0.14f + ndotl * aoSample * 0.86f)
+                        + Vector3.One * (specular * specIntensity + fresnel + rim * 0.08f);
                     int offset = bufferIndex * 4;
                     WritePixel(rgba, offset, color);
                 }
@@ -348,42 +372,6 @@ internal static partial class ProceduralPreviewRasterizer
         rgba[offset + 3] = 255;
     }
 
-    private static float Edge(float ax, float ay, float bx, float by, float px, float py)
-    {
-        return (px - ax) * (by - ay) - (py - ay) * (bx - ax);
-    }
-
-    private static float Lerp(float a, float b, float t)
-    {
-        return a + ((b - a) * t);
-    }
-
-    private static uint Hash(uint seed, uint x, uint y)
-    {
-        uint value = seed ^ (x * 374761393u) ^ (y * 668265263u);
-        value ^= value >> 13;
-        value *= 1274126177u;
-        value ^= value >> 16;
-        return value;
-    }
-
-    private static float Sample01(uint seed, uint x, uint y)
-    {
-        return (Hash(seed, x, y) & 0x00FFFFFFu) / 16777215f;
-    }
-
-    private static byte ToByte(float value)
-    {
-        int rounded = (int)MathF.Round(value);
-        if (rounded <= 0)
-        {
-            return 0;
-        }
-
-        return rounded >= 255 ? (byte)255 : (byte)rounded;
-    }
-
     private readonly record struct TexturePayload(int Width, int Height, byte[] Rgba8);
-
-    private readonly record struct MeshRasterVertex(float X, float Y, float Z, Vector3 Normal, Vector2 Uv);
+    private readonly record struct MeshRasterVertex(float X, float Y, float Z, Vector3 Normal, Vector2 Uv, Vector3 Color);
 }
