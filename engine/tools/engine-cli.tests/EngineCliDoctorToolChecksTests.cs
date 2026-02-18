@@ -72,6 +72,74 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCmakeVersionCheckReturnsNonZero()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 9
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(["doctor", "--project", tempRoot]);
+
+            Assert.Equal(1, code);
+            Assert.Equal(2, runner.Invocations.Count);
+            Assert.Equal("dotnet", runner.Invocations[0].ExecutablePath);
+            Assert.Equal("cmake", runner.Invocations[1].ExecutablePath);
+            Assert.Contains(
+                "cmake CLI version check failed with exit code 9.",
+                error.ToString(),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCmakeVersionCheckThrows()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                ThrowOnCmake = true
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(["doctor", "--project", tempRoot]);
+
+            Assert.Equal(1, code);
+            Assert.Equal(2, runner.Invocations.Count);
+            Assert.Equal("dotnet", runner.Invocations[0].ExecutablePath);
+            Assert.Equal("cmake", runner.Invocations[1].ExecutablePath);
+            Assert.Contains(
+                "cmake version check failed: Failed to start process 'cmake'.",
+                error.ToString(),
+                StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -109,6 +177,8 @@ public sealed class EngineCliDoctorToolChecksTests
 
         public bool ThrowOnDotnet { get; init; }
 
+        public bool ThrowOnCmake { get; init; }
+
         public int Run(
             string executablePath,
             IReadOnlyList<string> arguments,
@@ -130,6 +200,11 @@ public sealed class EngineCliDoctorToolChecksTests
 
             if (string.Equals(executablePath, "cmake", StringComparison.OrdinalIgnoreCase))
             {
+                if (ThrowOnCmake)
+                {
+                    throw new InvalidOperationException("Failed to start process 'cmake'.");
+                }
+
                 return CmakeExitCode;
             }
 
