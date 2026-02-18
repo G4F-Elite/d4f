@@ -26,6 +26,52 @@ public sealed record ProceduralMaterial(
         ArgumentNullException.ThrowIfNull(Scalars);
         ArgumentNullException.ThrowIfNull(Vectors);
         ArgumentNullException.ThrowIfNull(TextureRefs);
+
+        foreach ((string key, float value) in Scalars)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidDataException("Scalar parameter name cannot be empty.");
+            }
+
+            if (!float.IsFinite(value))
+            {
+                throw new InvalidDataException(
+                    $"Scalar parameter '{key}' must be finite.");
+            }
+        }
+
+        foreach ((string key, Vector4 value) in Vectors)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                throw new InvalidDataException("Vector parameter name cannot be empty.");
+            }
+
+            if (!float.IsFinite(value.X) ||
+                !float.IsFinite(value.Y) ||
+                !float.IsFinite(value.Z) ||
+                !float.IsFinite(value.W))
+            {
+                throw new InvalidDataException(
+                    $"Vector parameter '{key}' must contain only finite components.");
+            }
+        }
+
+        foreach ((string slot, string textureRef) in TextureRefs)
+        {
+            if (string.IsNullOrWhiteSpace(slot))
+            {
+                throw new InvalidDataException("Texture slot name cannot be empty.");
+            }
+
+            if (string.IsNullOrWhiteSpace(textureRef))
+            {
+                throw new InvalidDataException(
+                    $"Texture reference for slot '{slot}' cannot be empty.");
+            }
+        }
+
         return this;
     }
 }
