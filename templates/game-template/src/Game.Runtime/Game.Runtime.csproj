@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
     <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Audio/Engine.Audio.csproj" />
+    <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Content/Engine.Content.csproj" />
     <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Core/Engine.Core.csproj" />
+    <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.NativeBindings/Engine.NativeBindings.csproj" />
     <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Net/Engine.Net.csproj" />
     <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Procedural/Engine.Procedural.csproj" />
     <ProjectReference Include="__ENGINE_MANAGED_SRC_RELATIVE__/Engine.Rendering/Engine.Rendering.csproj" />

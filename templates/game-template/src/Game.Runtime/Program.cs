@@ -1,14 +1,17 @@
 using System.Globalization;
 using System.Numerics;
 using Engine.Audio;
+using Engine.Content;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
+using Engine.NativeBindings;
 using Engine.Net;
 using Engine.Procedural;
 using Engine.UI;
 
 const uint DefaultSeed = 1337u;
 uint seed = ParseSeed(args);
+TryConfigurePackagedContent();
 
 LevelGenResult level = LevelGenerator.Generate(new LevelGenOptions(
     Seed: seed,
@@ -92,6 +95,19 @@ static ProcMeshData BuildDemoMesh()
     builder.GenerateUv(UvProjection.Box, scale: 0.5f);
     builder.GenerateLod(screenCoverage: 0.55f);
     return builder.Build();
+}
+
+static void TryConfigurePackagedContent()
+{
+    string runtimeConfigPath = PackagedRuntimeContentBootstrap.GetDefaultRuntimeConfigPath();
+    if (!File.Exists(runtimeConfigPath))
+    {
+        return;
+    }
+
+    PackagedRuntimeContentBootstrap.ConfigureFromRuntimeConfig(
+        NativeFacadeFactory.CreateContentRuntimeFacade(),
+        runtimeConfigPath);
 }
 
 static UiSummary BuildUiPreviewSummary(LevelGenResult level)

@@ -26,11 +26,15 @@ public sealed class EngineCliTemplateRuntimeTests
             string projectText = File.ReadAllText(runtimeProjectPath);
             Assert.DoesNotContain("__ENGINE_MANAGED_SRC_RELATIVE__", projectText, StringComparison.Ordinal);
             Assert.Contains("ProjectReference", projectText, StringComparison.Ordinal);
+            Assert.Contains("Engine.Content/Engine.Content.csproj", projectText, StringComparison.Ordinal);
+            Assert.Contains("Engine.NativeBindings/Engine.NativeBindings.csproj", projectText, StringComparison.Ordinal);
             Assert.Contains("Engine.Procedural/Engine.Procedural.csproj", projectText, StringComparison.Ordinal);
             Assert.Contains("Engine.Net/Engine.Net.csproj", projectText, StringComparison.Ordinal);
 
             string programText = File.ReadAllText(runtimeProgramPath);
             Assert.DoesNotContain("__GAME_NAME__", programText, StringComparison.Ordinal);
+            Assert.Contains("TryConfigurePackagedContent", programText, StringComparison.Ordinal);
+            Assert.Contains("PackagedRuntimeContentBootstrap.ConfigureFromRuntimeConfig", programText, StringComparison.Ordinal);
             Assert.Contains("LevelGenerator.Generate", programText, StringComparison.Ordinal);
             Assert.Contains("UiPreviewHost", programText, StringComparison.Ordinal);
             Assert.Contains("InMemoryNetSession", programText, StringComparison.Ordinal);
