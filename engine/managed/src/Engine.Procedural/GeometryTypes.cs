@@ -140,9 +140,36 @@ public sealed record ProcMeshData(
             }
         }
 
+        float previousCoverage = float.PositiveInfinity;
+        int previousIndexCount = int.MaxValue;
+
         foreach (ProcMeshLod lod in Lods)
         {
             _ = lod.Validate();
+
+            if (lod.ScreenCoverage >= previousCoverage)
+            {
+                throw new InvalidDataException(
+                    "LOD levels must be strictly ordered by descending screen coverage.");
+            }
+
+            if (lod.Indices.Count > previousIndexCount)
+            {
+                throw new InvalidDataException(
+                    "LOD levels must not increase triangle/index count compared to the previous level.");
+            }
+
+            foreach (int index in lod.Indices)
+            {
+                if (index < 0 || index >= Vertices.Count)
+                {
+                    throw new InvalidDataException(
+                        $"LOD index {index} is outside vertex range [0, {Vertices.Count - 1}].");
+                }
+            }
+
+            previousCoverage = lod.ScreenCoverage;
+            previousIndexCount = lod.Indices.Count;
         }
 
         return this;
