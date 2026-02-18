@@ -14,6 +14,10 @@ public sealed class NetPeerStats
 
     public double RoundTripTimeMs { get; private set; }
 
+    public double AverageSendBandwidthKbps { get; private set; }
+
+    public double AverageReceiveBandwidthKbps { get; private set; }
+
     public double LossPercent => MessagesSent == 0
         ? 0d
         : (double)MessagesDropped / MessagesSent * 100d;
@@ -55,6 +59,30 @@ public sealed class NetPeerStats
         RoundTripTimeMs = rttMs;
     }
 
+    internal void RecalculateAverageBandwidth(long tickCount, int tickRateHz)
+    {
+        if (tickCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tickCount), "Tick count cannot be negative.");
+        }
+
+        if (tickRateHz <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tickRateHz), "Tick rate must be greater than zero.");
+        }
+
+        if (tickCount == 0)
+        {
+            AverageSendBandwidthKbps = 0d;
+            AverageReceiveBandwidthKbps = 0d;
+            return;
+        }
+
+        double seconds = tickCount / (double)tickRateHz;
+        AverageSendBandwidthKbps = (BytesSent * 8d) / 1000d / seconds;
+        AverageReceiveBandwidthKbps = (BytesReceived * 8d) / 1000d / seconds;
+    }
+
     internal NetPeerStats Clone()
     {
         var clone = new NetPeerStats();
@@ -64,6 +92,8 @@ public sealed class NetPeerStats
         clone.MessagesReceived = MessagesReceived;
         clone.MessagesDropped = MessagesDropped;
         clone.RoundTripTimeMs = RoundTripTimeMs;
+        clone.AverageSendBandwidthKbps = AverageSendBandwidthKbps;
+        clone.AverageReceiveBandwidthKbps = AverageReceiveBandwidthKbps;
         return clone;
     }
 }

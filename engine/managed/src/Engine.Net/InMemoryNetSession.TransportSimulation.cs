@@ -27,9 +27,11 @@ public sealed partial class InMemoryNetSession
     private void ApplySimulatedRtt()
     {
         _serverStats.SetRoundTripTime(_config.SimulatedRttMs);
+        _serverStats.RecalculateAverageBandwidth(_clock.CurrentTick, _config.TickRateHz);
         foreach (ClientState client in _clients.Values)
         {
             client.Stats.SetRoundTripTime(_config.SimulatedRttMs);
+            client.Stats.RecalculateAverageBandwidth(_clock.CurrentTick, _config.TickRateHz);
         }
     }
 
