@@ -28,6 +28,13 @@ internal struct EngineNativeWindowEvents
 }
 
 [StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeStringView
+{
+    public IntPtr Data;
+    public nuint Length;
+}
+
+[StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeDrawItem
 {
     public ulong Mesh;

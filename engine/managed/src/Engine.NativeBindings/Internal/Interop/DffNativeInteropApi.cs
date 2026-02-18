@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Reflection;
+using System.Text;
 
 namespace Engine.NativeBindings.Internal.Interop;
 
@@ -85,10 +86,30 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         => NativeMethods.EngineGetNet(engine, out net);
 
     public EngineNativeStatus ContentMountPak(IntPtr engine, string pakPath)
-        => NativeMethods.ContentMountPak(engine, pakPath);
+    {
+        EngineNativeStringView pathView = CreateUtf8StringView(pakPath, out IntPtr allocatedUtf8);
+        try
+        {
+            return NativeMethods.ContentMountPakView(engine, in pathView);
+        }
+        finally
+        {
+            FreeUtf8StringViewBuffer(allocatedUtf8);
+        }
+    }
 
     public EngineNativeStatus ContentMountDirectory(IntPtr engine, string directoryPath)
-        => NativeMethods.ContentMountDirectory(engine, directoryPath);
+    {
+        EngineNativeStringView pathView = CreateUtf8StringView(directoryPath, out IntPtr allocatedUtf8);
+        try
+        {
+            return NativeMethods.ContentMountDirectoryView(engine, in pathView);
+        }
+        finally
+        {
+            FreeUtf8StringViewBuffer(allocatedUtf8);
+        }
+    }
 
     public EngineNativeStatus ContentReadFile(
         IntPtr engine,
@@ -96,7 +117,22 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         IntPtr buffer,
         nuint bufferSize,
         out nuint outSize)
-        => NativeMethods.ContentReadFile(engine, assetPath, buffer, bufferSize, out outSize);
+    {
+        EngineNativeStringView pathView = CreateUtf8StringView(assetPath, out IntPtr allocatedUtf8);
+        try
+        {
+            return NativeMethods.ContentReadFileView(
+                engine,
+                in pathView,
+                buffer,
+                bufferSize,
+                out outSize);
+        }
+        finally
+        {
+            FreeUtf8StringViewBuffer(allocatedUtf8);
+        }
+    }
 
     public EngineNativeStatus RendererBeginFrame(
         IntPtr renderer,
@@ -240,6 +276,33 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out uint hitCount)
         => NativeMethods.PhysicsOverlap(physics, in query, hits, hitCapacity, out hitCount);
 
+    private static EngineNativeStringView CreateUtf8StringView(
+        string value,
+        out IntPtr allocatedUtf8)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (value.Length == 0)
+        {
+            allocatedUtf8 = IntPtr.Zero;
+            return default;
+        }
+
+        allocatedUtf8 = Marshal.StringToCoTaskMemUTF8(value);
+        return new EngineNativeStringView
+        {
+            Data = allocatedUtf8,
+            Length = checked((nuint)Encoding.UTF8.GetByteCount(value))
+        };
+    }
+
+    private static void FreeUtf8StringViewBuffer(IntPtr allocatedUtf8)
+    {
+        if (allocatedUtf8 != IntPtr.Zero)
+        {
+            Marshal.FreeCoTaskMem(allocatedUtf8);
+        }
+    }
+
     private static partial class NativeMethods
     {
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "engine_get_native_api_version")]
@@ -287,32 +350,23 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             IntPtr engine,
             out IntPtr outNet);
 
-        [LibraryImport(
-            EngineNativeConstants.LibraryName,
-            EntryPoint = "content_mount_pak",
-            StringMarshalling = StringMarshalling.Utf8)]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_pak_view")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentMountPak(
+        internal static partial EngineNativeStatus ContentMountPakView(
             IntPtr engine,
-            string pakPath);
+            in EngineNativeStringView pakPath);
 
-        [LibraryImport(
-            EngineNativeConstants.LibraryName,
-            EntryPoint = "content_mount_directory",
-            StringMarshalling = StringMarshalling.Utf8)]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_mount_directory_view")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentMountDirectory(
+        internal static partial EngineNativeStatus ContentMountDirectoryView(
             IntPtr engine,
-            string directoryPath);
+            in EngineNativeStringView directoryPath);
 
-        [LibraryImport(
-            EngineNativeConstants.LibraryName,
-            EntryPoint = "content_read_file",
-            StringMarshalling = StringMarshalling.Utf8)]
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "content_read_file_view")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
-        internal static partial EngineNativeStatus ContentReadFile(
+        internal static partial EngineNativeStatus ContentReadFileView(
             IntPtr engine,
-            string assetPath,
+            in EngineNativeStringView assetPath,
             IntPtr buffer,
             nuint bufferSize,
             out nuint outSize);
