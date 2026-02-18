@@ -236,12 +236,27 @@ public sealed partial class EngineCliApp
             return 1;
         }
 
+        ReplayRecording? replayOverride = null;
+        ulong replaySeed = command.ReplaySeed;
+        double fixedDeltaSeconds = command.FixedDeltaSeconds;
+        if (!string.IsNullOrWhiteSpace(command.ReplayPath))
+        {
+            string replayPath = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ReplayPath);
+            ReplayRecording replay = ReplayRecordingCodec.Read(replayPath);
+            EnsureReplayContainsCaptureTick(replay, command.CaptureFrame);
+            replayOverride = replay;
+            replaySeed = replay.Seed;
+            fixedDeltaSeconds = replay.FixedDeltaSeconds;
+            _stdout.WriteLine($"Replay loaded: {replayPath}");
+        }
+
         string artifactsDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.ArtifactsDirectory);
         var generationOptions = new TestArtifactGenerationOptions(
             command.CaptureFrame,
-            command.ReplaySeed,
-            command.FixedDeltaSeconds,
-            command.HostMode);
+            replaySeed,
+            fixedDeltaSeconds,
+            command.HostMode,
+            replayOverride);
         TestArtifactsOutput artifactsOutput = TestArtifactGenerator.Generate(artifactsDirectory, generationOptions);
 
         if (!string.IsNullOrWhiteSpace(command.GoldenDirectory))
@@ -341,5 +356,27 @@ public sealed partial class EngineCliApp
         ulong TriangleCount,
         ulong UploadBytes,
         ulong GpuMemoryBytes);
+
+    private static void EnsureReplayContainsCaptureTick(ReplayRecording replay, int captureFrame)
+    {
+        ArgumentNullException.ThrowIfNull(replay);
+        if (captureFrame < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(captureFrame), "Capture frame cannot be negative.");
+        }
+
+        if (replay.Frames.Count == 0)
+        {
+            throw new InvalidDataException("Replay does not contain frames.");
+        }
+
+        long captureTick = captureFrame;
+        bool hasCaptureTick = replay.Frames.Any(frame => frame.Tick == captureTick);
+        if (!hasCaptureTick)
+        {
+            throw new InvalidDataException(
+                $"Replay does not contain tick '{captureTick}' required by '--capture-frame {captureFrame}'.");
+        }
+    }
 
 }

@@ -128,6 +128,7 @@ public sealed class EngineCliParserTests
         Assert.Equal(1.0 / 60.0, command.FixedDeltaSeconds, 6);
         Assert.Equal(1.0, command.TolerantMaxMae, 6);
         Assert.Equal(48.0, command.TolerantMinPsnrDb, 6);
+        Assert.Null(command.ReplayPath);
     }
 
     [Fact]
@@ -158,7 +159,8 @@ public sealed class EngineCliParserTests
             "--seed", "9001",
             "--fixed-dt", "0.0333333",
             "--mae-threshold", "0.25",
-            "--psnr-threshold", "52.5"
+            "--psnr-threshold", "52.5",
+            "--replay", "artifacts/replay/recording.json"
         ]);
 
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
@@ -168,6 +170,7 @@ public sealed class EngineCliParserTests
         Assert.Equal(0.0333333, command.FixedDeltaSeconds, 6);
         Assert.Equal(0.25, command.TolerantMaxMae, 6);
         Assert.Equal(52.5, command.TolerantMinPsnrDb, 6);
+        Assert.Equal("artifacts/replay/recording.json", command.ReplayPath);
     }
 
     [Fact]
@@ -228,6 +231,15 @@ public sealed class EngineCliParserTests
         Assert.Equal(
             "Option '--host' must be one of: headless, offscreen, headless-offscreen, hidden, hidden-window.",
             invalidHost.Error);
+
+        EngineCliParseResult invalidReplayPath = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--replay", " "
+        ]);
+        Assert.False(invalidReplayPath.IsSuccess);
+        Assert.Equal("Option '--replay' cannot be empty.", invalidReplayPath.Error);
     }
 
     [Fact]

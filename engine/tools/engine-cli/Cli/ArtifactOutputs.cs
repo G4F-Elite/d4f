@@ -65,7 +65,8 @@ internal sealed record TestArtifactGenerationOptions(
     int CaptureFrame,
     ulong ReplaySeed,
     double FixedDeltaSeconds,
-    TestHostMode HostMode)
+    TestHostMode HostMode,
+    ReplayRecording? ReplayOverride = null)
 {
     public static TestArtifactGenerationOptions Default { get; } = new(1, 1337UL, 1.0 / 60.0, TestHostMode.HeadlessOffscreen);
 
@@ -84,6 +85,19 @@ internal sealed record TestArtifactGenerationOptions(
         if (!Enum.IsDefined(HostMode))
         {
             throw new InvalidDataException($"Unsupported test host mode: {HostMode}.");
+        }
+
+        if (ReplayOverride is not null)
+        {
+            if (ReplayOverride.Seed != ReplaySeed)
+            {
+                throw new InvalidDataException("Replay override seed must match generation replay seed.");
+            }
+
+            if (Math.Abs(ReplayOverride.FixedDeltaSeconds - FixedDeltaSeconds) > 1e-9)
+            {
+                throw new InvalidDataException("Replay override fixed delta must match generation fixed delta.");
+            }
         }
 
         return this;
@@ -152,22 +166,10 @@ internal static class TestArtifactGenerator
 
         string replayRelativePath = Path.Combine("replay", "recording.json");
         string replayFullPath = Path.Combine(outputDirectory, replayRelativePath);
+        ReplayRecording replayRecording = BuildReplayRecording(options, multiplayerArtifacts.ProfileLogRelativePath);
         ReplayRecordingCodec.Write(
             replayFullPath,
-            new ReplayRecording(
-                Seed: options.ReplaySeed,
-                FixedDeltaSeconds: options.FixedDeltaSeconds,
-                Frames: BuildReplayFrames(options.CaptureFrame),
-                NetworkEvents:
-                [
-                    $"capture.frame={options.CaptureFrame}",
-                    $"net.profile={multiplayerArtifacts.ProfileLogRelativePath}"
-                ],
-                TimedNetworkEvents:
-                [
-                    new ReplayTimedNetworkEvent(0L, $"capture.frame={options.CaptureFrame}"),
-                    new ReplayTimedNetworkEvent(options.CaptureFrame, $"net.profile={multiplayerArtifacts.ProfileLogRelativePath}")
-                ]));
+            replayRecording);
         manifestEntries.Add(
             new TestingArtifactEntry(
                 Kind: "replay",
@@ -245,6 +247,94 @@ internal static class TestArtifactGenerator
         }
 
         return frames;
+    }
+
+    private static ReplayRecording BuildReplayRecording(
+        TestArtifactGenerationOptions options,
+        string profileLogRelativePath)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        if (string.IsNullOrWhiteSpace(profileLogRelativePath))
+        {
+            throw new ArgumentException("Profile log relative path cannot be empty.", nameof(profileLogRelativePath));
+        }
+
+        const long captureMetaTick = 0L;
+        long profileMetaTick = options.CaptureFrame;
+        string captureMeta = $"capture.frame={options.CaptureFrame}";
+        string profileMeta = $"net.profile={profileLogRelativePath}";
+
+        if (options.ReplayOverride is null)
+        {
+            return new ReplayRecording(
+                Seed: options.ReplaySeed,
+                FixedDeltaSeconds: options.FixedDeltaSeconds,
+                Frames: BuildReplayFrames(options.CaptureFrame),
+                NetworkEvents:
+                [
+                    captureMeta,
+                    profileMeta
+                ],
+                TimedNetworkEvents:
+                [
+                    new ReplayTimedNetworkEvent(captureMetaTick, captureMeta),
+                    new ReplayTimedNetworkEvent(profileMetaTick, profileMeta)
+                ]);
+        }
+
+        List<string>? networkEvents = options.ReplayOverride.NetworkEvents?.ToList() ?? [];
+        AddUniqueNetworkEvent(networkEvents, captureMeta);
+        AddUniqueNetworkEvent(networkEvents, profileMeta);
+
+        List<ReplayTimedNetworkEvent>? timedNetworkEvents = options.ReplayOverride.TimedNetworkEvents?.ToList() ?? [];
+        AddUniqueTimedNetworkEvent(timedNetworkEvents, captureMetaTick, captureMeta);
+        AddUniqueTimedNetworkEvent(timedNetworkEvents, profileMetaTick, profileMeta);
+
+        return options.ReplayOverride with
+        {
+            NetworkEvents = networkEvents,
+            TimedNetworkEvents = timedNetworkEvents
+        };
+    }
+
+    private static void AddUniqueNetworkEvent(List<string> events, string value)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Event value cannot be empty.", nameof(value));
+        }
+
+        if (events.Any(existing => string.Equals(existing, value, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        events.Add(value);
+    }
+
+    private static void AddUniqueTimedNetworkEvent(
+        List<ReplayTimedNetworkEvent> events,
+        long tick,
+        string value)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        if (tick < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(tick), "Timed network event tick cannot be negative.");
+        }
+
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new ArgumentException("Event value cannot be empty.", nameof(value));
+        }
+
+        if (events.Any(existing => existing.Tick == tick && string.Equals(existing.Event, value, StringComparison.Ordinal)))
+        {
+            return;
+        }
+
+        events.Add(new ReplayTimedNetworkEvent(tick, value));
     }
 
     private static RenderStatsArtifact CaptureRenderStats(IRenderingFacade renderingFacade)

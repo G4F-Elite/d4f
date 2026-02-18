@@ -48,7 +48,8 @@ public sealed record TestCommand(
     ulong ReplaySeed,
     double FixedDeltaSeconds,
     double TolerantMaxMae,
-    double TolerantMinPsnrDb) : EngineCliCommand;
+    double TolerantMinPsnrDb,
+    string? ReplayPath) : EngineCliCommand;
 
 public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
 

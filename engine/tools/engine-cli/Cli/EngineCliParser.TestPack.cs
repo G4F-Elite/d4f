@@ -131,6 +131,14 @@ public static partial class EngineCliParser
             }
         }
 
+        string? replayPath = options.TryGetValue("replay", out string? replayPathValue)
+            ? replayPathValue
+            : null;
+        if (replayPath is not null && string.IsNullOrWhiteSpace(replayPath))
+        {
+            return EngineCliParseResult.Failure("Option '--replay' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new TestCommand(
                 project,
@@ -143,7 +151,8 @@ public static partial class EngineCliParser
                 replaySeed,
                 fixedDeltaSeconds,
                 tolerantMaxMae,
-                tolerantMinPsnrDb));
+                tolerantMinPsnrDb,
+                replayPath));
     }
 
     private static EngineCliParseResult ParsePack(IReadOnlyDictionary<string, string> options)
