@@ -60,7 +60,16 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(multiplayerRoot.GetProperty("serverEntityCount").GetInt32() > 0);
             Assert.True(multiplayerRoot.GetProperty("synchronized").GetBoolean());
             Assert.Equal(2, multiplayerRoot.GetProperty("clientStats").GetArrayLength());
-            Assert.True(multiplayerRoot.GetProperty("serverStats").GetProperty("messagesSent").GetInt32() > 0);
+            JsonElement serverStats = multiplayerRoot.GetProperty("serverStats");
+            Assert.True(serverStats.GetProperty("messagesSent").GetInt32() > 0);
+            Assert.True(serverStats.GetProperty("averageSendBandwidthKbps").GetDouble() > 0.0);
+            Assert.True(serverStats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
+            foreach (JsonElement clientStats in multiplayerRoot.GetProperty("clientStats").EnumerateArray())
+            {
+                JsonElement stats = clientStats.GetProperty("stats");
+                Assert.True(stats.GetProperty("averageSendBandwidthKbps").GetDouble() >= 0.0);
+                Assert.True(stats.GetProperty("averageReceiveBandwidthKbps").GetDouble() >= 0.0);
+            }
 
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
             using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));

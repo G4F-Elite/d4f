@@ -13,7 +13,9 @@ internal sealed record MultiplayerDemoStats(
     int MessagesReceived,
     int MessagesDropped,
     double RoundTripTimeMs,
-    double LossPercent);
+    double LossPercent,
+    double AverageSendBandwidthKbps,
+    double AverageReceiveBandwidthKbps);
 
 internal sealed record MultiplayerDemoClientStats(
     uint ClientId,
@@ -272,7 +274,9 @@ internal static class MultiplayerDemoArtifactGenerator
             MessagesReceived: stats.MessagesReceived,
             MessagesDropped: stats.MessagesDropped,
             RoundTripTimeMs: stats.RoundTripTimeMs,
-            LossPercent: stats.LossPercent);
+            LossPercent: stats.LossPercent,
+            AverageSendBandwidthKbps: stats.AverageSendBandwidthKbps,
+            AverageReceiveBandwidthKbps: stats.AverageReceiveBandwidthKbps);
     }
 
     private static string NormalizePath(string path)
