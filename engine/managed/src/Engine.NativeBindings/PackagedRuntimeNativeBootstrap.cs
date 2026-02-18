@@ -8,8 +8,10 @@ public static class PackagedRuntimeNativeBootstrap
     public const string NativeLibrarySearchPathEnvironmentVariable = "DFF_NATIVE_LIBRARY_SEARCH_PATH";
 
     private const string NativeLibraryProperty = "nativeLibrary";
+    private const string AppDirectoryProperty = "appDirectory";
     private const string NativeLibrarySearchPathProperty = "nativeLibrarySearchPath";
     private const string OriginToken = "$ORIGIN";
+    private const string DefaultAppDirectory = "App";
 
     public static void ConfigureEnvironmentFromRuntimeConfig(string runtimeConfigPath, string? appBaseDirectory = null)
     {
@@ -27,7 +29,10 @@ public static class PackagedRuntimeNativeBootstrap
         }
 
         RuntimeNativeConfig config = ReadConfig(normalizedConfigPath);
-        string nativeLibraryPath = ResolveNativeLibraryPath(normalizedConfigPath, config.NativeLibrary);
+        string nativeLibraryPath = ResolveNativeLibraryPath(
+            normalizedConfigPath,
+            config.AppDirectory,
+            config.NativeLibrary);
         if (!File.Exists(nativeLibraryPath))
         {
             throw new FileNotFoundException(
@@ -92,22 +97,36 @@ public static class PackagedRuntimeNativeBootstrap
             }
 
             string nativeLibrary = ReadRequiredString(root, runtimeConfigPath, NativeLibraryProperty);
+            string appDirectory = ReadOptionalString(root, runtimeConfigPath, AppDirectoryProperty) ?? DefaultAppDirectory;
+            appDirectory = ValidateAndNormalizeRelativeDirectoryPath(
+                runtimeConfigPath,
+                AppDirectoryProperty,
+                appDirectory);
             string? nativeLibrarySearchPath = ReadOptionalString(root, runtimeConfigPath, NativeLibrarySearchPathProperty);
-            return new RuntimeNativeConfig(nativeLibrary, nativeLibrarySearchPath);
+            return new RuntimeNativeConfig(appDirectory, nativeLibrary, nativeLibrarySearchPath);
         }
     }
 
-    private static string ResolveNativeLibraryPath(string runtimeConfigPath, string nativeLibrary)
+    private static string ResolveNativeLibraryPath(
+        string runtimeConfigPath,
+        string appDirectory,
+        string nativeLibrary)
     {
         if (Path.IsPathRooted(nativeLibrary))
         {
             return Path.GetFullPath(nativeLibrary);
         }
 
-        string configDirectory = Path.GetDirectoryName(runtimeConfigPath)
-            ?? throw new InvalidDataException($"Runtime native config path is invalid: {runtimeConfigPath}");
-        string packageRoot = Path.GetFullPath(Path.Combine(configDirectory, ".."));
-        return Path.GetFullPath(Path.Combine(packageRoot, NormalizeRelativePath(nativeLibrary)));
+        string normalizedLibrary = NormalizeRelativePath(nativeLibrary);
+        string packageRoot = ResolvePackageRoot(runtimeConfigPath);
+        string libraryDirectory = Path.GetDirectoryName(normalizedLibrary) ?? string.Empty;
+        if (libraryDirectory.Length == 0 || string.Equals(libraryDirectory, ".", StringComparison.Ordinal))
+        {
+            string normalizedAppDirectory = NormalizeRelativePath(appDirectory);
+            return Path.GetFullPath(Path.Combine(packageRoot, normalizedAppDirectory, normalizedLibrary));
+        }
+
+        return Path.GetFullPath(Path.Combine(packageRoot, normalizedLibrary));
     }
 
     private static string ResolveSearchPath(
@@ -128,10 +147,15 @@ public static class PackagedRuntimeNativeBootstrap
             return Path.GetFullPath(configuredSearchPath);
         }
 
+        string packageRoot = ResolvePackageRoot(runtimeConfigPath);
+        return Path.GetFullPath(Path.Combine(packageRoot, NormalizeRelativePath(configuredSearchPath)));
+    }
+
+    private static string ResolvePackageRoot(string runtimeConfigPath)
+    {
         string configDirectory = Path.GetDirectoryName(runtimeConfigPath)
             ?? throw new InvalidDataException($"Runtime native config path is invalid: {runtimeConfigPath}");
-        string packageRoot = Path.GetFullPath(Path.Combine(configDirectory, ".."));
-        return Path.GetFullPath(Path.Combine(packageRoot, NormalizeRelativePath(configuredSearchPath)));
+        return Path.GetFullPath(Path.Combine(configDirectory, ".."));
     }
 
     internal static void ApplyConfiguredSearchPath(string loaderVariableName, bool pathComparisonIgnoreCase)
@@ -199,6 +223,34 @@ public static class PackagedRuntimeNativeBootstrap
             .Replace('\\', Path.DirectorySeparatorChar);
     }
 
+    private static string ValidateAndNormalizeRelativeDirectoryPath(
+        string runtimeConfigPath,
+        string propertyName,
+        string pathValue)
+    {
+        if (Path.IsPathRooted(pathValue))
+        {
+            throw new InvalidDataException(
+                $"Runtime native config '{runtimeConfigPath}' property '{propertyName}' must be a relative path.");
+        }
+
+        string normalized = NormalizeRelativePath(pathValue).Trim();
+        string[] segments = normalized.Split(Path.DirectorySeparatorChar, StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length == 0)
+        {
+            throw new InvalidDataException(
+                $"Runtime native config '{runtimeConfigPath}' property '{propertyName}' cannot be empty.");
+        }
+
+        if (segments.Any(static segment => segment is "." or ".."))
+        {
+            throw new InvalidDataException(
+                $"Runtime native config '{runtimeConfigPath}' property '{propertyName}' cannot contain relative navigation segments.");
+        }
+
+        return Path.Combine(segments);
+    }
+
     private static string ReadRequiredString(JsonElement root, string runtimeConfigPath, string propertyName)
     {
         if (!root.TryGetProperty(propertyName, out JsonElement property))
@@ -251,5 +303,5 @@ public static class PackagedRuntimeNativeBootstrap
         return value.Trim();
     }
 
-    private readonly record struct RuntimeNativeConfig(string NativeLibrary, string? NativeLibrarySearchPath);
+    private readonly record struct RuntimeNativeConfig(string AppDirectory, string NativeLibrary, string? NativeLibrarySearchPath);
 }

@@ -44,6 +44,7 @@ public sealed class EngineCliPackPipelineTests
             string runtimeConfigPath = Path.Combine(projectRoot, "dist", "package", "config", "runtime.json");
             using JsonDocument runtimeConfig = JsonDocument.Parse(File.ReadAllText(runtimeConfigPath));
             Assert.Equal("pak-only", runtimeConfig.RootElement.GetProperty("contentMode").GetString());
+            Assert.Equal("App", runtimeConfig.RootElement.GetProperty("appDirectory").GetString());
             Assert.Equal("dff_native.dll", runtimeConfig.RootElement.GetProperty("nativeLibrary").GetString());
             Assert.True(runtimeConfig.RootElement.GetProperty("nativeLibrarySearchPath").ValueKind is JsonValueKind.Null);
             Assert.False(runtimeConfig.RootElement.TryGetProperty("compiledManifest", out _));
@@ -153,6 +154,7 @@ public sealed class EngineCliPackPipelineTests
             using JsonDocument runtimeConfig = JsonDocument.Parse(
                 File.ReadAllText(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
             Assert.Equal("linux-x64", runtimeConfig.RootElement.GetProperty("runtime").GetString());
+            Assert.Equal("App", runtimeConfig.RootElement.GetProperty("appDirectory").GetString());
             Assert.Equal("libdff_native.so", runtimeConfig.RootElement.GetProperty("nativeLibrary").GetString());
             Assert.Equal("$ORIGIN", runtimeConfig.RootElement.GetProperty("nativeLibrarySearchPath").GetString());
 

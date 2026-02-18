@@ -13,7 +13,8 @@ public sealed class PackagedRuntimeNativeBootstrapTests
             runtimeConfigPath,
             """
             {
-              "nativeLibrary": "App/dff_native.dll",
+              "appDirectory": "App",
+              "nativeLibrary": "dff_native.dll",
               "nativeLibrarySearchPath": null
             }
             """);
@@ -49,7 +50,8 @@ public sealed class PackagedRuntimeNativeBootstrapTests
             runtimeConfigPath,
             """
             {
-              "nativeLibrary": "App/dff_native.dll",
+              "appDirectory": "App",
+              "nativeLibrary": "dff_native.dll",
               "nativeLibrarySearchPath": "$ORIGIN"
             }
             """);
@@ -83,7 +85,8 @@ public sealed class PackagedRuntimeNativeBootstrapTests
             runtimeConfigPath,
             """
             {
-              "nativeLibrary": "App/dff_native.dll"
+              "appDirectory": "App",
+              "nativeLibrary": "dff_native.dll"
             }
             """);
 
@@ -95,6 +98,68 @@ public sealed class PackagedRuntimeNativeBootstrapTests
                 Path.Combine("App", "dff_native.dll"),
                 exception.FileName ?? string.Empty,
                 StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            Directory.Delete(packageRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigureEnvironmentFromRuntimeConfig_ShouldRespectExplicitRelativeLibraryPath()
+    {
+        string packageRoot = CreateTempPackage();
+        string altDirectory = Path.Combine(packageRoot, "Alt");
+        Directory.CreateDirectory(altDirectory);
+        string altLibraryPath = Path.Combine(altDirectory, "custom_native.dll");
+        File.WriteAllBytes(altLibraryPath, [0xAA, 0xBB, 0xCC, 0xDD]);
+        string runtimeConfigPath = Path.Combine(packageRoot, "config", "runtime.json");
+        File.WriteAllText(
+            runtimeConfigPath,
+            """
+            {
+              "appDirectory": "App",
+              "nativeLibrary": "Alt/custom_native.dll"
+            }
+            """);
+
+        string previousLibrary = Environment.GetEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable) ?? string.Empty;
+
+        try
+        {
+            PackagedRuntimeNativeBootstrap.ConfigureEnvironmentFromRuntimeConfig(runtimeConfigPath);
+
+            Assert.Equal(
+                Path.GetFullPath(altLibraryPath),
+                Environment.GetEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable));
+        }
+        finally
+        {
+            RestoreEnvironmentVariable(PackagedRuntimeNativeBootstrap.NativeLibraryPathEnvironmentVariable, previousLibrary);
+            Directory.Delete(packageRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigureEnvironmentFromRuntimeConfig_ShouldRejectAbsoluteAppDirectory()
+    {
+        string packageRoot = CreateTempPackage();
+        string runtimeConfigPath = Path.Combine(packageRoot, "config", "runtime.json");
+        string absoluteAppDirectory = Path.GetFullPath(Path.Combine(packageRoot, "App"));
+        File.WriteAllText(
+            runtimeConfigPath,
+            $$"""
+            {
+              "appDirectory": "{{absoluteAppDirectory.Replace("\\", "\\\\")}}",
+              "nativeLibrary": "dff_native.dll"
+            }
+            """);
+
+        try
+        {
+            InvalidDataException exception = Assert.Throws<InvalidDataException>(() =>
+                PackagedRuntimeNativeBootstrap.ConfigureEnvironmentFromRuntimeConfig(runtimeConfigPath));
+            Assert.Contains("must be a relative path", exception.Message, StringComparison.Ordinal);
         }
         finally
         {
