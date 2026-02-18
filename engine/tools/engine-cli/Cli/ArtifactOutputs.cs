@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
 using Engine.AssetPipeline;
+using Engine.Core.Handles;
 using Engine.Rendering;
 using Engine.Testing;
 
@@ -52,6 +53,13 @@ internal static class ArtifactOutputWriter
 internal sealed record TestCaptureArtifact(string RelativeCapturePath, string RelativeBufferPath);
 
 internal sealed record TestArtifactsOutput(string ManifestPath, IReadOnlyList<TestCaptureArtifact> Captures);
+internal sealed record RenderStatsArtifact(
+    uint DrawItemCount,
+    uint UiItemCount,
+    ulong TriangleCount,
+    ulong UploadBytes,
+    ulong GpuMemoryBytes,
+    ulong PresentCount);
 
 internal sealed record TestArtifactGenerationOptions(
     int CaptureFrame,
@@ -128,6 +136,10 @@ internal static class TestArtifactGenerator
             outputDirectory,
             options.ReplaySeed,
             options.FixedDeltaSeconds);
+        string renderStatsRelativePath = Path.Combine("render", "frame-stats.json");
+        string renderStatsFullPath = Path.Combine(outputDirectory, renderStatsRelativePath);
+        RenderStatsArtifact renderStats = CaptureRenderStats(captureFacade);
+        WriteRenderStats(renderStatsFullPath, renderStats);
 
         string replayRelativePath = Path.Combine("replay", "recording.json");
         string replayFullPath = Path.Combine(outputDirectory, replayRelativePath);
@@ -158,6 +170,11 @@ internal static class TestArtifactGenerator
                 Kind: "net-profile-log",
                 RelativePath: multiplayerArtifacts.ProfileLogRelativePath,
                 Description: "Network profiling log with RTT/loss/bandwidth counters for server and clients."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
+                Kind: "render-stats-log",
+                RelativePath: NormalizePath(renderStatsRelativePath),
+                Description: "Render counters log with draw calls, triangles, upload bytes and GPU memory estimate."));
 
         string manifestPath = ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
         return new TestArtifactsOutput(manifestPath, captures);
@@ -209,5 +226,96 @@ internal static class TestArtifactGenerator
         }
 
         return frames;
+    }
+
+    private static RenderStatsArtifact CaptureRenderStats(IRenderingFacade renderingFacade)
+    {
+        if (renderingFacade is not NoopRenderingFacade)
+        {
+            return new RenderStatsArtifact(0u, 0u, 0u, 0u, 0u, 0u);
+        }
+
+        MeshHandle mesh = default;
+        TextureHandle texture = default;
+        MaterialHandle material = default;
+
+        try
+        {
+            mesh = renderingFacade.CreateMeshFromCpu(
+                positions:
+                [
+                    0f, 0f, 0f,
+                    1f, 0f, 0f,
+                    0f, 1f, 0f,
+                    1f, 1f, 0f
+                ],
+                indices: [0u, 1u, 2u, 2u, 1u, 3u]);
+            texture = renderingFacade.CreateTextureFromCpu(1u, 1u, [255, 255, 255, 255]);
+            material = renderingFacade.CreateMaterialFromBlob([1]);
+
+            using (renderingFacade.BeginFrame(2048, 64))
+            {
+                var packet = new RenderPacket(
+                    frameNumber: 0,
+                    drawCommands:
+                    [
+                        new DrawCommand(
+                            new EntityId(index: 1, generation: 1u),
+                            mesh,
+                            material,
+                            texture)
+                    ]);
+                renderingFacade.Submit(packet);
+            }
+
+            renderingFacade.Present();
+            RenderingFrameStats stats = renderingFacade.GetLastFrameStats();
+            return new RenderStatsArtifact(
+                stats.DrawItemCount,
+                stats.UiItemCount,
+                stats.TriangleCount,
+                stats.UploadBytes,
+                stats.GpuMemoryBytes,
+                stats.PresentCount);
+        }
+        finally
+        {
+            if (mesh.IsValid)
+            {
+                renderingFacade.DestroyResource(mesh.Value);
+            }
+
+            if (texture.IsValid)
+            {
+                renderingFacade.DestroyResource(texture.Value);
+            }
+
+            if (material.IsValid)
+            {
+                renderingFacade.DestroyResource(material.Value);
+            }
+
+            using (renderingFacade.BeginFrame(1024, 64))
+            {
+                renderingFacade.Submit(RenderPacket.Empty(1));
+            }
+
+            renderingFacade.Present();
+        }
+    }
+
+    private static void WriteRenderStats(string outputPath, RenderStatsArtifact stats)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(stats);
+
+        string? directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string json = JsonSerializer.Serialize(stats, ArtifactOutputWriter.SerializerOptions);
+        File.WriteAllText(outputPath, json);
     }
 }

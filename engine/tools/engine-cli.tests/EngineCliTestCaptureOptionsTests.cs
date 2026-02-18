@@ -38,8 +38,10 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "shadow-0012.png")));
             string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
             string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
+            string renderStatsPath = Path.Combine(artifactsRoot, "render", "frame-stats.json");
             Assert.True(File.Exists(multiplayerPath));
             Assert.True(File.Exists(profileLogPath));
+            Assert.True(File.Exists(renderStatsPath));
 
             string replayPath = Path.Combine(artifactsRoot, "replay", "recording.json");
             Assert.True(File.Exists(replayPath));
@@ -87,6 +89,12 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.Contains("peakSendKbps=", profileLog, StringComparison.Ordinal);
             Assert.Contains("peakReceiveKbps=", profileLog, StringComparison.Ordinal);
             Assert.Contains("client-", profileLog, StringComparison.Ordinal);
+            using JsonDocument renderStatsJson = JsonDocument.Parse(File.ReadAllText(renderStatsPath));
+            JsonElement renderStatsRoot = renderStatsJson.RootElement;
+            Assert.True(renderStatsRoot.GetProperty("drawItemCount").GetInt32() > 0);
+            Assert.True(renderStatsRoot.GetProperty("triangleCount").GetUInt64() > 0);
+            Assert.True(renderStatsRoot.GetProperty("uploadBytes").GetUInt64() > 0);
+            Assert.True(renderStatsRoot.GetProperty("gpuMemoryBytes").GetUInt64() > 0);
 
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
             using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
@@ -103,6 +111,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "net-profile-log",
                     StringComparison.Ordinal));
             Assert.True(hasNetProfileLog);
+            bool hasRenderStatsLog = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "render-stats-log",
+                    StringComparison.Ordinal));
+            Assert.True(hasRenderStatsLog);
         }
         finally
         {
