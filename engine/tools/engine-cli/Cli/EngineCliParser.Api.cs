@@ -28,6 +28,10 @@ public static partial class EngineCliParser
         string header = options.TryGetValue("header", out string? headerValue)
             ? headerValue
             : Path.Combine("engine", "native", "include", "engine_native.h");
+        if (string.IsNullOrWhiteSpace(header))
+        {
+            return EngineCliParseResult.Failure("Option '--header' cannot be empty.");
+        }
 
         string output = GetOutOrOutputPath(
             options,
