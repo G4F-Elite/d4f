@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 using Engine.Cli;
+using Engine.Procedural;
 
 namespace Engine.Cli.Tests;
 
@@ -107,6 +108,44 @@ public sealed class EngineCliPreviewQualityTests
 
             (double brightFraction, _) = ComputeBrightnessFractions(meshRgba);
             Assert.InRange(brightFraction, 0.01, 0.45);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_Preview_TexturePreviewShouldApplyDisplayTransform()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDefaultManifest(tempRoot);
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(
+            [
+                "preview",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--out", "artifacts/preview"
+            ]);
+
+            Assert.Equal(0, code);
+            byte[] previewRgba = DecodePngRgba(
+                Path.Combine(tempRoot, "artifacts", "preview", "textures", "textures_noise.png"),
+                out _,
+                out _);
+
+            const string assetPath = "textures/noise.tex";
+            uint seed = ComputePreviewSeed("texture", assetPath);
+            LevelMeshChunk chunk = BuildChunkFromPathForTest(assetPath, seed);
+            ProceduralTextureSurface surface = ProceduralChunkSurfaceCatalog.BuildChunkSurface(chunk, seed, 96, 96);
+
+            Assert.NotEqual(surface.AlbedoRgba8, previewRgba);
         }
         finally
         {
@@ -233,6 +272,46 @@ public sealed class EngineCliPreviewQualityTests
         }
 
         return (bright / (double)pixelCount, dark / (double)pixelCount);
+    }
+
+    private static uint ComputePreviewSeed(string kind, string assetPath)
+    {
+        string value = $"{kind}|{assetPath}";
+        uint hash = 2166136261u;
+        foreach (char ch in value)
+        {
+            hash ^= ch;
+            hash *= 16777619u;
+        }
+
+        return hash;
+    }
+
+    private static LevelMeshChunk BuildChunkFromPathForTest(string assetPath, uint seed)
+    {
+        string normalized = assetPath.Replace('\\', '/').ToLowerInvariant();
+        LevelNodeType type = normalized.Contains("corridor", StringComparison.Ordinal)
+            ? LevelNodeType.Corridor
+            : normalized.Contains("junction", StringComparison.Ordinal)
+                ? LevelNodeType.Junction
+                : normalized.Contains("deadend", StringComparison.Ordinal)
+                    ? LevelNodeType.DeadEnd
+                    : normalized.Contains("shaft", StringComparison.Ordinal)
+                        ? LevelNodeType.Shaft
+                        : LevelNodeType.Room;
+        int variant = (int)(Hash(seed, 17u, 29u) & 0x3u);
+        int nodeId = (int)(Hash(seed, 41u, 53u) & 0x7FFFu);
+        string typeTag = type.ToString().ToLowerInvariant();
+        return new LevelMeshChunk(nodeId, $"chunk/{typeTag}/v{variant}");
+    }
+
+    private static uint Hash(uint seed, uint x, uint y)
+    {
+        uint value = seed ^ (x * 374761393u) ^ (y * 668265263u);
+        value ^= value >> 13;
+        value *= 1274126177u;
+        value ^= value >> 16;
+        return value;
     }
 
     private static byte[] DecodePngRgba(string path, out int width, out int height)

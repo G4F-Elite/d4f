@@ -53,7 +53,8 @@ internal static partial class ProceduralPreviewRasterizer
             seed,
             width,
             height);
-        return new GoldenImageBuffer(width, height, surface.AlbedoRgba8.ToArray());
+        byte[] displayRgba = ConvertLinearToDisplay(surface.AlbedoRgba8);
+        return new GoldenImageBuffer(width, height, displayRgba);
     }
 
     private static GoldenImageBuffer BuildMaterialPreview(LevelMeshChunk chunk, uint seed, int width, int height)
@@ -370,6 +371,25 @@ internal static partial class ProceduralPreviewRasterizer
         rgba[offset + 1] = ToByte(displayColor.Y * 255f);
         rgba[offset + 2] = ToByte(displayColor.Z * 255f);
         rgba[offset + 3] = 255;
+    }
+
+    private static byte[] ConvertLinearToDisplay(byte[] linearRgba)
+    {
+        var display = new byte[linearRgba.Length];
+        for (int i = 0; i < linearRgba.Length; i += 4)
+        {
+            var linear = new Vector3(
+                linearRgba[i] / 255f,
+                linearRgba[i + 1] / 255f,
+                linearRgba[i + 2] / 255f);
+            Vector3 mapped = ToneMapToDisplay(linear);
+            display[i] = ToByte(mapped.X * 255f);
+            display[i + 1] = ToByte(mapped.Y * 255f);
+            display[i + 2] = ToByte(mapped.Z * 255f);
+            display[i + 3] = linearRgba[i + 3];
+        }
+
+        return display;
     }
 
     private readonly record struct TexturePayload(int Width, int Height, byte[] Rgba8);
