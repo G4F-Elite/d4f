@@ -85,6 +85,18 @@ void TestBuildCanonicalFrameGraphCombinations() {
              FrameGraphBuildConfig{
                  .has_draws = true,
                  .has_ui = false,
+                 .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_ALBEDO},
+             &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
+  assert(error.empty());
+  AssertKindsOrder(
+      output,
+      {PassKind::kShadowMap, PassKind::kPbrOpaque, PassKind::kDebugAlbedo,
+       PassKind::kPresent});
+
+  assert(dff::native::render::BuildCanonicalFrameGraph(
+             FrameGraphBuildConfig{
+                 .has_draws = true,
+                 .has_ui = false,
                  .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_ROUGHNESS},
              &graph, &output, &error) == ENGINE_NATIVE_STATUS_OK);
   assert(error.empty());
