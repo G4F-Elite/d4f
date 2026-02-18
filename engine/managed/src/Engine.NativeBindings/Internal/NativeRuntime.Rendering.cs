@@ -64,7 +64,11 @@ internal sealed partial class NativeRuntime
                 VertexOffset = command.VertexOffset,
                 VertexCount = command.VertexCount,
                 IndexOffset = command.IndexOffset,
-                IndexCount = command.IndexCount
+                IndexCount = command.IndexCount,
+                ScissorX = command.ScissorRect.X,
+                ScissorY = command.ScissorRect.Y,
+                ScissorWidth = command.ScissorRect.Width,
+                ScissorHeight = command.ScissorRect.Height
             };
         }
 

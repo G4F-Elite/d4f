@@ -60,6 +60,10 @@ internal struct EngineNativeUiDrawItem
     public uint VertexCount;
     public uint IndexOffset;
     public uint IndexCount;
+    public float ScissorX;
+    public float ScissorY;
+    public float ScissorWidth;
+    public float ScissorHeight;
 }
 
 [StructLayout(LayoutKind.Sequential)]

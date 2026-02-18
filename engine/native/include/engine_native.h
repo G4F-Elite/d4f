@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 11u
+#define ENGINE_NATIVE_API_VERSION 12u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -70,6 +70,10 @@ typedef struct engine_native_ui_draw_item {
   uint32_t vertex_count;
   uint32_t index_offset;
   uint32_t index_count;
+  float scissor_x;
+  float scissor_y;
+  float scissor_width;
+  float scissor_height;
 } engine_native_ui_draw_item_t;
 
 typedef struct engine_native_mesh_cpu_data {

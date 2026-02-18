@@ -29,5 +29,9 @@ public sealed class RenderingAbiLayoutTests
         Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.VertexCount)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.VertexCount)));
         Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.IndexOffset)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.IndexOffset)));
         Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.IndexCount)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.IndexCount)));
+        Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.ScissorX)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.ScissorX)));
+        Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.ScissorY)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.ScissorY)));
+        Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.ScissorWidth)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.ScissorWidth)));
+        Assert.Equal(Marshal.OffsetOf<EngineNativeUiDrawItem>(nameof(EngineNativeUiDrawItem.ScissorHeight)), Marshal.OffsetOf<NativeUiDrawItem>(nameof(NativeUiDrawItem.ScissorHeight)));
     }
 }

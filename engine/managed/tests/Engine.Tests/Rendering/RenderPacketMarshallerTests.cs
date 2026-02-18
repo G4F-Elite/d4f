@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.Rendering;
 using Xunit;
@@ -128,7 +129,14 @@ public sealed class RenderPacketMarshallerTests
         ];
         IReadOnlyList<UiDrawCommand> uiCommands =
         [
-            new UiDrawCommand(12, 4, 6, 3, 8)
+            new UiDrawCommand(
+                12,
+                4,
+                6,
+                3,
+                8,
+                new RectF(10f, 20f, 30f, 40f),
+                new RectF(12f, 24f, 15f, 16f))
         ];
 
         var packet = RenderPacketMarshaller.Marshal(
@@ -167,6 +175,10 @@ public sealed class RenderPacketMarshallerTests
         Assert.Equal((uint)6, ui0.VertexCount);
         Assert.Equal((uint)3, ui0.IndexOffset);
         Assert.Equal((uint)8, ui0.IndexCount);
+        Assert.Equal(12f, ui0.ScissorX);
+        Assert.Equal(24f, ui0.ScissorY);
+        Assert.Equal(15f, ui0.ScissorWidth);
+        Assert.Equal(16f, ui0.ScissorHeight);
     }
 
     [Fact]

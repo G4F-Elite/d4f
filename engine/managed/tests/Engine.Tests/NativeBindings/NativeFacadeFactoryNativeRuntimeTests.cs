@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.ECS;
 using Engine.NativeBindings;
@@ -421,7 +422,14 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         using var frameArena = nativeSet.Rendering.BeginFrame(1024, 64);
 
         var draw = new DrawCommand(entity, new MeshHandle(10), new MaterialHandle(20), new TextureHandle(30));
-        var ui = new UiDrawCommand(new TextureHandle(40), 5, 6, 7, 8);
+        var ui = new UiDrawCommand(
+            new TextureHandle(40),
+            5,
+            6,
+            7,
+            8,
+            new RectF(1f, 2f, 20f, 30f),
+            new RectF(3f, 4f, 10f, 12f));
         var packet = new RenderPacket(0, [draw], [ui]);
 
         nativeSet.Rendering.Submit(packet);
@@ -447,6 +455,10 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal((uint)6, submittedUi.VertexCount);
         Assert.Equal((uint)7, submittedUi.IndexOffset);
         Assert.Equal((uint)8, submittedUi.IndexCount);
+        Assert.Equal(3f, submittedUi.ScissorX);
+        Assert.Equal(4f, submittedUi.ScissorY);
+        Assert.Equal(10f, submittedUi.ScissorWidth);
+        Assert.Equal(12f, submittedUi.ScissorHeight);
     }
 
     [Fact]
