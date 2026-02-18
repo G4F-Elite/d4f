@@ -34,6 +34,8 @@ public sealed class EngineCliTemplateRuntimeTests
             string programText = File.ReadAllText(runtimeProgramPath);
             Assert.DoesNotContain("__GAME_NAME__", programText, StringComparison.Ordinal);
             Assert.Contains("TryConfigurePackagedContent", programText, StringComparison.Ordinal);
+            Assert.Contains("NativeFacadeFactory.CreateNativeFacadeSet", programText, StringComparison.Ordinal);
+            Assert.Contains("nativeFacades?.Dispose()", programText, StringComparison.Ordinal);
             Assert.Contains("PackagedRuntimeContentBootstrap.ConfigureFromRuntimeConfig", programText, StringComparison.Ordinal);
             Assert.Contains("LevelGenerator.Generate", programText, StringComparison.Ordinal);
             Assert.Contains("UiPreviewHost", programText, StringComparison.Ordinal);

@@ -11,52 +11,61 @@ using Engine.UI;
 
 const uint DefaultSeed = 1337u;
 uint seed = ParseSeed(args);
-TryConfigurePackagedContent();
+NativeFacadeSet? nativeFacades = null;
 
-LevelGenResult level = LevelGenerator.Generate(new LevelGenOptions(
-    Seed: seed,
-    TargetNodes: 24,
-    Density: 0.72f,
-    Danger: 0.48f,
-    Complexity: 0.68f));
+try
+{
+    TryConfigurePackagedContent(ref nativeFacades);
 
-ProcMeshData mesh = BuildDemoMesh();
-ProceduralTextureSurface surface = TextureBuilder.GenerateSurfaceMaps(new ProceduralTextureRecipe(
-    Kind: ProceduralTextureKind.Perlin,
-    Width: 96,
-    Height: 96,
-    Seed: seed ^ 0xA341_316Cu,
-    FbmOctaves: 4,
-    Frequency: 6f));
-ProceduralLitMaterialBundle materialBundle = ProceduralMaterialFactory.CreateLitPbrFromSurface(
-    surface,
-    textureKeyPrefix: "demo/rock",
-    roughness: 0.62f,
-    metallic: 0.08f);
+    LevelGenResult level = LevelGenerator.Generate(new LevelGenOptions(
+        Seed: seed,
+        TargetNodes: 24,
+        Density: 0.72f,
+        Danger: 0.48f,
+        Complexity: 0.68f));
 
-byte[] soundBlob = ProceduralSoundBlobBuilder.BuildMonoPcmBlob(
-    new ProceduralSoundRecipe(
-        Oscillator: OscillatorType.Triangle,
-        FrequencyHz: 220f,
-        Gain: 0.30f,
-        SampleRate: 44100,
-        Seed: seed ^ 0x9E37_79B9u,
-        Envelope: new AdsrEnvelope(0.02f, 0.12f, 0.5f, 0.2f),
-        Lfo: new LfoSettings(4.0f, 0.08f),
-        Filter: new OnePoleLowPassFilter(4200f)),
-    durationSeconds: 1.6f,
-    loop: false);
+    ProcMeshData mesh = BuildDemoMesh();
+    ProceduralTextureSurface surface = TextureBuilder.GenerateSurfaceMaps(new ProceduralTextureRecipe(
+        Kind: ProceduralTextureKind.Perlin,
+        Width: 96,
+        Height: 96,
+        Seed: seed ^ 0xA341_316Cu,
+        FbmOctaves: 4,
+        Frequency: 6f));
+    ProceduralLitMaterialBundle materialBundle = ProceduralMaterialFactory.CreateLitPbrFromSurface(
+        surface,
+        textureKeyPrefix: "demo/rock",
+        roughness: 0.62f,
+        metallic: 0.08f);
 
-UiSummary ui = BuildUiPreviewSummary(level);
-NetSummary net = RunMultiplayerSummary(level, seed);
+    byte[] soundBlob = ProceduralSoundBlobBuilder.BuildMonoPcmBlob(
+        new ProceduralSoundRecipe(
+            Oscillator: OscillatorType.Triangle,
+            FrequencyHz: 220f,
+            Gain: 0.30f,
+            SampleRate: 44100,
+            Seed: seed ^ 0x9E37_79B9u,
+            Envelope: new AdsrEnvelope(0.02f, 0.12f, 0.5f, 0.2f),
+            Lfo: new LfoSettings(4.0f, 0.08f),
+            Filter: new OnePoleLowPassFilter(4200f)),
+        durationSeconds: 1.6f,
+        loop: false);
 
-Console.WriteLine($"__GAME_NAME__ runtime demo (seed={seed}):");
-Console.WriteLine($"- Level: nodes={level.Graph.Nodes.Count}, chunks={level.MeshChunks.Count}, spawns={level.SpawnPoints.Count}");
-Console.WriteLine($"- Mesh: vertices={mesh.Vertices.Count}, triangles={mesh.Indices.Count / 3}, lods={mesh.Lods.Count}");
-Console.WriteLine($"- Material: template={materialBundle.Material.Template}, textures={materialBundle.Textures.Count}");
-Console.WriteLine($"- Audio: blob-bytes={soundBlob.Length}");
-Console.WriteLine($"- UI: draw-commands={ui.DrawCommandCount}, visible-list-items={ui.VisibleItemCount}");
-Console.WriteLine($"- Net: tick={net.Tick}, clients={net.ClientCount}, replicated-entities={net.ReplicatedEntityCount}, server-rtt={net.ServerRttMs:F2}ms");
+    UiSummary ui = BuildUiPreviewSummary(level);
+    NetSummary net = RunMultiplayerSummary(level, seed);
+
+    Console.WriteLine($"__GAME_NAME__ runtime demo (seed={seed}):");
+    Console.WriteLine($"- Level: nodes={level.Graph.Nodes.Count}, chunks={level.MeshChunks.Count}, spawns={level.SpawnPoints.Count}");
+    Console.WriteLine($"- Mesh: vertices={mesh.Vertices.Count}, triangles={mesh.Indices.Count / 3}, lods={mesh.Lods.Count}");
+    Console.WriteLine($"- Material: template={materialBundle.Material.Template}, textures={materialBundle.Textures.Count}");
+    Console.WriteLine($"- Audio: blob-bytes={soundBlob.Length}");
+    Console.WriteLine($"- UI: draw-commands={ui.DrawCommandCount}, visible-list-items={ui.VisibleItemCount}");
+    Console.WriteLine($"- Net: tick={net.Tick}, clients={net.ClientCount}, replicated-entities={net.ReplicatedEntityCount}, server-rtt={net.ServerRttMs:F2}ms");
+}
+finally
+{
+    nativeFacades?.Dispose();
+}
 
 return;
 
@@ -97,7 +106,7 @@ static ProcMeshData BuildDemoMesh()
     return builder.Build();
 }
 
-static void TryConfigurePackagedContent()
+static void TryConfigurePackagedContent(ref NativeFacadeSet? nativeFacades)
 {
     string runtimeConfigPath = PackagedRuntimeContentBootstrap.GetDefaultRuntimeConfigPath();
     if (!File.Exists(runtimeConfigPath))
@@ -105,8 +114,9 @@ static void TryConfigurePackagedContent()
         return;
     }
 
+    nativeFacades = NativeFacadeFactory.CreateNativeFacadeSet();
     PackagedRuntimeContentBootstrap.ConfigureFromRuntimeConfig(
-        NativeFacadeFactory.CreateContentRuntimeFacade(),
+        nativeFacades.Content,
         runtimeConfigPath);
 }
 
