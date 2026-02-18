@@ -12,6 +12,12 @@ namespace dff::native {
 class NetState {
  public:
   NetState();
+  ~NetState();
+
+  NetState(const NetState&) = delete;
+  NetState& operator=(const NetState&) = delete;
+  NetState(NetState&&) = delete;
+  NetState& operator=(NetState&&) = delete;
 
   engine_native_status_t Configure(const engine_native_net_desc_t& desc);
   engine_native_status_t Pump(engine_native_net_events_t* out_events);
@@ -43,6 +49,7 @@ class NetState {
   uint32_t max_events_per_pump_ = 1024u;
   uint32_t max_payload_bytes_ = 64u * 1024u;
   bool loopback_enabled_ = true;
+  bool registered_with_router_ = false;
   std::vector<QueuedEvent> pending_events_;
   std::vector<QueuedEvent> active_events_;
   std::vector<engine_native_net_event_t> pump_events_view_;

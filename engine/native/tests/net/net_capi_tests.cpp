@@ -164,6 +164,85 @@ void TestStandaloneNetWithoutLoopbackSuppressesMessages() {
   assert(net_destroy(net) == ENGINE_NATIVE_STATUS_OK);
 }
 
+void TestStandaloneMultiPeerRouting() {
+  engine_native_net_desc_t server_desc{};
+  server_desc.local_peer_id = 100u;
+  server_desc.max_events_per_pump = 8u;
+  server_desc.max_payload_bytes = 64u;
+  server_desc.loopback_enabled = 0u;
+
+  engine_native_net_desc_t client_a_desc = server_desc;
+  client_a_desc.local_peer_id = 200u;
+
+  engine_native_net_desc_t client_b_desc = server_desc;
+  client_b_desc.local_peer_id = 300u;
+
+  engine_native_net_t* server = nullptr;
+  engine_native_net_t* client_a = nullptr;
+  engine_native_net_t* client_b = nullptr;
+  assert(net_create(&server_desc, &server) == ENGINE_NATIVE_STATUS_OK);
+  assert(net_create(&client_a_desc, &client_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(net_create(&client_b_desc, &client_b) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_net_events_t events{};
+  assert(net_pump(server, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 1u);
+  assert(events.events[0].kind == ENGINE_NATIVE_NET_EVENT_KIND_CONNECTED);
+  assert(events.events[0].peer_id == 100u);
+
+  assert(net_pump(client_a, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 1u);
+  assert(events.events[0].kind == ENGINE_NATIVE_NET_EVENT_KIND_CONNECTED);
+  assert(events.events[0].peer_id == 200u);
+
+  assert(net_pump(client_b, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 1u);
+  assert(events.events[0].kind == ENGINE_NATIVE_NET_EVENT_KIND_CONNECTED);
+  assert(events.events[0].peer_id == 300u);
+
+  uint8_t payload_a[3]{1u, 2u, 3u};
+  engine_native_net_send_desc_t send_to_client_a{};
+  send_to_client_a.peer_id = 200u;
+  send_to_client_a.channel = 7u;
+  send_to_client_a.payload = payload_a;
+  send_to_client_a.payload_size = 3u;
+  assert(net_send(server, &send_to_client_a) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(net_pump(client_a, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 1u);
+  assert(events.events[0].kind == ENGINE_NATIVE_NET_EVENT_KIND_MESSAGE);
+  assert(events.events[0].peer_id == 100u);
+  assert(events.events[0].channel == 7u);
+  assert(events.events[0].payload_size == 3u);
+  assert(events.events[0].payload[0] == 1u);
+  assert(events.events[0].payload[1] == 2u);
+  assert(events.events[0].payload[2] == 3u);
+
+  assert(net_pump(client_b, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 0u);
+
+  uint8_t payload_b[2]{9u, 4u};
+  engine_native_net_send_desc_t send_to_server{};
+  send_to_server.peer_id = 100u;
+  send_to_server.channel = 3u;
+  send_to_server.payload = payload_b;
+  send_to_server.payload_size = 2u;
+  assert(net_send(client_a, &send_to_server) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(net_pump(server, &events) == ENGINE_NATIVE_STATUS_OK);
+  assert(events.event_count == 1u);
+  assert(events.events[0].kind == ENGINE_NATIVE_NET_EVENT_KIND_MESSAGE);
+  assert(events.events[0].peer_id == 200u);
+  assert(events.events[0].channel == 3u);
+  assert(events.events[0].payload_size == 2u);
+  assert(events.events[0].payload[0] == 9u);
+  assert(events.events[0].payload[1] == 4u);
+
+  assert(net_destroy(client_b) == ENGINE_NATIVE_STATUS_OK);
+  assert(net_destroy(client_a) == ENGINE_NATIVE_STATUS_OK);
+  assert(net_destroy(server) == ENGINE_NATIVE_STATUS_OK);
+}
+
 }  // namespace
 
 int main() {
@@ -171,5 +250,6 @@ int main() {
   TestEngineNetSendAndPumpFlow();
   TestStandaloneNetCreateDestroyAndLimits();
   TestStandaloneNetWithoutLoopbackSuppressesMessages();
+  TestStandaloneMultiPeerRouting();
   return 0;
 }
