@@ -41,7 +41,15 @@ internal static class PakBinaryCodec
                 : entry.AssetKey;
             sourceItems.Add(
                 new PakEntrySource(
-                    new PakEntry(entry.Path, entry.Kind, entry.CompiledPath, sizeBytes, 0, assetKey),
+                    new PakEntry(
+                        entry.Path,
+                        entry.Kind,
+                        entry.CompiledPath,
+                        sizeBytes,
+                        0,
+                        assetKey,
+                        entry.Category,
+                        entry.Tags),
                     compiledPath));
         }
 
@@ -68,7 +76,15 @@ internal static class PakBinaryCodec
                 : entry.AssetKey;
             sourceItems.Add(
                 new PakEntrySource(
-                    new PakEntry(entry.Path, entry.Kind, entry.CompiledPath, 0, 0, assetKey),
+                    new PakEntry(
+                        entry.Path,
+                        entry.Kind,
+                        entry.CompiledPath,
+                        0,
+                        0,
+                        assetKey,
+                        entry.Category,
+                        entry.Tags),
                     FullCompiledPath: null));
         }
 

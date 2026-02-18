@@ -8,4 +8,6 @@ public sealed record PakEntry(
     string CompiledPath,
     long SizeBytes,
     long OffsetBytes = 0,
-    string AssetKey = "");
+    string AssetKey = "",
+    string Category = "",
+    IReadOnlyList<string>? Tags = null);

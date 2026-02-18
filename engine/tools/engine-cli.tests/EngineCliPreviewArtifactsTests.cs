@@ -33,6 +33,7 @@ public sealed class EngineCliPreviewArtifactsTests
             string waveformImage = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.png");
             string waveformMetadata = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.json");
             string compressedWaveform = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.pcm16.gz");
+            string galleryPath = Path.Combine(previewRoot, "gallery", "gallery.json");
             string manifestPath = Path.Combine(previewRoot, "manifest.json");
 
             Assert.True(File.Exists(meshPreview));
@@ -42,6 +43,7 @@ public sealed class EngineCliPreviewArtifactsTests
             Assert.True(File.Exists(waveformImage));
             Assert.True(File.Exists(waveformMetadata));
             Assert.True(File.Exists(compressedWaveform));
+            Assert.True(File.Exists(galleryPath));
             Assert.True(File.Exists(manifestPath));
             Assert.True(new FileInfo(compressedWaveform).Length > 0);
 
@@ -56,6 +58,21 @@ public sealed class EngineCliPreviewArtifactsTests
                 entry.GetProperty("kind").GetString() == "audio-waveform");
             Assert.Contains(artifacts.EnumerateArray(), static entry =>
                 entry.GetProperty("kind").GetString() == "audio-compressed-preview");
+            Assert.Contains(artifacts.EnumerateArray(), static entry =>
+                entry.GetProperty("kind").GetString() == "preview-gallery");
+
+            using JsonDocument gallery = JsonDocument.Parse(File.ReadAllText(galleryPath));
+            JsonElement galleryEntries = gallery.RootElement;
+            Assert.Equal(JsonValueKind.Array, galleryEntries.ValueKind);
+            JsonElement meshEntry = galleryEntries.EnumerateArray().Single(static x =>
+                x.GetProperty("path").GetString() == "mesh/cube.mesh");
+            Assert.Equal("geometry", meshEntry.GetProperty("category").GetString());
+            Assert.Contains(meshEntry.GetProperty("tags").EnumerateArray(), static x =>
+                x.GetString() == "hero");
+            JsonElement audioEntry = galleryEntries.EnumerateArray().Single(static x =>
+                x.GetProperty("path").GetString() == "audio/ambience.wav");
+            Assert.Equal("audio", audioEntry.GetProperty("category").GetString());
+            Assert.Equal("audio/audio_ambience.png", audioEntry.GetProperty("previewPath").GetString());
 
             using JsonDocument waveform = JsonDocument.Parse(File.ReadAllText(waveformMetadata));
             Assert.Equal("audio/ambience.wav", waveform.RootElement.GetProperty("source").GetString());
@@ -131,10 +148,10 @@ public sealed class EngineCliPreviewArtifactsTests
             {
               "version": 1,
               "assets": [
-                { "path": "mesh/cube.mesh", "kind": "mesh" },
+                { "path": "mesh/cube.mesh", "kind": "mesh", "category": "geometry", "tags": ["hero", "hard-surface", "hero"] },
                 { "path": "textures/noise.tex", "kind": "texture" },
                 { "path": "materials/wall.mat", "kind": "material" },
-                { "path": "audio/ambience.wav", "kind": "audio" }
+                { "path": "audio/ambience.wav", "kind": "audio", "tags": ["ambient", "loop"] }
               ]
             }
             """);

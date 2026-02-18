@@ -42,8 +42,10 @@ public static class AssetPipelineService
 
             string path = ReadRequiredString(assetElement, "path", $"assets[{index}]");
             string kind = ReadRequiredString(assetElement, "kind", $"assets[{index}]");
+            string category = ReadOptionalCategory(assetElement, $"assets[{index}]");
+            IReadOnlyList<string> tags = ReadOptionalTags(assetElement, $"assets[{index}]");
 
-            entries.Add(new AssetManifestEntry(path, kind));
+            entries.Add(new AssetManifestEntry(path, kind, category, tags));
             index++;
         }
 
@@ -103,7 +105,9 @@ public static class AssetPipelineService
                     x.Path,
                     0,
                     0,
-                    PakEntryKeyBuilder.Compute(x.Path, x.Kind, x.Path, 0)))
+                    PakEntryKeyBuilder.Compute(x.Path, x.Kind, x.Path, 0),
+                    x.Category,
+                    x.Tags))
             .ToArray();
 
         return PakBinaryCodec.WriteMetadataOnly(outputPakPath, compatibilityEntries);
@@ -207,5 +211,66 @@ public static class AssetPipelineService
         }
 
         return value;
+    }
+
+    private static string ReadOptionalCategory(JsonElement element, string location)
+    {
+        if (!element.TryGetProperty("category", out JsonElement property))
+        {
+            return string.Empty;
+        }
+
+        if (property.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidDataException($"'{location}.category' must be a string.");
+        }
+
+        string? value = property.GetString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidDataException($"'{location}.category' cannot be empty.");
+        }
+
+        return value.Trim();
+    }
+
+    private static IReadOnlyList<string> ReadOptionalTags(JsonElement element, string location)
+    {
+        if (!element.TryGetProperty("tags", out JsonElement property))
+        {
+            return Array.Empty<string>();
+        }
+
+        if (property.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException($"'{location}.tags' must be an array of strings.");
+        }
+
+        var tags = new List<string>();
+        var unique = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        int index = 0;
+        foreach (JsonElement tagElement in property.EnumerateArray())
+        {
+            if (tagElement.ValueKind != JsonValueKind.String)
+            {
+                throw new InvalidDataException($"'{location}.tags[{index}]' must be a string.");
+            }
+
+            string? rawValue = tagElement.GetString();
+            if (string.IsNullOrWhiteSpace(rawValue))
+            {
+                throw new InvalidDataException($"'{location}.tags[{index}]' cannot be empty.");
+            }
+
+            string tag = rawValue.Trim();
+            if (unique.Add(tag))
+            {
+                tags.Add(tag);
+            }
+
+            index++;
+        }
+
+        return tags;
     }
 }

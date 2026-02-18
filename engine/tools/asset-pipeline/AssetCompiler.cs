@@ -30,7 +30,16 @@ internal static class AssetCompiler
 
             long sizeBytes = new FileInfo(compiledFullPath).Length;
             string assetKey = PakEntryKeyBuilder.Compute(entry.Path, entry.Kind, compiledRelativePath, sizeBytes);
-            entries.Add(new PakEntry(entry.Path, entry.Kind, compiledRelativePath, sizeBytes, 0, assetKey));
+            entries.Add(
+                new PakEntry(
+                    entry.Path,
+                    entry.Kind,
+                    compiledRelativePath,
+                    sizeBytes,
+                    0,
+                    assetKey,
+                    entry.Category,
+                    entry.Tags));
         }
 
         return entries;

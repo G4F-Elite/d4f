@@ -12,6 +12,7 @@ internal static class PreviewArtifactGenerator
     private const int PreviewHeight = 96;
     private const int WaveformWidth = 256;
     private const int WaveformHeight = 64;
+    private const string GalleryRelativePath = "gallery/gallery.json";
 
     public static string Generate(string outputDirectory, IReadOnlyList<PakEntry> compiledEntries)
     {
@@ -20,6 +21,7 @@ internal static class PreviewArtifactGenerator
 
         Directory.CreateDirectory(outputDirectory);
         var manifestEntries = new List<TestingArtifactEntry>(compiledEntries.Count * 3);
+        var galleryEntries = new List<PreviewGalleryEntry>(compiledEntries.Count);
 
         foreach (PakEntry entry in compiledEntries)
         {
@@ -33,6 +35,13 @@ internal static class PreviewArtifactGenerator
                     Kind: $"{entry.Kind}-preview",
                     RelativePath: NormalizePath(previewRelativePath),
                     Description: $"Preview for '{entry.Path}' ({entry.Kind})."));
+            galleryEntries.Add(
+                new PreviewGalleryEntry(
+                    entry.Path,
+                    entry.Kind,
+                    string.IsNullOrWhiteSpace(entry.Category) ? category : entry.Category,
+                    NormalizeTags(entry.Tags),
+                    NormalizePath(previewRelativePath)));
 
             if (!IsAudioKind(entry.Kind))
             {
@@ -73,6 +82,14 @@ internal static class PreviewArtifactGenerator
                     RelativePath: NormalizePath(waveformMetadataRelativePath),
                     Description: $"Waveform preview metadata for '{entry.Path}'."));
         }
+
+        string galleryFullPath = Path.Combine(outputDirectory, GalleryRelativePath);
+        WriteGallery(galleryFullPath, galleryEntries);
+        manifestEntries.Add(
+            new TestingArtifactEntry(
+                Kind: "preview-gallery",
+                RelativePath: GalleryRelativePath,
+                Description: "Gallery metadata with categories and tags for preview assets."));
 
         return ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
     }
@@ -231,6 +248,37 @@ internal static class PreviewArtifactGenerator
         return path.Replace('\\', '/');
     }
 
+    private static IReadOnlyList<string> NormalizeTags(IReadOnlyList<string>? tags)
+    {
+        if (tags is null || tags.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var normalized = new List<string>(tags.Count);
+        foreach (string tag in tags)
+        {
+            if (!string.IsNullOrWhiteSpace(tag))
+            {
+                normalized.Add(tag.Trim());
+            }
+        }
+
+        return normalized;
+    }
+
+    private static void WriteGallery(string outputPath, IReadOnlyList<PreviewGalleryEntry> entries)
+    {
+        string? directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string json = JsonSerializer.Serialize(entries, ArtifactOutputWriter.SerializerOptions);
+        File.WriteAllText(outputPath, json);
+    }
+
     private static uint ComputeSeed(string value)
     {
         uint hash = 2166136261u;
@@ -320,4 +368,11 @@ internal static class PreviewArtifactGenerator
         rgba[index + 2] = b;
         rgba[index + 3] = a;
     }
+
+    private sealed record PreviewGalleryEntry(
+        string Path,
+        string Kind,
+        string Category,
+        IReadOnlyList<string> Tags,
+        string PreviewPath);
 }
