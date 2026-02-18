@@ -41,10 +41,12 @@ public sealed class EngineCliTestCaptureOptionsTests
             string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
             string renderStatsPath = Path.Combine(artifactsRoot, "render", "frame-stats.json");
             string hostConfigPath = Path.Combine(artifactsRoot, "runtime", "test-host.json");
+            string runtimePerfPath = Path.Combine(artifactsRoot, "runtime", "perf-metrics.json");
             Assert.True(File.Exists(multiplayerPath));
             Assert.True(File.Exists(profileLogPath));
             Assert.True(File.Exists(renderStatsPath));
             Assert.True(File.Exists(hostConfigPath));
+            Assert.True(File.Exists(runtimePerfPath));
 
             string replayPath = Path.Combine(artifactsRoot, "replay", "recording.json");
             Assert.True(File.Exists(replayPath));
@@ -139,6 +141,20 @@ public sealed class EngineCliTestCaptureOptionsTests
             using JsonDocument hostConfigJson = JsonDocument.Parse(File.ReadAllText(hostConfigPath));
             Assert.Equal("hidden-window", hostConfigJson.RootElement.GetProperty("mode").GetString());
             Assert.Equal(0.02, hostConfigJson.RootElement.GetProperty("fixedDeltaSeconds").GetDouble(), 6);
+            using JsonDocument runtimePerfJson = JsonDocument.Parse(File.ReadAllText(runtimePerfPath));
+            JsonElement runtimePerfRoot = runtimePerfJson.RootElement;
+            string? runtimeBackend = runtimePerfRoot.GetProperty("backend").GetString();
+            Assert.True(
+                string.Equals(runtimeBackend, "native", StringComparison.Ordinal) ||
+                string.Equals(runtimeBackend, "noop", StringComparison.Ordinal));
+            int captureSampleCount = runtimePerfRoot.GetProperty("captureSampleCount").GetInt32();
+            Assert.True(captureSampleCount >= 5);
+            Assert.True(runtimePerfRoot.GetProperty("averageCaptureCpuMs").GetDouble() >= 0d);
+            Assert.True(runtimePerfRoot.GetProperty("peakCaptureCpuMs").GetDouble() >= runtimePerfRoot.GetProperty("averageCaptureCpuMs").GetDouble());
+            Assert.True(runtimePerfRoot.GetProperty("totalCaptureAllocatedBytes").GetInt64() >= 0L);
+            Assert.True(runtimePerfRoot.GetProperty("peakCaptureAllocatedBytes").GetInt64() >= runtimePerfRoot.GetProperty("averageCaptureAllocatedBytes").GetInt64());
+            Assert.Equal(3, runtimePerfRoot.GetProperty("releaseRendererInteropBudgetPerFrame").GetInt32());
+            Assert.Equal(3, runtimePerfRoot.GetProperty("releasePhysicsInteropBudgetPerTick").GetInt32());
 
             string manifestPath = Path.Combine(artifactsRoot, "manifest.json");
             using JsonDocument manifestJson = JsonDocument.Parse(File.ReadAllText(manifestPath));
@@ -167,6 +183,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "test-host-config",
                     StringComparison.Ordinal));
             Assert.True(hasHostConfig);
+            bool hasRuntimePerfMetrics = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "runtime-perf-metrics",
+                    StringComparison.Ordinal));
+            Assert.True(hasRuntimePerfMetrics);
         }
         finally
         {

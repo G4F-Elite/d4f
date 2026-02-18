@@ -1,5 +1,7 @@
 using System.Globalization;
+using System.Diagnostics;
 using System.Text.Json;
+using Engine.App;
 using Engine.AssetPipeline;
 using Engine.Core.Handles;
 using Engine.NativeBindings;
@@ -62,6 +64,18 @@ internal sealed record RenderStatsArtifact(
     ulong GpuMemoryBytes,
     ulong PresentCount);
 
+internal sealed record RuntimePerfMetricsArtifact(
+    string Backend,
+    int CaptureSampleCount,
+    double AverageCaptureCpuMs,
+    double PeakCaptureCpuMs,
+    long AverageCaptureAllocatedBytes,
+    long PeakCaptureAllocatedBytes,
+    long TotalCaptureAllocatedBytes,
+    bool ZeroAllocationCapturePath,
+    int ReleaseRendererInteropBudgetPerFrame,
+    int ReleasePhysicsInteropBudgetPerTick);
+
 internal sealed record TestArtifactGenerationOptions(
     int CaptureFrame,
     ulong ReplaySeed,
@@ -113,17 +127,78 @@ internal static class TestArtifactGenerator
     {
         private readonly NativeFacadeSet? _nativeFacadeSet;
 
-        public CaptureRuntimeScope(IRenderingFacade rendering, NativeFacadeSet? nativeFacadeSet)
+        public CaptureRuntimeScope(IRenderingFacade rendering, NativeFacadeSet? nativeFacadeSet, string backend)
         {
             Rendering = rendering ?? throw new ArgumentNullException(nameof(rendering));
             _nativeFacadeSet = nativeFacadeSet;
+            if (string.IsNullOrWhiteSpace(backend))
+            {
+                throw new ArgumentException("Capture backend cannot be empty.", nameof(backend));
+            }
+
+            Backend = backend;
         }
 
         public IRenderingFacade Rendering { get; }
 
+        public string Backend { get; }
+
         public void Dispose()
         {
             _nativeFacadeSet?.Dispose();
+        }
+    }
+
+    private sealed class CapturePerfAccumulator
+    {
+        private int _sampleCount;
+        private double _totalCaptureCpuMs;
+        private double _peakCaptureCpuMs;
+        private long _totalCaptureAllocatedBytes;
+        private long _peakCaptureAllocatedBytes;
+
+        public void AddSample(double captureCpuMs, long captureAllocatedBytes)
+        {
+            if (!double.IsFinite(captureCpuMs) || captureCpuMs < 0d)
+            {
+                throw new ArgumentOutOfRangeException(nameof(captureCpuMs), "Capture CPU time must be finite and non-negative.");
+            }
+
+            if (captureAllocatedBytes < 0L)
+            {
+                throw new ArgumentOutOfRangeException(nameof(captureAllocatedBytes), "Capture allocation bytes cannot be negative.");
+            }
+
+            _sampleCount = checked(_sampleCount + 1);
+            _totalCaptureCpuMs += captureCpuMs;
+            _peakCaptureCpuMs = Math.Max(_peakCaptureCpuMs, captureCpuMs);
+            _totalCaptureAllocatedBytes = checked(_totalCaptureAllocatedBytes + captureAllocatedBytes);
+            _peakCaptureAllocatedBytes = Math.Max(_peakCaptureAllocatedBytes, captureAllocatedBytes);
+        }
+
+        public RuntimePerfMetricsArtifact BuildArtifact(string backend)
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(backend);
+
+            InteropBudgetOptions releaseBudgets = InteropBudgetOptions.ReleaseStrict;
+            long averageAllocatedBytes = _sampleCount == 0
+                ? 0L
+                : _totalCaptureAllocatedBytes / _sampleCount;
+            double averageCpuMs = _sampleCount == 0
+                ? 0d
+                : _totalCaptureCpuMs / _sampleCount;
+            bool zeroAllocationCapturePath = _peakCaptureAllocatedBytes == 0L;
+            return new RuntimePerfMetricsArtifact(
+                Backend: backend,
+                CaptureSampleCount: _sampleCount,
+                AverageCaptureCpuMs: averageCpuMs,
+                PeakCaptureCpuMs: _peakCaptureCpuMs,
+                AverageCaptureAllocatedBytes: averageAllocatedBytes,
+                PeakCaptureAllocatedBytes: _peakCaptureAllocatedBytes,
+                TotalCaptureAllocatedBytes: _totalCaptureAllocatedBytes,
+                ZeroAllocationCapturePath: zeroAllocationCapturePath,
+                ReleaseRendererInteropBudgetPerFrame: releaseBudgets.MaxRendererCallsPerFrame,
+                ReleasePhysicsInteropBudgetPerTick: releaseBudgets.MaxPhysicsCallsPerTick);
         }
     }
 
@@ -149,10 +224,11 @@ internal static class TestArtifactGenerator
 
         using CaptureRuntimeScope captureScope = CreateCaptureRuntimeScope();
         IRenderingFacade captureFacade = captureScope.Rendering;
+        var capturePerfAccumulator = new CapturePerfAccumulator();
 
         foreach (CaptureDefinition definition in captureDefinitions)
         {
-            GoldenImageBuffer image = CaptureBuffer(captureFacade, definition);
+            GoldenImageBuffer image = CaptureBuffer(captureFacade, definition, capturePerfAccumulator);
             string captureFullPath = Path.Combine(outputDirectory, definition.RelativeCapturePath);
             ArtifactOutputWriter.WriteRgbaPng(captureFullPath, image);
             manifestEntries.Add(
@@ -184,6 +260,10 @@ internal static class TestArtifactGenerator
         string renderStatsFullPath = Path.Combine(outputDirectory, renderStatsRelativePath);
         RenderStatsArtifact renderStats = CaptureRenderStats(captureFacade);
         WriteRenderStats(renderStatsFullPath, renderStats);
+        string runtimePerfMetricsRelativePath = Path.Combine("runtime", "perf-metrics.json");
+        string runtimePerfMetricsFullPath = Path.Combine(outputDirectory, runtimePerfMetricsRelativePath);
+        RuntimePerfMetricsArtifact runtimePerfMetrics = capturePerfAccumulator.BuildArtifact(captureScope.Backend);
+        WriteRuntimePerfMetrics(runtimePerfMetricsFullPath, runtimePerfMetrics);
 
         string replayRelativePath = Path.Combine("replay", "recording.json");
         string replayFullPath = Path.Combine(outputDirectory, replayRelativePath);
@@ -217,15 +297,31 @@ internal static class TestArtifactGenerator
                 Kind: "render-stats-log",
                 RelativePath: NormalizePath(renderStatsRelativePath),
                 Description: "Render counters log with draw calls, triangles, upload bytes and GPU memory estimate."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
+                Kind: "runtime-perf-metrics",
+                RelativePath: NormalizePath(runtimePerfMetricsRelativePath),
+                Description: "Runtime capture performance metrics with allocation profile and release interop budgets."));
 
         string manifestPath = ArtifactOutputWriter.WriteManifest(outputDirectory, manifestEntries);
         return new TestArtifactsOutput(manifestPath, captures);
     }
 
-    private static GoldenImageBuffer CaptureBuffer(IRenderingFacade captureFacade, CaptureDefinition definition)
+    private static GoldenImageBuffer CaptureBuffer(
+        IRenderingFacade captureFacade,
+        CaptureDefinition definition,
+        CapturePerfAccumulator capturePerfAccumulator)
     {
+        ArgumentNullException.ThrowIfNull(capturePerfAccumulator);
+
+        long allocationBefore = GC.GetAllocatedBytesForCurrentThread();
+        long timestampBefore = Stopwatch.GetTimestamp();
         RenderCaptureFrame(captureFacade, definition.Kind);
         byte[] rgba = captureFacade.CaptureFrameRgba8(CaptureWidth, CaptureHeight);
+        double captureCpuMs = Stopwatch.GetElapsedTime(timestampBefore).TotalMilliseconds;
+        long allocationAfter = GC.GetAllocatedBytesForCurrentThread();
+        long allocationDelta = Math.Max(0L, allocationAfter - allocationBefore);
+        capturePerfAccumulator.AddSample(captureCpuMs, allocationDelta);
         return new GoldenImageBuffer(checked((int)CaptureWidth), checked((int)CaptureHeight), rgba);
     }
 
@@ -519,7 +615,7 @@ internal static class TestArtifactGenerator
         try
         {
             NativeFacadeSet nativeFacadeSet = NativeFacadeFactory.CreateNativeFacadeSet();
-            return new CaptureRuntimeScope(nativeFacadeSet.Rendering, nativeFacadeSet);
+            return new CaptureRuntimeScope(nativeFacadeSet.Rendering, nativeFacadeSet, backend: "native");
         }
         catch (Exception ex) when (
             ex is DllNotFoundException or
@@ -530,8 +626,23 @@ internal static class TestArtifactGenerator
             InvalidOperationException or
             TypeInitializationException)
         {
-            return new CaptureRuntimeScope(NoopRenderingFacade.Instance, nativeFacadeSet: null);
+            return new CaptureRuntimeScope(NoopRenderingFacade.Instance, nativeFacadeSet: null, backend: "noop");
         }
+    }
+
+    private static void WriteRuntimePerfMetrics(string outputPath, RuntimePerfMetricsArtifact metrics)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(metrics);
+
+        string? directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        string json = JsonSerializer.Serialize(metrics, ArtifactOutputWriter.SerializerOptions);
+        File.WriteAllText(outputPath, json);
     }
 
     private static void WriteRenderStats(string outputPath, RenderStatsArtifact stats)
