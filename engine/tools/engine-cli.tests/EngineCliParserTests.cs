@@ -106,6 +106,8 @@ public sealed class EngineCliParserTests
         Assert.Equal(1, command.CaptureFrame);
         Assert.Equal(1337UL, command.ReplaySeed);
         Assert.Equal(1.0 / 60.0, command.FixedDeltaSeconds, 6);
+        Assert.Equal(1.0, command.TolerantMaxMae, 6);
+        Assert.Equal(48.0, command.TolerantMinPsnrDb, 6);
     }
 
     [Fact]
@@ -133,13 +135,17 @@ public sealed class EngineCliParserTests
             "--project", "game",
             "--capture-frame", "12",
             "--seed", "9001",
-            "--fixed-dt", "0.0333333"
+            "--fixed-dt", "0.0333333",
+            "--mae-threshold", "0.25",
+            "--psnr-threshold", "52.5"
         ]);
 
         TestCommand command = Assert.IsType<TestCommand>(result.Command);
         Assert.Equal(12, command.CaptureFrame);
         Assert.Equal(9001UL, command.ReplaySeed);
         Assert.Equal(0.0333333, command.FixedDeltaSeconds, 6);
+        Assert.Equal(0.25, command.TolerantMaxMae, 6);
+        Assert.Equal(52.5, command.TolerantMinPsnrDb, 6);
     }
 
     [Fact]
@@ -171,6 +177,24 @@ public sealed class EngineCliParserTests
         ]);
         Assert.False(invalidFixedDt.IsSuccess);
         Assert.Equal("Option '--fixed-dt' must be a positive number.", invalidFixedDt.Error);
+
+        EngineCliParseResult invalidMae = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--mae-threshold", "0"
+        ]);
+        Assert.False(invalidMae.IsSuccess);
+        Assert.Equal("Option '--mae-threshold' must be a positive number.", invalidMae.Error);
+
+        EngineCliParseResult invalidPsnr = EngineCliParser.Parse(
+        [
+            "test",
+            "--project", "game",
+            "--psnr-threshold", "-5"
+        ]);
+        Assert.False(invalidPsnr.IsSuccess);
+        Assert.Equal("Option '--psnr-threshold' must be a positive number.", invalidPsnr.Error);
     }
 
     [Fact]

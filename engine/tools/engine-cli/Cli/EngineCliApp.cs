@@ -266,11 +266,20 @@ public sealed partial class EngineCliApp
         if (!string.IsNullOrWhiteSpace(command.GoldenDirectory))
         {
             string goldenDirectory = AssetPipelineService.ResolveRelativePath(projectDirectory, command.GoldenDirectory);
+            GoldenImageComparisonOptions comparisonOptions = command.PixelPerfectGolden
+                ? GoldenImageComparisonOptions.PixelPerfect
+                : new GoldenImageComparisonOptions
+                {
+                    PixelPerfectMatch = false,
+                    MaxMeanAbsoluteError = command.TolerantMaxMae,
+                    MinPsnrDb = command.TolerantMinPsnrDb
+                };
+
             GoldenComparisonSummary summary = GoldenArtifactsComparer.Compare(
                 artifactsDirectory,
                 goldenDirectory,
                 artifactsOutput.Captures,
-                command.PixelPerfectGolden);
+                comparisonOptions);
             if (!summary.IsSuccess)
             {
                 foreach (string failure in summary.Failures)
@@ -283,8 +292,10 @@ public sealed partial class EngineCliApp
                 return 1;
             }
 
-            _stdout.WriteLine(
-                $"Golden comparison passed for {summary.ComparedCount} capture(s) ({(command.PixelPerfectGolden ? "pixel-perfect" : "tolerant")}).");
+            string modeSummary = command.PixelPerfectGolden
+                ? "pixel-perfect"
+                : $"tolerant: MAE<={command.TolerantMaxMae:F4}, PSNR>={command.TolerantMinPsnrDb:F4}dB";
+            _stdout.WriteLine($"Golden comparison passed for {summary.ComparedCount} capture(s) ({modeSummary}).");
         }
 
         _stdout.WriteLine($"Test artifacts created: {artifactsDirectory}");

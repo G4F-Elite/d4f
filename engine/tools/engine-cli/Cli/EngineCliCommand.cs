@@ -34,7 +34,9 @@ public sealed record TestCommand(
     bool PixelPerfectGolden,
     int CaptureFrame,
     ulong ReplaySeed,
-    double FixedDeltaSeconds) : EngineCliCommand;
+    double FixedDeltaSeconds,
+    double TolerantMaxMae,
+    double TolerantMinPsnrDb) : EngineCliCommand;
 
 public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
 

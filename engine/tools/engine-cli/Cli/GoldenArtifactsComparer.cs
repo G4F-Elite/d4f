@@ -15,17 +15,15 @@ internal static class GoldenArtifactsComparer
         string artifactsDirectory,
         string goldenDirectory,
         IReadOnlyList<TestCaptureArtifact> captures,
-        bool pixelPerfect)
+        GoldenImageComparisonOptions options)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(artifactsDirectory);
         ArgumentException.ThrowIfNullOrWhiteSpace(goldenDirectory);
         ArgumentNullException.ThrowIfNull(captures);
+        ArgumentNullException.ThrowIfNull(options);
 
         var failures = new List<string>();
         int comparedCount = 0;
-        GoldenImageComparisonOptions options = pixelPerfect
-            ? GoldenImageComparisonOptions.PixelPerfect
-            : GoldenImageComparisonOptions.TolerantDefault;
 
         foreach (TestCaptureArtifact capture in captures)
         {

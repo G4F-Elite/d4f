@@ -113,6 +113,52 @@ public sealed class EngineCliTestGoldenComparisonTests
         }
     }
 
+    [Fact]
+    public void Run_TestCommand_ShouldApplyCustomTolerantThresholds()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int firstRunCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests-source"]);
+            Assert.Equal(0, firstRunCode);
+
+            string sourceArtifacts = Path.Combine(tempRoot, "artifacts", "tests-source");
+            string goldenDirectory = Path.Combine(tempRoot, "goldens");
+            CopyDirectory(sourceArtifacts, goldenDirectory);
+
+            string goldenBufferPath = Path.Combine(goldenDirectory, "screenshots", "frame-0001.rgba8.bin");
+            byte[] bytes = File.ReadAllBytes(goldenBufferPath);
+            bytes[^1] ^= 0xFF;
+            File.WriteAllBytes(goldenBufferPath, bytes);
+
+            int secondRunCode = app.Run(
+            [
+                "test",
+                "--project", tempRoot,
+                "--out", "artifacts/tests-target",
+                "--golden", "goldens",
+                "--comparison", "tolerant",
+                "--mae-threshold", "0.000001",
+                "--psnr-threshold", "90"
+            ]);
+
+            Assert.Equal(1, secondRunCode);
+            string errorText = error.ToString();
+            Assert.Contains("Golden compare failed", errorText, StringComparison.Ordinal);
+            Assert.Contains("MAE=", errorText, StringComparison.Ordinal);
+            Assert.Contains("PSNR=", errorText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
     {
         Directory.CreateDirectory(destinationDirectory);

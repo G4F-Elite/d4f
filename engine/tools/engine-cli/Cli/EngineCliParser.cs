@@ -1,5 +1,6 @@
 using System.Globalization;
 using Engine.Rendering;
+using Engine.Testing;
 
 namespace Engine.Cli;
 
@@ -324,6 +325,26 @@ public static partial class EngineCliParser
             }
         }
 
+        double tolerantMaxMae = GoldenImageComparisonOptions.TolerantDefault.MaxMeanAbsoluteError;
+        if (options.TryGetValue("mae-threshold", out string? maeThresholdValue))
+        {
+            if (!double.TryParse(maeThresholdValue, NumberStyles.Float, CultureInfo.InvariantCulture, out tolerantMaxMae) ||
+                tolerantMaxMae <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--mae-threshold' must be a positive number.");
+            }
+        }
+
+        double tolerantMinPsnrDb = GoldenImageComparisonOptions.TolerantDefault.MinPsnrDb;
+        if (options.TryGetValue("psnr-threshold", out string? psnrThresholdValue))
+        {
+            if (!double.TryParse(psnrThresholdValue, NumberStyles.Float, CultureInfo.InvariantCulture, out tolerantMinPsnrDb) ||
+                tolerantMinPsnrDb <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--psnr-threshold' must be a positive number.");
+            }
+        }
+
         return EngineCliParseResult.Success(
             new TestCommand(
                 project,
@@ -333,7 +354,9 @@ public static partial class EngineCliParser
                 pixelPerfect,
                 captureFrame,
                 replaySeed,
-                fixedDeltaSeconds));
+                fixedDeltaSeconds,
+                tolerantMaxMae,
+                tolerantMinPsnrDb));
     }
 
     private static EngineCliParseResult ParsePack(IReadOnlyDictionary<string, string> options)
