@@ -165,11 +165,14 @@ public sealed class GameHostPipelineTests
             options);
 
         var frames = host.RunFrames(1);
+        FrameObservabilitySnapshot snapshot = host.LastFrameObservability;
 
         Assert.Equal(1, frames);
         Assert.Equal(0, physics.SyncToCallCount);
         Assert.Equal(0, physics.StepCallCount);
         Assert.Equal(0, physics.SyncFromCallCount);
+        Assert.Equal(0, snapshot.PhysicsInteropCallCount);
+        Assert.Equal(3, snapshot.RendererInteropCallCount);
         Assert.Equal(
             [
                 "platform",
@@ -215,12 +218,15 @@ public sealed class GameHostPipelineTests
             options);
 
         var frames = host.RunFrames(1);
+        FrameObservabilitySnapshot snapshot = host.LastFrameObservability;
 
         Assert.Equal(1, frames);
         Assert.Equal(1, physics.SyncToCallCount);
         Assert.Equal(4, physics.StepCallCount);
         Assert.Equal(1, physics.SyncFromCallCount);
         Assert.Equal([options.FixedDt, options.FixedDt, options.FixedDt, options.FixedDt], physics.StepDeltaTimes);
+        Assert.Equal(6, snapshot.PhysicsInteropCallCount);
+        Assert.Equal(3, snapshot.RendererInteropCallCount);
         Assert.Equal(
             [
                 "platform",
@@ -418,6 +424,8 @@ public sealed class GameHostPipelineTests
         Assert.Equal(1, frames);
         Assert.Equal(7, snapshot.FrameNumber);
         Assert.Equal(1, snapshot.PhysicsSubsteps);
+        Assert.Equal(3, snapshot.PhysicsInteropCallCount);
+        Assert.Equal(3, snapshot.RendererInteropCallCount);
         Assert.Equal(rendering.LastFrameStats, snapshot.RenderingStats);
         Assert.Equal(1, rendering.GetLastFrameStatsCallCount);
         Assert.True(snapshot.PrePhysicsCpuTime >= TimeSpan.Zero);

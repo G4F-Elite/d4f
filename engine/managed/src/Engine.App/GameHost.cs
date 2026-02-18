@@ -12,6 +12,7 @@ namespace Engine.App;
 
 public sealed class GameHost
 {
+    private const int RendererInteropCallsPerFrame = 3;
     private readonly World _world;
     private readonly IPlatformFacade _platformFacade;
     private readonly ITimingFacade _timingFacade;
@@ -146,6 +147,7 @@ public sealed class GameHost
         _renderingFacade.Present();
         RenderingFrameStats renderingStats = _renderingFacade.GetLastFrameStats();
         TimeSpan renderCpuTime = Stopwatch.GetElapsedTime(stageStart);
+        int physicsInteropCalls = substeps == 0 ? 0 : substeps + 2;
 
         TimeSpan totalCpuTime = Stopwatch.GetElapsedTime(frameStart);
         LastFrameObservability = new FrameObservabilitySnapshot(
@@ -158,6 +160,8 @@ public sealed class GameHost
             renderCpuTime,
             totalCpuTime,
             substeps,
+            physicsInteropCalls,
+            RendererInteropCallsPerFrame,
             renderingStats);
     }
 

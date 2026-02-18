@@ -13,6 +13,8 @@ public readonly record struct FrameObservabilitySnapshot(
     TimeSpan RenderCpuTime,
     TimeSpan TotalCpuTime,
     int PhysicsSubsteps,
+    int PhysicsInteropCallCount,
+    int RendererInteropCallCount,
     RenderingFrameStats RenderingStats)
 {
     public static FrameObservabilitySnapshot Empty { get; } = new(
@@ -24,6 +26,8 @@ public readonly record struct FrameObservabilitySnapshot(
         TimeSpan.Zero,
         TimeSpan.Zero,
         TimeSpan.Zero,
+        0,
+        0,
         0,
         RenderingFrameStats.Empty);
 }

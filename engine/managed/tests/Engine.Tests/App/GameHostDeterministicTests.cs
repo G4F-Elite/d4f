@@ -49,5 +49,7 @@ public sealed class GameHostDeterministicTests
         Assert.Equal(1, physics.StepCallCount);
         Assert.Equal(TimeSpan.FromMilliseconds(10), physics.StepDeltaTimes[0]);
         Assert.Equal(1, snapshot.PhysicsSubsteps);
+        Assert.Equal(3, snapshot.PhysicsInteropCallCount);
+        Assert.Equal(3, snapshot.RendererInteropCallCount);
     }
 }
