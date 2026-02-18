@@ -50,4 +50,19 @@ public sealed class UiDrawCommandTests
         Assert.Throws<ArgumentOutOfRangeException>(() => new UiDrawCommand(new TextureHandle(1), 0, 0, 0, 1));
         Assert.Throws<ArgumentOutOfRangeException>(() => new UiDrawCommand(new TextureHandle(1), 0, 1, 0, 0));
     }
+
+    [Fact]
+    public void Constructor_RejectsNonFiniteBoundsAndScissor()
+    {
+        RectF valid = new(0, 0, 10, 10);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new UiDrawCommand(new TextureHandle(1), 0, 1, 0, 1, new RectF(float.NaN, 0, 10, 10)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new UiDrawCommand(new TextureHandle(1), 0, 1, 0, 1, new RectF(0, float.PositiveInfinity, 10, 10)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new UiDrawCommand(new TextureHandle(1), 0, 1, 0, 1, valid, new RectF(0, 0, float.NaN, 10)));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new UiDrawCommand(new TextureHandle(1), 0, 1, 0, 1, valid, new RectF(0, 0, 10, float.NegativeInfinity)));
+    }
 }

@@ -41,6 +41,9 @@ public readonly record struct UiDrawCommand
             throw new ArgumentOutOfRangeException(nameof(indexCount), "Index count must be positive.");
         }
 
+        ValidateRect(bounds, nameof(bounds));
+        ValidateRect(scissorRect, nameof(scissorRect));
+
         Texture = texture;
         VertexOffset = vertexOffset;
         VertexCount = vertexCount;
@@ -106,4 +109,15 @@ public readonly record struct UiDrawCommand
     public RectF Bounds { get; }
 
     public RectF ScissorRect { get; }
+
+    private static void ValidateRect(RectF rect, string paramName)
+    {
+        if (!float.IsFinite(rect.X) ||
+            !float.IsFinite(rect.Y) ||
+            !float.IsFinite(rect.Width) ||
+            !float.IsFinite(rect.Height))
+        {
+            throw new ArgumentOutOfRangeException(paramName, "Rect components must be finite.");
+        }
+    }
 }
