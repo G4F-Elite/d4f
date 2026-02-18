@@ -77,8 +77,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 "engine_pump_events",
                 "renderer_begin_frame",
                 "renderer_submit",
-                "renderer_present",
-                "renderer_get_last_frame_stats",
+                "renderer_present_with_stats",
                 "physics_sync_from_world",
                 "physics_step",
                 "physics_sync_to_world",
@@ -122,7 +121,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         var exception = Assert.Throws<NativeCallException>(() => nativeSet.Rendering.Present());
 
-        Assert.Contains("renderer_get_last_frame_stats", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("renderer_present_with_stats", exception.Message, StringComparison.Ordinal);
         Assert.Contains("InternalError", exception.Message, StringComparison.Ordinal);
     }
 

@@ -111,6 +111,11 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
     public EngineNativeStatus RendererPresent(IntPtr renderer)
         => NativeMethods.RendererPresent(renderer);
 
+    public EngineNativeStatus RendererPresentWithStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats)
+        => NativeMethods.RendererPresentWithStats(renderer, out stats);
+
     public EngineNativeStatus RendererCreateMeshFromBlob(
         IntPtr renderer,
         IntPtr data,
@@ -329,6 +334,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
         internal static partial EngineNativeStatus RendererPresent(IntPtr renderer);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_present_with_stats")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererPresentWithStats(
+            IntPtr renderer,
+            out EngineNativeRendererFrameStats outStats);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_create_mesh_from_blob")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

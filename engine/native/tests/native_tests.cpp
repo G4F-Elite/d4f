@@ -181,15 +181,14 @@ void TestEngineAndSubsystemFlow() {
          ENGINE_NATIVE_STATUS_OK);
   assert(frame_memory != nullptr);
   assert(renderer_submit(renderer, &packet) == ENGINE_NATIVE_STATUS_OK);
-  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  engine_native_renderer_frame_stats_t renderer_stats{};
+  assert(renderer_present_with_stats(renderer, &renderer_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
   AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
                   {"shadow", "pbr_opaque", "ambient_occlusion", "bloom",
                    "tonemap", "color_grading",
                    "fxaa",
                    "present"});
-  engine_native_renderer_frame_stats_t renderer_stats{};
-  assert(renderer_get_last_frame_stats(renderer, &renderer_stats) ==
-         ENGINE_NATIVE_STATUS_OK);
   assert(renderer_stats.draw_item_count == 2u);
   assert(renderer_stats.ui_item_count == 0u);
   assert(renderer_stats.executed_pass_count == 8u);
@@ -354,6 +353,10 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_overlap(physics, &overlap_query, overlap_hits, 1u, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_begin_frame(renderer, 128u, 3u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_present_with_stats(renderer, nullptr) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(renderer_present_with_stats(nullptr, &renderer_stats) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(renderer_get_last_frame_stats(renderer, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

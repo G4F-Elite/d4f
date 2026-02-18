@@ -51,6 +51,25 @@ engine_native_status_t renderer_present(engine_native_renderer_t* renderer) {
   return renderer->state->Present();
 }
 
+engine_native_status_t renderer_present_with_stats(
+    engine_native_renderer_t* renderer,
+    engine_native_renderer_frame_stats_t* out_stats) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (out_stats == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const engine_native_status_t present_status = renderer->state->Present();
+  if (present_status != ENGINE_NATIVE_STATUS_OK) {
+    return present_status;
+  }
+
+  return renderer->state->GetLastFrameStats(out_stats);
+}
+
 engine_native_status_t renderer_create_mesh_from_blob(
     engine_native_renderer_t* renderer,
     const void* data,

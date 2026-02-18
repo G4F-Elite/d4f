@@ -324,6 +324,21 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         return RendererPresentStatus;
     }
 
+    public EngineNativeStatus RendererPresentWithStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats)
+    {
+        Calls.Add("renderer_present_with_stats");
+        stats = RendererFrameStatsToReturn;
+
+        if (RendererPresentStatus != EngineNativeStatus.Ok)
+        {
+            return RendererPresentStatus;
+        }
+
+        return RendererGetLastFrameStatsStatus;
+    }
+
     public EngineNativeStatus RendererCreateMeshFromBlob(
         IntPtr renderer,
         IntPtr data,

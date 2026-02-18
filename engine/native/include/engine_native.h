@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 12u
+#define ENGINE_NATIVE_API_VERSION 13u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -367,6 +367,10 @@ ENGINE_NATIVE_API engine_native_status_t renderer_submit(
 
 ENGINE_NATIVE_API engine_native_status_t renderer_present(
     engine_native_renderer_t* renderer);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_present_with_stats(
+    engine_native_renderer_t* renderer,
+    engine_native_renderer_frame_stats_t* out_stats);
 
 ENGINE_NATIVE_API engine_native_status_t renderer_create_mesh_from_blob(
     engine_native_renderer_t* renderer,

@@ -323,10 +323,9 @@ internal sealed partial class NativeRuntime
     {
         ThrowIfDisposed();
 
-        NativeStatusGuard.ThrowIfFailed(_interop.RendererPresent(_renderer), "renderer_present");
         NativeStatusGuard.ThrowIfFailed(
-            _interop.RendererGetLastFrameStats(_renderer, out var nativeStats),
-            "renderer_get_last_frame_stats");
+            _interop.RendererPresentWithStats(_renderer, out var nativeStats),
+            "renderer_present_with_stats");
         _lastFrameStats = new RenderingFrameStats(
             nativeStats.DrawItemCount,
             nativeStats.UiItemCount,

@@ -44,6 +44,10 @@ internal interface INativeInteropApi
 
     EngineNativeStatus RendererPresent(IntPtr renderer);
 
+    EngineNativeStatus RendererPresentWithStats(
+        IntPtr renderer,
+        out EngineNativeRendererFrameStats stats);
+
     EngineNativeStatus RendererCreateMeshFromBlob(
         IntPtr renderer,
         IntPtr data,
