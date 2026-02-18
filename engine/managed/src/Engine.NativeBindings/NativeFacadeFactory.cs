@@ -25,6 +25,8 @@ public static class NativeFacadeFactory
 
     public static IAudioFacade CreateAudioFacade() => new NativeAudioFacade(new NativeAudioApiStub());
 
+    public static IContentRuntimeFacade CreateContentRuntimeFacade() => new NativeContentRuntimeFacade(new NativeContentApiStub());
+
     public static IUiFacade CreateUiFacade() => new NativeUiFacade(new NativeUiApiStub());
 
     public static IRenderingFacade CreateRenderingFacade() => new NativeRenderingFacade(new NativeRenderingApiStub());
@@ -36,6 +38,8 @@ public static class NativeFacadeFactory
     internal static IPhysicsFacade CreatePhysicsFacade(INativePhysicsApi nativeApi) => new NativePhysicsFacade(nativeApi);
 
     internal static IAudioFacade CreateAudioFacade(INativeAudioApi nativeApi) => new NativeAudioFacade(nativeApi);
+
+    internal static IContentRuntimeFacade CreateContentRuntimeFacade(INativeContentApi nativeApi) => new NativeContentRuntimeFacade(nativeApi);
 
     internal static IUiFacade CreateUiFacade(INativeUiApi nativeApi) => new NativeUiFacade(nativeApi);
 
@@ -103,6 +107,22 @@ public static class NativeFacadeFactory
         }
 
         public void Update(World world, in FrameTiming timing) => _nativeApi.Update(world, timing);
+    }
+
+    private sealed class NativeContentRuntimeFacade : IContentRuntimeFacade
+    {
+        private readonly INativeContentApi _nativeApi;
+
+        public NativeContentRuntimeFacade(INativeContentApi nativeApi)
+        {
+            _nativeApi = nativeApi ?? throw new ArgumentNullException(nameof(nativeApi));
+        }
+
+        public void MountPak(string pakPath) => _nativeApi.ContentMountPak(pakPath);
+
+        public void MountDirectory(string directoryPath) => _nativeApi.ContentMountDirectory(directoryPath);
+
+        public byte[] ReadFile(string assetPath) => _nativeApi.ContentReadFile(assetPath);
     }
 
     private sealed class NativeAudioFacade : IAudioFacade

@@ -12,7 +12,13 @@ using Engine.Rendering;
 namespace Engine.NativeBindings.Internal;
 
 internal sealed partial class NativeRuntime
-    : INativePlatformApi, INativeTimingApi, INativePhysicsApi, INativeAudioApi, INativeRenderingApi, IDisposable
+    : INativePlatformApi,
+      INativeTimingApi,
+      INativePhysicsApi,
+      INativeAudioApi,
+      INativeContentApi,
+      INativeRenderingApi,
+      IDisposable
 {
     private readonly INativeInteropApi _interop;
     private readonly Stopwatch _clock = Stopwatch.StartNew();

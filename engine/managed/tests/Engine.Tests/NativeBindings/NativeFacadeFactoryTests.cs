@@ -16,6 +16,7 @@ public sealed class NativeFacadeFactoryTests
         var platform = NativeFacadeFactory.CreatePlatformFacade();
         var timing = NativeFacadeFactory.CreateTimingFacade();
         var physics = NativeFacadeFactory.CreatePhysicsFacade();
+        var content = NativeFacadeFactory.CreateContentRuntimeFacade();
         var ui = NativeFacadeFactory.CreateUiFacade();
         var rendering = NativeFacadeFactory.CreateRenderingFacade();
 
@@ -40,6 +41,8 @@ public sealed class NativeFacadeFactoryTests
         Assert.Equal(0, physics.Overlap(
             new PhysicsOverlapQuery(default, ColliderShapeType.Sphere, new(1, 1, 1)),
             overlapHits));
+        content.MountDirectory("D:/content");
+        Assert.Throws<FileNotFoundException>(() => content.ReadFile("assets/missing.bin"));
 
         ui.Update(world, frame1);
         using var frameArena = rendering.BeginFrame(1024, 64);

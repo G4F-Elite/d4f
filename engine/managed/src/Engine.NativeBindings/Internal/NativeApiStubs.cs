@@ -132,6 +132,48 @@ internal sealed class NativeAudioApiStub : INativeAudioApi
     }
 }
 
+internal sealed class NativeContentApiStub : INativeContentApi
+{
+    private readonly HashSet<string> _mountedPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
+
+    public void ContentMountPak(string pakPath)
+    {
+        if (string.IsNullOrWhiteSpace(pakPath))
+        {
+            throw new ArgumentException("Pak path cannot be empty.", nameof(pakPath));
+        }
+
+        _mountedPaths.Add(pakPath.Trim());
+    }
+
+    public void ContentMountDirectory(string directoryPath)
+    {
+        if (string.IsNullOrWhiteSpace(directoryPath))
+        {
+            throw new ArgumentException("Directory path cannot be empty.", nameof(directoryPath));
+        }
+
+        _mountedPaths.Add(directoryPath.Trim());
+    }
+
+    public byte[] ContentReadFile(string assetPath)
+    {
+        if (string.IsNullOrWhiteSpace(assetPath))
+        {
+            throw new ArgumentException("Asset path cannot be empty.", nameof(assetPath));
+        }
+
+        string normalizedPath = assetPath.Trim().Replace('\\', '/');
+        if (_files.TryGetValue(normalizedPath, out byte[]? payload))
+        {
+            return payload.ToArray();
+        }
+
+        throw new FileNotFoundException($"Asset '{normalizedPath}' was not found in mounted content sources.");
+    }
+}
+
 internal sealed class NativeRenderingApiStub : INativeRenderingApi
 {
     public FrameArena BeginFrame(int requestedBytes, int alignment)

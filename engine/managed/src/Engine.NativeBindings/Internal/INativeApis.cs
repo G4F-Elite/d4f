@@ -49,6 +49,15 @@ internal interface INativeAudioApi
     void SetAudioEmitterParams(ulong emitterId, in EngineNativeEmitterParams emitterParams);
 }
 
+internal interface INativeContentApi
+{
+    void ContentMountPak(string pakPath);
+
+    void ContentMountDirectory(string directoryPath);
+
+    byte[] ContentReadFile(string assetPath);
+}
+
 internal interface INativeRenderingApi
 {
     FrameArena BeginFrame(int requestedBytes, int alignment);

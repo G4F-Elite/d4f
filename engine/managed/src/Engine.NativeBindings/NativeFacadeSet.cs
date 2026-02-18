@@ -19,6 +19,7 @@ public sealed class NativeFacadeSet : IDisposable
         Timing = NativeFacadeFactory.CreateTimingFacade(runtime);
         Physics = NativeFacadeFactory.CreatePhysicsFacade(runtime);
         Audio = NativeFacadeFactory.CreateAudioFacade(runtime);
+        Content = NativeFacadeFactory.CreateContentRuntimeFacade(runtime);
         Ui = NativeFacadeFactory.CreateUiFacade(new NativeUiApiStub());
         Rendering = NativeFacadeFactory.CreateRenderingFacade(runtime);
     }
@@ -30,6 +31,8 @@ public sealed class NativeFacadeSet : IDisposable
     public IPhysicsFacade Physics { get; }
 
     public IAudioFacade Audio { get; }
+
+    public IContentRuntimeFacade Content { get; }
 
     public IUiFacade Ui { get; }
 
