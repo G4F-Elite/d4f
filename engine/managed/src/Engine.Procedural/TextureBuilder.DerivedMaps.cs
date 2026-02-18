@@ -1,3 +1,5 @@
+using System.Numerics;
+
 namespace Engine.Procedural;
 
 public static partial class TextureBuilder
@@ -133,62 +135,15 @@ public static partial class TextureBuilder
         int width,
         int heightPixels)
     {
-        ArgumentNullException.ThrowIfNull(baseLevelRgba8);
-        if (width <= 0 || heightPixels <= 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(width), "Texture dimensions must be greater than zero.");
-        }
+        return GenerateMipChain(baseLevelRgba8, width, heightPixels, MipReduceMode.ColorAverage);
+    }
 
-        int expectedLength = checked(width * heightPixels * 4);
-        if (baseLevelRgba8.Length != expectedLength)
-        {
-            throw new InvalidDataException(
-                $"Base mip payload size {baseLevelRgba8.Length} does not match dimensions {width}x{heightPixels} ({expectedLength} bytes).");
-        }
-
-        var chain = new List<TextureMipLevel>();
-        int currentWidth = width;
-        int currentHeight = heightPixels;
-        byte[] currentLevel = baseLevelRgba8.ToArray();
-        chain.Add(new TextureMipLevel(currentWidth, currentHeight, currentLevel).Validate());
-
-        while (currentWidth > 1 || currentHeight > 1)
-        {
-            int nextWidth = Math.Max(1, currentWidth / 2);
-            int nextHeight = Math.Max(1, currentHeight / 2);
-            var nextLevel = new byte[checked(nextWidth * nextHeight * 4)];
-
-            for (int y = 0; y < nextHeight; y++)
-            {
-                int srcY0 = Math.Min(y * 2, currentHeight - 1);
-                int srcY1 = Math.Min(srcY0 + 1, currentHeight - 1);
-
-                for (int x = 0; x < nextWidth; x++)
-                {
-                    int srcX0 = Math.Min(x * 2, currentWidth - 1);
-                    int srcX1 = Math.Min(srcX0 + 1, currentWidth - 1);
-
-                    int s00 = (srcY0 * currentWidth + srcX0) * 4;
-                    int s10 = (srcY0 * currentWidth + srcX1) * 4;
-                    int s01 = (srcY1 * currentWidth + srcX0) * 4;
-                    int s11 = (srcY1 * currentWidth + srcX1) * 4;
-                    int dst = (y * nextWidth + x) * 4;
-
-                    for (int c = 0; c < 4; c++)
-                    {
-                        int sum = currentLevel[s00 + c] + currentLevel[s10 + c] + currentLevel[s01 + c] + currentLevel[s11 + c];
-                        nextLevel[dst + c] = (byte)(sum / 4);
-                    }
-                }
-            }
-
-            currentWidth = nextWidth;
-            currentHeight = nextHeight;
-            currentLevel = nextLevel;
-            chain.Add(new TextureMipLevel(currentWidth, currentHeight, currentLevel).Validate());
-        }
-
-        return chain.ToArray();
+    public static IReadOnlyList<TextureMipLevel> GenerateNormalMipChainRgba8(
+        byte[] baseLevelRgba8,
+        int width,
+        int heightPixels)
+    {
+        return GenerateMipChain(baseLevelRgba8, width, heightPixels, MipReduceMode.NormalVectorAverage);
     }
 
     private static void ValidateHeightArray(float[] height, int width, int heightPixels)
@@ -219,5 +174,127 @@ public static partial class TextureBuilder
         }
 
         return bytes;
+    }
+
+    private static IReadOnlyList<TextureMipLevel> GenerateMipChain(
+        byte[] baseLevelRgba8,
+        int width,
+        int heightPixels,
+        MipReduceMode reduceMode)
+    {
+        ValidateBaseMipPayload(baseLevelRgba8, width, heightPixels);
+
+        var chain = new List<TextureMipLevel>();
+        int currentWidth = width;
+        int currentHeight = heightPixels;
+        byte[] currentLevel = baseLevelRgba8.ToArray();
+        chain.Add(new TextureMipLevel(currentWidth, currentHeight, currentLevel).Validate());
+
+        while (currentWidth > 1 || currentHeight > 1)
+        {
+            int nextWidth = Math.Max(1, currentWidth / 2);
+            int nextHeight = Math.Max(1, currentHeight / 2);
+            var nextLevel = new byte[checked(nextWidth * nextHeight * 4)];
+
+            for (int y = 0; y < nextHeight; y++)
+            {
+                int srcY0 = Math.Min(y * 2, currentHeight - 1);
+                int srcY1 = Math.Min(srcY0 + 1, currentHeight - 1);
+
+                for (int x = 0; x < nextWidth; x++)
+                {
+                    int srcX0 = Math.Min(x * 2, currentWidth - 1);
+                    int srcX1 = Math.Min(srcX0 + 1, currentWidth - 1);
+
+                    int s00 = (srcY0 * currentWidth + srcX0) * 4;
+                    int s10 = (srcY0 * currentWidth + srcX1) * 4;
+                    int s01 = (srcY1 * currentWidth + srcX0) * 4;
+                    int s11 = (srcY1 * currentWidth + srcX1) * 4;
+                    int dst = (y * nextWidth + x) * 4;
+
+                    if (reduceMode == MipReduceMode.ColorAverage)
+                    {
+                        for (int c = 0; c < 4; c++)
+                        {
+                            int sum = currentLevel[s00 + c] + currentLevel[s10 + c] + currentLevel[s01 + c] + currentLevel[s11 + c];
+                            nextLevel[dst + c] = (byte)(sum / 4);
+                        }
+                    }
+                    else
+                    {
+                        WriteAveragedNormal(currentLevel, s00, s10, s01, s11, nextLevel, dst);
+                    }
+                }
+            }
+
+            currentWidth = nextWidth;
+            currentHeight = nextHeight;
+            currentLevel = nextLevel;
+            chain.Add(new TextureMipLevel(currentWidth, currentHeight, currentLevel).Validate());
+        }
+
+        return chain.ToArray();
+    }
+
+    private static void ValidateBaseMipPayload(byte[] baseLevelRgba8, int width, int heightPixels)
+    {
+        ArgumentNullException.ThrowIfNull(baseLevelRgba8);
+        if (width <= 0 || heightPixels <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(width), "Texture dimensions must be greater than zero.");
+        }
+
+        int expectedLength = checked(width * heightPixels * 4);
+        if (baseLevelRgba8.Length != expectedLength)
+        {
+            throw new InvalidDataException(
+                $"Base mip payload size {baseLevelRgba8.Length} does not match dimensions {width}x{heightPixels} ({expectedLength} bytes).");
+        }
+    }
+
+    private static void WriteAveragedNormal(
+        byte[] source,
+        int s00,
+        int s10,
+        int s01,
+        int s11,
+        byte[] destination,
+        int dst)
+    {
+        Vector3 n00 = DecodeNormal(source, s00);
+        Vector3 n10 = DecodeNormal(source, s10);
+        Vector3 n01 = DecodeNormal(source, s01);
+        Vector3 n11 = DecodeNormal(source, s11);
+        Vector3 averaged = n00 + n10 + n01 + n11;
+        if (!float.IsFinite(averaged.X) ||
+            !float.IsFinite(averaged.Y) ||
+            !float.IsFinite(averaged.Z) ||
+            averaged.LengthSquared() <= 1e-8f)
+        {
+            averaged = Vector3.UnitZ;
+        }
+        else
+        {
+            averaged = Vector3.Normalize(averaged);
+        }
+
+        destination[dst] = EncodeSignedNormal(averaged.X);
+        destination[dst + 1] = EncodeSignedNormal(averaged.Y);
+        destination[dst + 2] = EncodeSignedNormal(averaged.Z);
+        destination[dst + 3] = 255;
+    }
+
+    private static Vector3 DecodeNormal(byte[] source, int offset)
+    {
+        float x = Math.Clamp((source[offset] - 128f) / 127f, -1f, 1f);
+        float y = Math.Clamp((source[offset + 1] - 128f) / 127f, -1f, 1f);
+        float z = Math.Clamp((source[offset + 2] - 128f) / 127f, -1f, 1f);
+        return new Vector3(x, y, z);
+    }
+
+    private enum MipReduceMode
+    {
+        ColorAverage = 0,
+        NormalVectorAverage = 1
     }
 }

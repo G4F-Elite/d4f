@@ -128,7 +128,7 @@ public static class ProceduralMaterialFactory
 
         IReadOnlyList<TextureMipLevel> albedoMips = CloneMipChain(surface.MipChain);
         IReadOnlyList<TextureMipLevel> normalMips = CloneMipChain(
-            TextureBuilder.GenerateMipChainRgba8(surface.NormalRgba8, surface.Width, surface.Height));
+            TextureBuilder.GenerateNormalMipChainRgba8(surface.NormalRgba8, surface.Width, surface.Height));
         IReadOnlyList<TextureMipLevel> roughnessMips = CloneMipChain(
             TextureBuilder.GenerateMipChainRgba8(surface.RoughnessRgba8, surface.Width, surface.Height));
         IReadOnlyList<TextureMipLevel> aoMips = CloneMipChain(

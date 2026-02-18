@@ -1,4 +1,5 @@
 using Engine.Procedural;
+using System.Numerics;
 
 namespace Engine.Tests.Procedural;
 
@@ -98,5 +99,50 @@ public sealed class ProceduralTextureBuilderAdvancedTests
         byte[] invalidBase = new byte[15];
 
         Assert.Throws<InvalidDataException>(() => TextureBuilder.GenerateMipChainRgba8(invalidBase, 2, 2));
+    }
+
+    [Fact]
+    public void GenerateNormalMipChainRgba8_ShouldNormalizeDownsampledVectors()
+    {
+        byte[] baseNormals =
+        [
+            EncodeSigned(1f), EncodeSigned(0f), EncodeSigned(0f), 255,
+            EncodeSigned(-1f), EncodeSigned(0f), EncodeSigned(0f), 255,
+            EncodeSigned(0f), EncodeSigned(1f), EncodeSigned(0f), 255,
+            EncodeSigned(0f), EncodeSigned(-1f), EncodeSigned(0f), 255
+        ];
+
+        IReadOnlyList<TextureMipLevel> mipChain = TextureBuilder.GenerateNormalMipChainRgba8(baseNormals, 2, 2);
+
+        Assert.Equal(2, mipChain.Count);
+        TextureMipLevel topMip = mipChain[1];
+        Assert.Equal((1, 1), (topMip.Width, topMip.Height));
+        Vector3 decoded = DecodeNormal(topMip.Rgba8, 0);
+        Assert.InRange(decoded.X, -0.05f, 0.05f);
+        Assert.InRange(decoded.Y, -0.05f, 0.05f);
+        Assert.InRange(decoded.Z, 0.95f, 1.0f);
+        Assert.Equal(255, topMip.Rgba8[3]);
+    }
+
+    [Fact]
+    public void GenerateNormalMipChainRgba8_ShouldFail_WhenBasePayloadSizeIsInvalid()
+    {
+        byte[] invalidBase = new byte[15];
+
+        Assert.Throws<InvalidDataException>(() => TextureBuilder.GenerateNormalMipChainRgba8(invalidBase, 2, 2));
+    }
+
+    private static byte EncodeSigned(float value)
+    {
+        int encoded = (int)MathF.Round((Math.Clamp(value, -1f, 1f) * 0.5f + 0.5f) * 255f);
+        return (byte)Math.Clamp(encoded, 0, 255);
+    }
+
+    private static Vector3 DecodeNormal(byte[] rgba, int offset)
+    {
+        return new Vector3(
+            (rgba[offset] / 255f) * 2f - 1f,
+            (rgba[offset + 1] / 255f) * 2f - 1f,
+            (rgba[offset + 2] / 255f) * 2f - 1f);
     }
 }

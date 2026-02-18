@@ -116,4 +116,70 @@ public sealed class ProceduralMaterialFactoryTests
         Assert.Throws<InvalidDataException>(() =>
             ProceduralMaterialFactory.CreateLitPbrFromSurface(invalidSurface, "proc/invalid"));
     }
+
+    [Fact]
+    public void CreateLitPbrFromSurface_ShouldBuildNormalizedNormalMipChain()
+    {
+        byte[] albedo =
+        [
+            128, 128, 128, 255,
+            128, 128, 128, 255,
+            128, 128, 128, 255,
+            128, 128, 128, 255
+        ];
+        byte[] normals =
+        [
+            EncodeSigned(1f), EncodeSigned(0f), EncodeSigned(0f), 255,
+            EncodeSigned(-1f), EncodeSigned(0f), EncodeSigned(0f), 255,
+            EncodeSigned(0f), EncodeSigned(1f), EncodeSigned(0f), 255,
+            EncodeSigned(0f), EncodeSigned(-1f), EncodeSigned(0f), 255
+        ];
+        byte[] roughness =
+        [
+            100, 100, 100, 255,
+            100, 100, 100, 255,
+            100, 100, 100, 255,
+            100, 100, 100, 255
+        ];
+        byte[] ao =
+        [
+            255, 255, 255, 255,
+            255, 255, 255, 255,
+            255, 255, 255, 255,
+            255, 255, 255, 255
+        ];
+        ProceduralTextureSurface surface = new(
+            Width: 2,
+            Height: 2,
+            HeightMap: [0f, 0f, 0f, 0f],
+            AlbedoRgba8: albedo,
+            NormalRgba8: normals,
+            RoughnessRgba8: roughness,
+            AmbientOcclusionRgba8: ao,
+            MipChain: TextureBuilder.GenerateMipChainRgba8(albedo, 2, 2));
+
+        ProceduralLitMaterialBundle bundle = ProceduralMaterialFactory.CreateLitPbrFromSurface(surface, "proc/test");
+        ProceduralTextureExport normalExport = bundle.Textures.Single(static x => x.Key.EndsWith(".normal", StringComparison.Ordinal));
+        TextureMipLevel topMip = normalExport.MipChain[^1];
+
+        Assert.Equal((1, 1), (topMip.Width, topMip.Height));
+        float nx = DecodeSigned(topMip.Rgba8[0]);
+        float ny = DecodeSigned(topMip.Rgba8[1]);
+        float nz = DecodeSigned(topMip.Rgba8[2]);
+        Assert.InRange(nx, -0.05f, 0.05f);
+        Assert.InRange(ny, -0.05f, 0.05f);
+        Assert.InRange(nz, 0.95f, 1.0f);
+        Assert.Equal(255, topMip.Rgba8[3]);
+    }
+
+    private static byte EncodeSigned(float value)
+    {
+        int encoded = (int)MathF.Round((Math.Clamp(value, -1f, 1f) * 0.5f + 0.5f) * 255f);
+        return (byte)Math.Clamp(encoded, 0, 255);
+    }
+
+    private static float DecodeSigned(byte value)
+    {
+        return (value / 255f) * 2f - 1f;
+    }
 }
