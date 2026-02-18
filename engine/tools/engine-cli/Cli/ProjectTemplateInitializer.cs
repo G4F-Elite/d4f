@@ -5,6 +5,7 @@ namespace Engine.Cli;
 internal static class ProjectTemplateInitializer
 {
     private const string GameNameToken = "__GAME_NAME__";
+    private const string EngineManagedSourceRelativeToken = "__ENGINE_MANAGED_SRC_RELATIVE__";
     private const string RuntimeTemplateDirectoryName = "Game.Runtime";
     private const string RuntimeTemplateProjectName = "Game.Runtime.csproj";
 
@@ -22,7 +23,19 @@ internal static class ProjectTemplateInitializer
         CopyDirectory(templateDirectory, projectDirectory);
         EnsureGameAssetsDirectory(projectDirectory);
         RenameRuntimeProject(projectDirectory, gameName);
+
+        string? engineManagedSourceDirectory = ResolveEngineManagedSourceDirectory();
+        if (engineManagedSourceDirectory is null)
+        {
+            throw new DirectoryNotFoundException(
+                "Engine managed source directory was not found under 'engine/managed/src'.");
+        }
+
+        string relativeManagedSourcePath = NormalizeRelativePath(
+            Path.GetRelativePath(projectDirectory, engineManagedSourceDirectory));
+
         ReplaceTokensInTextFiles(projectDirectory, GameNameToken, gameName);
+        ReplaceTokensInTextFiles(projectDirectory, EngineManagedSourceRelativeToken, relativeManagedSourcePath);
     }
 
     private static void EnsureGameAssetsDirectory(string projectDirectory)
@@ -110,6 +123,39 @@ internal static class ProjectTemplateInitializer
         }
 
         return null;
+    }
+
+    private static string? ResolveEngineManagedSourceDirectory()
+    {
+        string fromCurrentDirectory = Path.Combine(Environment.CurrentDirectory, "engine", "managed", "src");
+        if (Directory.Exists(fromCurrentDirectory))
+        {
+            return fromCurrentDirectory;
+        }
+
+        DirectoryInfo? probe = new(AppContext.BaseDirectory);
+        while (probe is not null)
+        {
+            string candidate = Path.Combine(probe.FullName, "engine", "managed", "src");
+            if (Directory.Exists(candidate))
+            {
+                return candidate;
+            }
+
+            probe = probe.Parent;
+        }
+
+        return null;
+    }
+
+    private static string NormalizeRelativePath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return ".";
+        }
+
+        return path.Replace('\\', '/');
     }
 
     private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
