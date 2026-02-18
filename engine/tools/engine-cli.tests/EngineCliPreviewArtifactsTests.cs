@@ -32,6 +32,7 @@ public sealed class EngineCliPreviewArtifactsTests
             string audioPreview = Path.Combine(previewRoot, "audio", "audio_ambience.png");
             string waveformImage = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.png");
             string waveformMetadata = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.json");
+            string compressedWaveform = Path.Combine(previewRoot, "audio", "audio_ambience.waveform.pcm16.gz");
             string manifestPath = Path.Combine(previewRoot, "manifest.json");
 
             Assert.True(File.Exists(meshPreview));
@@ -40,7 +41,9 @@ public sealed class EngineCliPreviewArtifactsTests
             Assert.True(File.Exists(audioPreview));
             Assert.True(File.Exists(waveformImage));
             Assert.True(File.Exists(waveformMetadata));
+            Assert.True(File.Exists(compressedWaveform));
             Assert.True(File.Exists(manifestPath));
+            Assert.True(new FileInfo(compressedWaveform).Length > 0);
 
             Assert.Equal(((uint)96, (uint)96), ReadPngDimensions(meshPreview));
             Assert.Equal(((uint)256, (uint)64), ReadPngDimensions(waveformImage));
@@ -51,10 +54,13 @@ public sealed class EngineCliPreviewArtifactsTests
                 entry.GetProperty("kind").GetString() == "audio-waveform-preview");
             Assert.Contains(artifacts.EnumerateArray(), static entry =>
                 entry.GetProperty("kind").GetString() == "audio-waveform");
+            Assert.Contains(artifacts.EnumerateArray(), static entry =>
+                entry.GetProperty("kind").GetString() == "audio-compressed-preview");
 
             using JsonDocument waveform = JsonDocument.Parse(File.ReadAllText(waveformMetadata));
             Assert.Equal("audio/ambience.wav", waveform.RootElement.GetProperty("source").GetString());
             Assert.Equal("audio", waveform.RootElement.GetProperty("kind").GetString());
+            Assert.Equal("audio/audio_ambience.waveform.pcm16.gz", waveform.RootElement.GetProperty("compressedPreviewPath").GetString());
             Assert.True(waveform.RootElement.GetProperty("samples").GetArrayLength() >= 128);
         }
         finally
@@ -96,9 +102,12 @@ public sealed class EngineCliPreviewArtifactsTests
             byte[] secondMesh = File.ReadAllBytes(Path.Combine(tempRoot, "artifacts", "preview-b", "meshes", "mesh_cube.png"));
             byte[] firstWave = File.ReadAllBytes(Path.Combine(tempRoot, "artifacts", "preview-a", "audio", "audio_ambience.waveform.png"));
             byte[] secondWave = File.ReadAllBytes(Path.Combine(tempRoot, "artifacts", "preview-b", "audio", "audio_ambience.waveform.png"));
+            byte[] firstCompressed = File.ReadAllBytes(Path.Combine(tempRoot, "artifacts", "preview-a", "audio", "audio_ambience.waveform.pcm16.gz"));
+            byte[] secondCompressed = File.ReadAllBytes(Path.Combine(tempRoot, "artifacts", "preview-b", "audio", "audio_ambience.waveform.pcm16.gz"));
 
             Assert.Equal(firstMesh, secondMesh);
             Assert.Equal(firstWave, secondWave);
+            Assert.Equal(firstCompressed, secondCompressed);
         }
         finally
         {

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.IO.Compression;
 using System.Text.Json;
 using Engine.AssetPipeline;
 using Engine.Testing;
@@ -52,7 +53,20 @@ internal static class PreviewArtifactGenerator
 
             string waveformMetadataRelativePath = BuildWaveformMetadataRelativePath(entry.Path);
             string waveformMetadataFullPath = Path.Combine(outputDirectory, waveformMetadataRelativePath);
-            WriteWaveformMetadata(waveformMetadataFullPath, entry, waveformSamples);
+            string compressedPreviewRelativePath = BuildCompressedWaveformRelativePath(entry.Path);
+            string compressedPreviewFullPath = Path.Combine(outputDirectory, compressedPreviewRelativePath);
+            WriteCompressedWaveformPreview(compressedPreviewFullPath, waveformSamples);
+            manifestEntries.Add(
+                new TestingArtifactEntry(
+                    Kind: "audio-compressed-preview",
+                    RelativePath: NormalizePath(compressedPreviewRelativePath),
+                    Description: $"Compressed waveform preview for '{entry.Path}'."));
+
+            WriteWaveformMetadata(
+                waveformMetadataFullPath,
+                entry,
+                waveformSamples,
+                compressedPreviewRelativePath);
             manifestEntries.Add(
                 new TestingArtifactEntry(
                     Kind: "audio-waveform",
@@ -122,7 +136,8 @@ internal static class PreviewArtifactGenerator
     private static void WriteWaveformMetadata(
         string path,
         PakEntry entry,
-        IReadOnlyList<float> samples)
+        IReadOnlyList<float> samples,
+        string compressedPreviewRelativePath)
     {
         string? directory = Path.GetDirectoryName(path);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -139,6 +154,7 @@ internal static class PreviewArtifactGenerator
                 kind = entry.Kind,
                 sampleRate,
                 durationSeconds = duration.ToString("F6", CultureInfo.InvariantCulture),
+                compressedPreviewPath = NormalizePath(compressedPreviewRelativePath),
                 samples = samples
             },
             ArtifactOutputWriter.SerializerOptions);
@@ -195,6 +211,12 @@ internal static class PreviewArtifactGenerator
         return Path.Combine("audio", $"{safeName}.waveform.json");
     }
 
+    private static string BuildCompressedWaveformRelativePath(string sourceAssetPath)
+    {
+        string safeName = BuildSafeAssetToken(NormalizePath(sourceAssetPath));
+        return Path.Combine("audio", $"{safeName}.waveform.pcm16.gz");
+    }
+
     private static string BuildSafeAssetToken(string sourceAssetPath)
     {
         string withoutExtension = Path.ChangeExtension(sourceAssetPath, null) ?? sourceAssetPath;
@@ -228,6 +250,34 @@ internal static class PreviewArtifactGenerator
         value *= 1274126177u;
         value ^= value >> 16;
         return value;
+    }
+
+    private static void WriteCompressedWaveformPreview(string path, IReadOnlyList<float> samples)
+    {
+        string? directory = Path.GetDirectoryName(path);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        byte[] pcm16 = BuildPcm16(samples);
+        using var fileStream = File.Create(path);
+        using var gzipStream = new GZipStream(fileStream, CompressionLevel.Optimal, leaveOpen: false);
+        gzipStream.Write(pcm16);
+    }
+
+    private static byte[] BuildPcm16(IReadOnlyList<float> samples)
+    {
+        var bytes = new byte[samples.Count * sizeof(short)];
+        for (int i = 0; i < samples.Count; i++)
+        {
+            short sample = (short)Math.Clamp((int)MathF.Round(samples[i] * short.MaxValue), short.MinValue, short.MaxValue);
+            int offset = i * sizeof(short);
+            bytes[offset] = unchecked((byte)(sample & 0xFF));
+            bytes[offset + 1] = unchecked((byte)((sample >> 8) & 0xFF));
+        }
+
+        return bytes;
     }
 
     private static void FillSolid(
