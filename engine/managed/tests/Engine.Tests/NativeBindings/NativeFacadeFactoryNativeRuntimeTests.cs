@@ -61,6 +61,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         Assert.Equal(
             [
+                "engine_get_native_api_version",
                 "engine_create",
                 "engine_get_renderer",
                 "engine_get_physics",
@@ -466,7 +467,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         Assert.Contains("engine_create", exception.Message, StringComparison.Ordinal);
         Assert.Contains("VersionMismatch", exception.Message, StringComparison.Ordinal);
-        Assert.Equal(["engine_create"], backend.Calls);
+        Assert.Equal(["engine_get_native_api_version", "engine_create"], backend.Calls);
     }
 
     private static RenderPacket CreatePacket(EntityId entity)

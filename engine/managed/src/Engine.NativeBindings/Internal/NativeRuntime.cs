@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
@@ -36,6 +37,12 @@ internal sealed partial class NativeRuntime
     public NativeRuntime(INativeInteropApi interop)
     {
         _interop = interop ?? throw new ArgumentNullException(nameof(interop));
+        uint nativeApiVersion = _interop.EngineGetNativeApiVersion();
+        if (nativeApiVersion != EngineNativeConstants.ApiVersion)
+        {
+            throw new InvalidDataException(
+                $"Native API version mismatch. Managed expects {EngineNativeConstants.ApiVersion}, native reports {nativeApiVersion}.");
+        }
 
         var createDesc = new EngineNativeCreateDesc
         {
