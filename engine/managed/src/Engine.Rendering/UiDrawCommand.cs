@@ -13,6 +13,18 @@ public readonly record struct UiDrawCommand
         uint indexOffset,
         uint indexCount,
         RectF bounds)
+        : this(texture, vertexOffset, vertexCount, indexOffset, indexCount, bounds, bounds)
+    {
+    }
+
+    public UiDrawCommand(
+        TextureHandle texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount,
+        RectF bounds,
+        RectF scissorRect)
     {
         if (!texture.IsValid)
         {
@@ -35,6 +47,7 @@ public readonly record struct UiDrawCommand
         IndexOffset = indexOffset;
         IndexCount = indexCount;
         Bounds = bounds;
+        ScissorRect = scissorRect;
     }
 
     public UiDrawCommand(
@@ -54,7 +67,19 @@ public readonly record struct UiDrawCommand
         uint indexOffset,
         uint indexCount,
         RectF bounds)
-        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount, bounds)
+        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount, bounds, bounds)
+    {
+    }
+
+    public UiDrawCommand(
+        uint texture,
+        uint vertexOffset,
+        uint vertexCount,
+        uint indexOffset,
+        uint indexCount,
+        RectF bounds,
+        RectF scissorRect)
+        : this(new TextureHandle(texture), vertexOffset, vertexCount, indexOffset, indexCount, bounds, scissorRect)
     {
     }
 
@@ -79,4 +104,6 @@ public readonly record struct UiDrawCommand
     public uint IndexCount { get; }
 
     public RectF Bounds { get; }
+
+    public RectF ScissorRect { get; }
 }
