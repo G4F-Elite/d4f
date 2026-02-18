@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 13u
+#define ENGINE_NATIVE_API_VERSION 14u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
