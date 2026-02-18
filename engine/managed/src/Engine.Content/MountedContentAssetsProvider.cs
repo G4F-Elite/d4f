@@ -5,10 +5,19 @@ namespace Engine.Content;
 public sealed class MountedContentAssetsProvider : IAssetsProvider
 {
     private readonly IContentRuntimeFacade _contentRuntime;
+    private readonly AssetsRuntimeMode _runtimeMode;
 
-    public MountedContentAssetsProvider(IContentRuntimeFacade contentRuntime)
+    public MountedContentAssetsProvider(
+        IContentRuntimeFacade contentRuntime,
+        AssetsRuntimeMode runtimeMode = AssetsRuntimeMode.Development)
     {
         _contentRuntime = contentRuntime ?? throw new ArgumentNullException(nameof(contentRuntime));
+        if (!Enum.IsDefined(runtimeMode))
+        {
+            throw new ArgumentOutOfRangeException(nameof(runtimeMode), runtimeMode, "Unsupported assets runtime mode.");
+        }
+
+        _runtimeMode = runtimeMode;
     }
 
     public void MountPak(string pakPath)
@@ -18,6 +27,12 @@ public sealed class MountedContentAssetsProvider : IAssetsProvider
 
     public void MountDirectory(string directoryPath)
     {
+        if (_runtimeMode == AssetsRuntimeMode.PakOnly)
+        {
+            throw new InvalidOperationException(
+                "Mounted content provider is running in pak-only mode and cannot mount development directories.");
+        }
+
         _contentRuntime.MountDirectory(directoryPath);
     }
 

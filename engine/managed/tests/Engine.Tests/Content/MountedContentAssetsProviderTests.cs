@@ -20,6 +20,26 @@ public sealed class MountedContentAssetsProviderTests
     }
 
     [Fact]
+    public void MountDirectory_ShouldThrowInPakOnlyMode()
+    {
+        var runtime = new FakeContentRuntimeFacade();
+        var provider = new MountedContentAssetsProvider(runtime, AssetsRuntimeMode.PakOnly);
+
+        InvalidOperationException exception = Assert.Throws<InvalidOperationException>(() => provider.MountDirectory("D:/game/dev-content"));
+        Assert.Contains("pak-only", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Null(runtime.LastMountedDirectoryPath);
+    }
+
+    [Fact]
+    public void Constructor_ShouldValidateRuntimeMode()
+    {
+        var runtime = new FakeContentRuntimeFacade();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            _ = new MountedContentAssetsProvider(runtime, (AssetsRuntimeMode)999));
+    }
+
+    [Fact]
     public void Load_ShouldReturnRawBytes_WhenRequestedTypeIsByteArray()
     {
         var runtime = new FakeContentRuntimeFacade();
