@@ -4,6 +4,7 @@
     <ProjectReference Include="..\Engine.Audio\Engine.Audio.csproj" />
     <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
     <ProjectReference Include="..\Engine.ECS\Engine.ECS.csproj" />
+    <ProjectReference Include="..\Engine.Net\Engine.Net.csproj" />
     <ProjectReference Include="..\Engine.Physics\Engine.Physics.csproj" />
     <ProjectReference Include="..\Engine.Rendering\Engine.Rendering.csproj" />
     <ProjectReference Include="..\Engine.UI\Engine.UI.csproj" />

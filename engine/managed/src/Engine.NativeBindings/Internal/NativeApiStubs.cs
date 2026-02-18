@@ -174,6 +174,41 @@ internal sealed class NativeContentApiStub : INativeContentApi
     }
 }
 
+internal sealed class NativeNetApiStub : INativeNetApi
+{
+    private readonly Queue<NativeNetEventData> _events = new();
+
+    public IReadOnlyList<NativeNetEventData> NetPump()
+    {
+        if (_events.Count == 0)
+        {
+            return Array.Empty<NativeNetEventData>();
+        }
+
+        var drained = new NativeNetEventData[_events.Count];
+        for (var i = 0; i < drained.Length; i++)
+        {
+            drained[i] = _events.Dequeue();
+        }
+
+        return drained;
+    }
+
+    public void NetSend(uint peerId, byte channel, ReadOnlySpan<byte> payload)
+    {
+        if (peerId == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(peerId), "Peer id must be greater than zero.");
+        }
+
+        _events.Enqueue(new NativeNetEventData(
+            (byte)EngineNativeNetEventKind.Message,
+            channel,
+            peerId,
+            payload.ToArray()));
+    }
+}
+
 internal sealed class NativeRenderingApiStub : INativeRenderingApi
 {
     public FrameArena BeginFrame(int requestedBytes, int alignment)

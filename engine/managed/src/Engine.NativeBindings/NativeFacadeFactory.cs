@@ -6,6 +6,7 @@ using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.NativeBindings.Internal;
 using Engine.NativeBindings.Internal.Interop;
+using Engine.Net;
 using Engine.Physics;
 using Engine.Rendering;
 using Engine.UI;
@@ -27,6 +28,8 @@ public static class NativeFacadeFactory
 
     public static IContentRuntimeFacade CreateContentRuntimeFacade() => new NativeContentRuntimeFacade(new NativeContentApiStub());
 
+    public static INetFacade CreateNetFacade() => new NativeNetFacade(new NativeNetApiStub());
+
     public static IUiFacade CreateUiFacade() => new NativeUiFacade(new NativeUiApiStub());
 
     public static IRenderingFacade CreateRenderingFacade() => new NativeRenderingFacade(new NativeRenderingApiStub());
@@ -40,6 +43,8 @@ public static class NativeFacadeFactory
     internal static IAudioFacade CreateAudioFacade(INativeAudioApi nativeApi) => new NativeAudioFacade(nativeApi);
 
     internal static IContentRuntimeFacade CreateContentRuntimeFacade(INativeContentApi nativeApi) => new NativeContentRuntimeFacade(nativeApi);
+
+    internal static INetFacade CreateNetFacade(INativeNetApi nativeApi) => new NativeNetFacade(nativeApi);
 
     internal static IUiFacade CreateUiFacade(INativeUiApi nativeApi) => new NativeUiFacade(nativeApi);
 
@@ -271,6 +276,69 @@ public static class NativeFacadeFactory
                                      recipe.Envelope.DecaySeconds +
                                      recipe.Envelope.ReleaseSeconds;
             return MathF.Max(0.25f, envelopeDuration + 0.25f);
+        }
+    }
+
+    private sealed class NativeNetFacade : INetFacade
+    {
+        private readonly INativeNetApi _nativeApi;
+
+        public NativeNetFacade(INativeNetApi nativeApi)
+        {
+            _nativeApi = nativeApi ?? throw new ArgumentNullException(nameof(nativeApi));
+        }
+
+        public IReadOnlyList<NetEvent> Pump()
+        {
+            IReadOnlyList<NativeNetEventData> nativeEvents = _nativeApi.NetPump();
+            if (nativeEvents.Count == 0)
+            {
+                return Array.Empty<NetEvent>();
+            }
+
+            var events = new NetEvent[nativeEvents.Count];
+            for (var i = 0; i < events.Length; i++)
+            {
+                NativeNetEventData native = nativeEvents[i];
+                events[i] = new NetEvent(
+                    MapEventKind(native.Kind),
+                    MapChannel(native.Channel),
+                    native.PeerId,
+                    native.Payload);
+            }
+
+            return events;
+        }
+
+        public void Send(uint peerId, NetworkChannel channel, ReadOnlySpan<byte> payload)
+        {
+            if (!Enum.IsDefined(channel))
+            {
+                throw new InvalidDataException($"Unsupported network channel value: {channel}.");
+            }
+
+            _nativeApi.NetSend(peerId, (byte)channel, payload);
+        }
+
+        private static NetEventKind MapEventKind(byte kind)
+        {
+            return kind switch
+            {
+                (byte)EngineNativeNetEventKind.Connected => NetEventKind.Connected,
+                (byte)EngineNativeNetEventKind.Disconnected => NetEventKind.Disconnected,
+                (byte)EngineNativeNetEventKind.Message => NetEventKind.Message,
+                _ => throw new InvalidDataException($"Unsupported native net event kind value: {kind}.")
+            };
+        }
+
+        private static NetworkChannel MapChannel(byte channel)
+        {
+            return channel switch
+            {
+                (byte)NetworkChannel.ReliableOrdered => NetworkChannel.ReliableOrdered,
+                (byte)NetworkChannel.Unreliable => NetworkChannel.Unreliable,
+                _ => throw new InvalidDataException($"Unsupported native network channel value: {channel}.")
+            };
         }
     }
 

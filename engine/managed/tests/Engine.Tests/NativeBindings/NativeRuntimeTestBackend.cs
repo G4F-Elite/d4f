@@ -117,6 +117,10 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus NetSendStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeNetSendDesc? LastNetSendDesc { get; private set; }
+
+    public byte[] LastNetSendPayload { get; private set; } = Array.Empty<byte>();
+
     public ulong CaptureRequestIdToReturn { get; set; } = 1u;
 
     public ulong AudioSoundHandleToReturn { get; set; } = 0x1_0000_1001UL;
@@ -530,6 +534,17 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeStatus NetSend(IntPtr net, in EngineNativeNetSendDesc sendDesc)
     {
         Calls.Add("net_send");
+        LastNetSendDesc = sendDesc;
+        if (sendDesc.Payload != IntPtr.Zero && sendDesc.PayloadSize > 0u)
+        {
+            LastNetSendPayload = new byte[checked((int)sendDesc.PayloadSize)];
+            Marshal.Copy(sendDesc.Payload, LastNetSendPayload, 0, LastNetSendPayload.Length);
+        }
+        else
+        {
+            LastNetSendPayload = Array.Empty<byte>();
+        }
+
         return NetSendStatus;
     }
 

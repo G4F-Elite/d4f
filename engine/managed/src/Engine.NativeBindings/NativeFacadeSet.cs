@@ -2,6 +2,7 @@ using System;
 using Engine.Audio;
 using Engine.Core.Abstractions;
 using Engine.NativeBindings.Internal;
+using Engine.Net;
 using Engine.Physics;
 using Engine.Rendering;
 using Engine.UI;
@@ -20,6 +21,7 @@ public sealed class NativeFacadeSet : IDisposable
         Physics = NativeFacadeFactory.CreatePhysicsFacade(runtime);
         Audio = NativeFacadeFactory.CreateAudioFacade(runtime);
         Content = NativeFacadeFactory.CreateContentRuntimeFacade(runtime);
+        Net = NativeFacadeFactory.CreateNetFacade(runtime);
         Ui = NativeFacadeFactory.CreateUiFacade(new NativeUiApiStub());
         Rendering = NativeFacadeFactory.CreateRenderingFacade(runtime);
     }
@@ -33,6 +35,8 @@ public sealed class NativeFacadeSet : IDisposable
     public IAudioFacade Audio { get; }
 
     public IContentRuntimeFacade Content { get; }
+
+    public INetFacade Net { get; }
 
     public IUiFacade Ui { get; }
 

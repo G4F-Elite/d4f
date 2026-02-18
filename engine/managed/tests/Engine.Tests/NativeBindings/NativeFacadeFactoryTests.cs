@@ -2,6 +2,7 @@ using System;
 using Engine.Core.Timing;
 using Engine.ECS;
 using Engine.NativeBindings;
+using Engine.Net;
 using Engine.Physics;
 using Engine.Rendering;
 using Xunit;
@@ -17,6 +18,7 @@ public sealed class NativeFacadeFactoryTests
         var timing = NativeFacadeFactory.CreateTimingFacade();
         var physics = NativeFacadeFactory.CreatePhysicsFacade();
         var content = NativeFacadeFactory.CreateContentRuntimeFacade();
+        var net = NativeFacadeFactory.CreateNetFacade();
         var ui = NativeFacadeFactory.CreateUiFacade();
         var rendering = NativeFacadeFactory.CreateRenderingFacade();
 
@@ -43,6 +45,12 @@ public sealed class NativeFacadeFactoryTests
             overlapHits));
         content.MountDirectory("D:/content");
         Assert.Throws<FileNotFoundException>(() => content.ReadFile("assets/missing.bin"));
+        net.Send(77u, NetworkChannel.Unreliable, [1, 2, 3]);
+        NetEvent netEvent = Assert.Single(net.Pump());
+        Assert.Equal(NetEventKind.Message, netEvent.Kind);
+        Assert.Equal(NetworkChannel.Unreliable, netEvent.Channel);
+        Assert.Equal(77u, netEvent.PeerId);
+        Assert.Equal([1, 2, 3], netEvent.Payload);
 
         ui.Update(world, frame1);
         using var frameArena = rendering.BeginFrame(1024, 64);

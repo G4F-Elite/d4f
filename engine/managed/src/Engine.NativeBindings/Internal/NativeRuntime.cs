@@ -17,6 +17,7 @@ internal sealed partial class NativeRuntime
       INativePhysicsApi,
       INativeAudioApi,
       INativeContentApi,
+      INativeNetApi,
       INativeRenderingApi,
       IDisposable
 {

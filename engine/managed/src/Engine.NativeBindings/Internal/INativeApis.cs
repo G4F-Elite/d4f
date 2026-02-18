@@ -58,6 +58,19 @@ internal interface INativeContentApi
     byte[] ContentReadFile(string assetPath);
 }
 
+internal readonly record struct NativeNetEventData(
+    byte Kind,
+    byte Channel,
+    uint PeerId,
+    byte[] Payload);
+
+internal interface INativeNetApi
+{
+    IReadOnlyList<NativeNetEventData> NetPump();
+
+    void NetSend(uint peerId, byte channel, ReadOnlySpan<byte> payload);
+}
+
 internal interface INativeRenderingApi
 {
     FrameArena BeginFrame(int requestedBytes, int alignment);
