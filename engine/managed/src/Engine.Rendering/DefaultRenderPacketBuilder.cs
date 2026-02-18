@@ -9,10 +9,8 @@ namespace Engine.Rendering;
 public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 {
     public static DefaultRenderPacketBuilder Instance { get; } = new();
-    private readonly List<(EntityId Entity, RenderMeshInstance Component)> _renderMeshInstances = new(128);
-    private readonly List<DrawCommand> _drawCommands = new(128);
-    private readonly List<(EntityId Entity, UiRenderBatch Batch)> _uiBatches = new(64);
-    private readonly List<UiDrawCommand> _uiCommands = new(256);
+    [ThreadStatic]
+    private static BuilderScratch? s_scratch;
 
     private DefaultRenderPacketBuilder()
     {
@@ -27,8 +25,9 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
     {
         ArgumentNullException.ThrowIfNull(world);
         ArgumentNullException.ThrowIfNull(frameArena);
-        IReadOnlyList<DrawCommand> drawCommands = CollectDrawCommands(world);
-        IReadOnlyList<UiDrawCommand> uiCommands = CollectUiCommands(world);
+        BuilderScratch scratch = s_scratch ??= new BuilderScratch();
+        IReadOnlyList<DrawCommand> drawCommands = CollectDrawCommands(world, scratch);
+        IReadOnlyList<UiDrawCommand> uiCommands = CollectUiCommands(world, scratch);
 
         return RenderPacketMarshaller.Marshal(
             timing.FrameNumber,
@@ -39,41 +38,41 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             renderSettings.FeatureFlags);
     }
 
-    private IReadOnlyList<DrawCommand> CollectDrawCommands(World world)
+    private static IReadOnlyList<DrawCommand> CollectDrawCommands(World world, BuilderScratch scratch)
     {
-        _renderMeshInstances.Clear();
-        world.QueryNonAlloc(_renderMeshInstances);
+        scratch.RenderMeshInstances.Clear();
+        world.QueryNonAlloc(scratch.RenderMeshInstances);
 
-        _drawCommands.Clear();
-        for (int i = 0; i < _renderMeshInstances.Count; i++)
+        scratch.DrawCommands.Clear();
+        for (int i = 0; i < scratch.RenderMeshInstances.Count; i++)
         {
-            (EntityId entity, RenderMeshInstance instance) = _renderMeshInstances[i];
+            (EntityId entity, RenderMeshInstance instance) = scratch.RenderMeshInstances[i];
             if (!TryCreateDrawCommand(entity, in instance, out DrawCommand drawCommand))
             {
                 continue;
             }
 
-            _drawCommands.Add(drawCommand);
+            scratch.DrawCommands.Add(drawCommand);
         }
 
-        return _drawCommands;
+        return scratch.DrawCommands;
     }
 
-    private IReadOnlyList<UiDrawCommand> CollectUiCommands(World world)
+    private static IReadOnlyList<UiDrawCommand> CollectUiCommands(World world, BuilderScratch scratch)
     {
-        _uiBatches.Clear();
-        world.QueryNonAlloc(_uiBatches);
+        scratch.UiBatches.Clear();
+        world.QueryNonAlloc(scratch.UiBatches);
 
-        if (_uiBatches.Count == 0)
+        if (scratch.UiBatches.Count == 0)
         {
-            _uiCommands.Clear();
-            return _uiCommands;
+            scratch.UiCommands.Clear();
+            return scratch.UiCommands;
         }
 
         int writeIndex = 0;
-        for (int i = 0; i < _uiBatches.Count; i++)
+        for (int i = 0; i < scratch.UiBatches.Count; i++)
         {
-            (EntityId entity, UiRenderBatch batch) = _uiBatches[i];
+            (EntityId entity, UiRenderBatch batch) = scratch.UiBatches[i];
             if (batch.Commands.Count == 0)
             {
                 continue;
@@ -81,7 +80,7 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 
             if (writeIndex != i)
             {
-                _uiBatches[writeIndex] = (entity, batch);
+                scratch.UiBatches[writeIndex] = (entity, batch);
             }
 
             writeIndex++;
@@ -89,17 +88,17 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
 
         if (writeIndex == 0)
         {
-            _uiBatches.Clear();
-            _uiCommands.Clear();
-            return _uiCommands;
+            scratch.UiBatches.Clear();
+            scratch.UiCommands.Clear();
+            return scratch.UiCommands;
         }
 
-        if (writeIndex < _uiBatches.Count)
+        if (writeIndex < scratch.UiBatches.Count)
         {
-            _uiBatches.RemoveRange(writeIndex, _uiBatches.Count - writeIndex);
+            scratch.UiBatches.RemoveRange(writeIndex, scratch.UiBatches.Count - writeIndex);
         }
 
-        _uiBatches.Sort(static (left, right) =>
+        scratch.UiBatches.Sort(static (left, right) =>
         {
             int byIndex = left.Entity.Index.CompareTo(right.Entity.Index);
             if (byIndex != 0)
@@ -110,13 +109,13 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             return left.Entity.Generation.CompareTo(right.Entity.Generation);
         });
 
-        _uiCommands.Clear();
-        for (int i = 0; i < _uiBatches.Count; i++)
+        scratch.UiCommands.Clear();
+        for (int i = 0; i < scratch.UiBatches.Count; i++)
         {
-            _uiCommands.AddRange(_uiBatches[i].Batch.Commands);
+            scratch.UiCommands.AddRange(scratch.UiBatches[i].Batch.Commands);
         }
 
-        return _uiCommands;
+        return scratch.UiCommands;
     }
 
     private static bool TryCreateDrawCommand(
@@ -142,5 +141,16 @@ public sealed class DefaultRenderPacketBuilder : IRenderPacketBuilder
             instance.SortKeyHigh,
             instance.SortKeyLow);
         return true;
+    }
+
+    private sealed class BuilderScratch
+    {
+        public List<(EntityId Entity, RenderMeshInstance Component)> RenderMeshInstances { get; } = new(128);
+
+        public List<DrawCommand> DrawCommands { get; } = new(128);
+
+        public List<(EntityId Entity, UiRenderBatch Batch)> UiBatches { get; } = new(64);
+
+        public List<UiDrawCommand> UiCommands { get; } = new(256);
     }
 }
