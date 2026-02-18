@@ -48,6 +48,30 @@ public sealed class ProceduralTextureBuilderDomainWarpTests
     }
 
     [Fact]
+    public void GenerateHeight_WithDomainWarpOctaves_ChangesSignalShape()
+    {
+        ProceduralTextureRecipe singleOctave = new(
+            Kind: ProceduralTextureKind.Perlin,
+            Width: 48,
+            Height: 32,
+            Seed: 700u,
+            FbmOctaves: 4,
+            Frequency: 6f,
+            DomainWarpStrength: 0.24f,
+            DomainWarpFrequency: 7f,
+            DomainWarpOctaves: 1);
+        ProceduralTextureRecipe multiOctave = singleOctave with
+        {
+            DomainWarpOctaves = 4
+        };
+
+        float[] first = TextureBuilder.GenerateHeight(singleOctave);
+        float[] second = TextureBuilder.GenerateHeight(multiOctave);
+
+        Assert.NotEqual(first, second);
+    }
+
+    [Fact]
     public void GenerateHeight_WithZeroDomainWarpStrength_MatchesPlainNoise()
     {
         ProceduralTextureRecipe recipeA = new(
@@ -99,5 +123,15 @@ public sealed class ProceduralTextureBuilderDomainWarpTests
             DomainWarpStrength: 0.1f,
             DomainWarpFrequency: float.NaN);
         Assert.Throws<ArgumentOutOfRangeException>(() => nanFrequency.Validate());
+
+        ProceduralTextureRecipe zeroOctaves = new(
+            Kind: ProceduralTextureKind.Perlin,
+            Width: 8,
+            Height: 8,
+            Seed: 1u,
+            DomainWarpStrength: 0.1f,
+            DomainWarpFrequency: 4f,
+            DomainWarpOctaves: 0);
+        Assert.Throws<ArgumentOutOfRangeException>(() => zeroOctaves.Validate());
     }
 }

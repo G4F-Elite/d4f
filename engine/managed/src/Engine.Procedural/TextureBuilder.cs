@@ -20,7 +20,8 @@ public sealed record ProceduralTextureRecipe(
     int FbmOctaves = 4,
     float Frequency = 4f,
     float DomainWarpStrength = 0f,
-    float DomainWarpFrequency = 8f)
+    float DomainWarpFrequency = 8f,
+    int DomainWarpOctaves = 2)
 {
     public ProceduralTextureRecipe Validate()
     {
@@ -52,6 +53,11 @@ public sealed record ProceduralTextureRecipe(
         if (!float.IsFinite(DomainWarpFrequency) || DomainWarpFrequency <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(DomainWarpFrequency), "Domain warp frequency must be finite and greater than zero.");
+        }
+
+        if (DomainWarpOctaves <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(DomainWarpOctaves), "Domain warp octaves must be greater than zero.");
         }
 
         return this;
