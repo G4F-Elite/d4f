@@ -236,6 +236,39 @@ public sealed class EngineCliPackPipelineTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldSkipPublish_WhenRuntimeProjectIsMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareAssetManifest(tempRoot);
+            var runner = new RecordingCommandRunner();
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(
+            [
+                "pack",
+                "--project", tempRoot,
+                "--manifest", "assets/manifest.json",
+                "--runtime", "win-x64"
+            ]);
+
+            Assert.Equal(0, code);
+            Assert.Empty(runner.Invocations);
+            Assert.Contains("Publish skipped: runtime .csproj was not found", output.ToString(), StringComparison.Ordinal);
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "Game.pak")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
     private static void PrepareAssetManifest(string rootPath)
     {
         string assetsDirectory = Path.Combine(rootPath, "assets");
