@@ -496,6 +496,7 @@ public sealed class EngineCliAppValidationTests
             Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "dumps", "albedo-0001.png")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba8.bin")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr")));
             Assert.Contains("Render stats: draw=", output.ToString(), StringComparison.Ordinal);
 
             (uint width, uint height) = ReadPngDimensions(screenshotPath);

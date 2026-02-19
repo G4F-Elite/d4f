@@ -35,10 +35,18 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.rgba8.bin")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.rgba16f.bin")));
+            string screenshotExrPath = Path.Combine(artifactsRoot, "screenshots", "frame-0012.rgba16f.exr");
+            Assert.True(File.Exists(screenshotExrPath));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "albedo-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "normals-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "depth-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "shadow-0012.png")));
+            ExrHeaderInfo screenshotExr = ReadExrHeader(screenshotExrPath);
+            Assert.Equal(64, screenshotExr.Width);
+            Assert.Equal(64, screenshotExr.Height);
+            Assert.Equal(0, screenshotExr.Compression);
+            Assert.True(screenshotExr.HasScanlineLineOrder);
+            Assert.Equal(["R", "G", "B", "A"], screenshotExr.Channels);
             string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
             string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
             string snapshotBinaryPath = Path.Combine(artifactsRoot, "net", "multiplayer-snapshot.bin");
@@ -221,6 +229,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "screenshot-buffer-rgba16f",
                     StringComparison.Ordinal));
             Assert.True(hasScreenshotRgba16f);
+            bool hasScreenshotRgba16fExr = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "screenshot-buffer-rgba16f-exr",
+                    StringComparison.Ordinal));
+            Assert.True(hasScreenshotRgba16fExr);
         }
         finally
         {
@@ -251,5 +265,123 @@ public sealed class EngineCliTestCaptureOptionsTests
         }
     }
 
+    private static ExrHeaderInfo ReadExrHeader(string filePath)
+    {
+        byte[] bytes = File.ReadAllBytes(filePath);
+        Assert.True(bytes.Length > 64);
+
+        int offset = 0;
+        uint magic = ReadUInt32(bytes, ref offset);
+        Assert.Equal(20000630u, magic);
+
+        uint version = ReadUInt32(bytes, ref offset);
+        Assert.Equal(2u, version & 0xFFu);
+
+        var channels = new List<string>();
+        int compression = -1;
+        int width = -1;
+        int height = -1;
+        bool lineOrderScanline = false;
+
+        while (offset < bytes.Length)
+        {
+            string name = ReadNullTerminatedAscii(bytes, ref offset);
+            if (name.Length == 0)
+            {
+                break;
+            }
+
+            string type = ReadNullTerminatedAscii(bytes, ref offset);
+            int valueSize = ReadInt32(bytes, ref offset);
+            Assert.True(valueSize >= 0);
+            Assert.True(offset + valueSize <= bytes.Length);
+
+            if (name == "channels" && type == "chlist")
+            {
+                int local = offset;
+                int limit = offset + valueSize;
+                while (local < limit)
+                {
+                    string channelName = ReadNullTerminatedAscii(bytes, ref local);
+                    if (channelName.Length == 0)
+                    {
+                        break;
+                    }
+
+                    channels.Add(channelName);
+                    local += 4;
+                    local += 1;
+                    local += 3;
+                    local += 4;
+                    local += 4;
+                }
+            }
+            else if (name == "compression" && type == "compression")
+            {
+                Assert.True(valueSize >= 1);
+                compression = bytes[offset];
+            }
+            else if ((name == "dataWindow" || name == "displayWindow") && type == "box2i")
+            {
+                if (name == "dataWindow")
+                {
+                    int local = offset;
+                    int minX = ReadInt32(bytes, ref local);
+                    int minY = ReadInt32(bytes, ref local);
+                    int maxX = ReadInt32(bytes, ref local);
+                    int maxY = ReadInt32(bytes, ref local);
+                    width = checked(maxX - minX + 1);
+                    height = checked(maxY - minY + 1);
+                }
+            }
+            else if (name == "lineOrder" && type == "lineOrder")
+            {
+                Assert.True(valueSize >= 1);
+                lineOrderScanline = bytes[offset] == 0;
+            }
+
+            offset += valueSize;
+        }
+
+        return new ExrHeaderInfo(width, height, compression, lineOrderScanline, channels);
+    }
+
+    private static uint ReadUInt32(byte[] bytes, ref int offset)
+    {
+        Assert.True(offset + 4 <= bytes.Length);
+        uint value = BitConverter.ToUInt32(bytes, offset);
+        offset += 4;
+        return value;
+    }
+
+    private static int ReadInt32(byte[] bytes, ref int offset)
+    {
+        Assert.True(offset + 4 <= bytes.Length);
+        int value = BitConverter.ToInt32(bytes, offset);
+        offset += 4;
+        return value;
+    }
+
+    private static string ReadNullTerminatedAscii(byte[] bytes, ref int offset)
+    {
+        int start = offset;
+        while (offset < bytes.Length && bytes[offset] != 0)
+        {
+            offset++;
+        }
+
+        Assert.True(offset < bytes.Length);
+        string value = System.Text.Encoding.ASCII.GetString(bytes, start, offset - start);
+        offset++;
+        return value;
+    }
+
     private sealed record CommandInvocation(string ExecutablePath, string[] Arguments, string WorkingDirectory);
+
+    private sealed record ExrHeaderInfo(
+        int Width,
+        int Height,
+        int Compression,
+        bool HasScanlineLineOrder,
+        IReadOnlyList<string> Channels);
 }

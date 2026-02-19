@@ -259,6 +259,16 @@ internal static class TestArtifactGenerator
                         Kind: $"{definition.Kind}-buffer-rgba16f",
                         RelativePath: NormalizePath(relativeFloatBufferPath),
                         Description: "Runtime RGBA16F capture buffer for HDR/readback verification."));
+
+                string relativeFloatExrPath = Path.ChangeExtension(definition.RelativeCapturePath, ".rgba16f.exr")
+                    ?? throw new InvalidDataException($"Unable to compute EXR capture path for '{definition.RelativeCapturePath}'.");
+                string fullFloatExrPath = Path.Combine(outputDirectory, relativeFloatExrPath);
+                Rgba16FExrCodec.Write(fullFloatExrPath, checked((int)CaptureWidth), checked((int)CaptureHeight), rgba16Float);
+                manifestEntries.Add(
+                    new TestingArtifactEntry(
+                        Kind: $"{definition.Kind}-buffer-rgba16f-exr",
+                        RelativePath: NormalizePath(relativeFloatExrPath),
+                        Description: "Runtime RGBA16F OpenEXR capture for HDR inspection workflows."));
             }
 
             captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
