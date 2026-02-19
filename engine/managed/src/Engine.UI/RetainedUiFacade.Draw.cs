@@ -351,26 +351,31 @@ public sealed partial class RetainedUiFacade
 
     private static TextLayoutResult ComputeTextLayout(UiText text, RectF bounds)
     {
-        const float glyphWidth = 8f;
-        const float lineHeight = 16f;
+        const float fallbackGlyphWidth = 8f;
+        const float fallbackLineHeight = 16f;
+        UiFontAtlas? fontAtlas = text.FontAtlas;
+        float lineHeight = fontAtlas?.LineHeight ?? fallbackLineHeight;
+        Func<char, float> resolveAdvance = fontAtlas is null
+            ? static _ => fallbackGlyphWidth
+            : fontAtlas.GetAdvance;
 
         if (bounds.Width <= 0f || bounds.Height <= 0f)
         {
             return new TextLayoutResult(0u, RectF.Empty);
         }
 
-        string[] lines = BuildTextLines(text.Content, text.WrapMode, bounds.Width, glyphWidth);
+        string[] lines = BuildTextLines(text.Content, text.WrapMode, bounds.Width, resolveAdvance);
         if (lines.Length == 0)
         {
             return new TextLayoutResult(0u, RectF.Empty);
         }
 
-        int maxCharsInLine = 0;
+        float maxLineWidth = 0f;
         int glyphCount = 0;
         for (int i = 0; i < lines.Length; i++)
         {
             string line = lines[i];
-            maxCharsInLine = Math.Max(maxCharsInLine, line.Length);
+            maxLineWidth = Math.Max(maxLineWidth, MeasureLineWidth(line, resolveAdvance));
             glyphCount += line.Length;
         }
 
@@ -379,7 +384,7 @@ public sealed partial class RetainedUiFacade
             return new TextLayoutResult(0u, RectF.Empty);
         }
 
-        float textWidth = Math.Min(bounds.Width, maxCharsInLine * glyphWidth);
+        float textWidth = Math.Min(bounds.Width, maxLineWidth);
         float textHeight = Math.Min(bounds.Height, lines.Length * lineHeight);
 
         float x = text.HorizontalAlignment switch
@@ -409,9 +414,10 @@ public sealed partial class RetainedUiFacade
         string content,
         UiTextWrapMode wrapMode,
         float availableWidth,
-        float glyphWidth)
+        Func<char, float> resolveAdvance)
     {
         ArgumentNullException.ThrowIfNull(content);
+        ArgumentNullException.ThrowIfNull(resolveAdvance);
         if (content.Length == 0)
         {
             return Array.Empty<string>();
@@ -422,7 +428,8 @@ public sealed partial class RetainedUiFacade
             return content.Split('\n', StringSplitOptions.None);
         }
 
-        int maxCharsPerLine = Math.Max(1, (int)MathF.Floor(availableWidth / glyphWidth));
+        float maxWidth = Math.Max(1f, availableWidth);
+        float spaceWidth = resolveAdvance(' ');
         var lines = new List<string>();
         string[] paragraphs = content.Split('\n', StringSplitOptions.None);
         for (int i = 0; i < paragraphs.Length; i++)
@@ -436,37 +443,48 @@ public sealed partial class RetainedUiFacade
 
             string[] words = paragraph.Split(' ', StringSplitOptions.None);
             string current = string.Empty;
+            float currentWidth = 0f;
             for (int wordIndex = 0; wordIndex < words.Length; wordIndex++)
             {
                 string word = words[wordIndex];
-                if (word.Length > maxCharsPerLine)
+                float wordWidth = MeasureLineWidth(word, resolveAdvance);
+
+                if (wordWidth > maxWidth)
                 {
                     if (current.Length > 0)
                     {
                         lines.Add(current);
                         current = string.Empty;
+                        currentWidth = 0f;
                     }
 
-                    int offset = 0;
-                    while (offset < word.Length)
+                    foreach (string chunk in SplitWordToWidth(word, maxWidth, resolveAdvance))
                     {
-                        int take = Math.Min(maxCharsPerLine, word.Length - offset);
-                        lines.Add(word.Substring(offset, take));
-                        offset += take;
+                        lines.Add(chunk);
                     }
 
                     continue;
                 }
 
-                string candidate = current.Length == 0 ? word : $"{current} {word}";
-                if (candidate.Length <= maxCharsPerLine)
+                if (current.Length == 0)
                 {
-                    current = candidate;
+                    current = word;
+                    currentWidth = wordWidth;
                 }
                 else
                 {
-                    lines.Add(current);
-                    current = word;
+                    float candidateWidth = currentWidth + spaceWidth + wordWidth;
+                    if (candidateWidth <= maxWidth)
+                    {
+                        current = $"{current} {word}";
+                        currentWidth = candidateWidth;
+                    }
+                    else
+                    {
+                        lines.Add(current);
+                        current = word;
+                        currentWidth = wordWidth;
+                    }
                 }
             }
 
@@ -477,6 +495,61 @@ public sealed partial class RetainedUiFacade
         }
 
         return lines.Count == 0 ? Array.Empty<string>() : lines.ToArray();
+    }
+
+    private static float MeasureLineWidth(string line, Func<char, float> resolveAdvance)
+    {
+        ArgumentNullException.ThrowIfNull(line);
+        ArgumentNullException.ThrowIfNull(resolveAdvance);
+
+        float width = 0f;
+        for (int i = 0; i < line.Length; i++)
+        {
+            width += resolveAdvance(line[i]);
+        }
+
+        return width;
+    }
+
+    private static IEnumerable<string> SplitWordToWidth(string word, float maxWidth, Func<char, float> resolveAdvance)
+    {
+        ArgumentNullException.ThrowIfNull(word);
+        ArgumentNullException.ThrowIfNull(resolveAdvance);
+        if (word.Length == 0)
+        {
+            yield return string.Empty;
+            yield break;
+        }
+
+        int start = 0;
+        while (start < word.Length)
+        {
+            float width = 0f;
+            int end = start;
+            while (end < word.Length)
+            {
+                float nextWidth = width + resolveAdvance(word[end]);
+                if (nextWidth > maxWidth && end > start)
+                {
+                    break;
+                }
+
+                width = nextWidth;
+                end++;
+                if (nextWidth > maxWidth)
+                {
+                    break;
+                }
+            }
+
+            if (end == start)
+            {
+                end++;
+            }
+
+            yield return word[start..end];
+            start = end;
+        }
     }
 
     private readonly record struct TextLayoutResult(uint GlyphCount, RectF Bounds);

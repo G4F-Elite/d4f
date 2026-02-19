@@ -10,6 +10,7 @@ public sealed class UiText : UiElement
     private UiTextWrapMode _wrapMode;
     private UiTextHorizontalAlignment _horizontalAlignment;
     private UiTextVerticalAlignment _verticalAlignment;
+    private UiFontAtlas? _fontAtlas;
 
     public UiText(string id, TextureHandle fontTexture, string content)
         : base(id)
@@ -40,6 +41,12 @@ public sealed class UiText : UiElement
             ArgumentNullException.ThrowIfNull(value);
             _content = value;
         }
+    }
+
+    public UiFontAtlas? FontAtlas
+    {
+        get => _fontAtlas;
+        set => _fontAtlas = value;
     }
 
     public UiTextWrapMode WrapMode

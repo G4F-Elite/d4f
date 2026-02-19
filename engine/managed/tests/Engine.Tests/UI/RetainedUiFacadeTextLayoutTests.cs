@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.Core.Timing;
@@ -55,6 +56,56 @@ public sealed class RetainedUiFacadeTextLayoutTests
         Assert.Throws<InvalidDataException>(() => text.WrapMode = (UiTextWrapMode)777);
         Assert.Throws<InvalidDataException>(() => text.HorizontalAlignment = (UiTextHorizontalAlignment)777);
         Assert.Throws<InvalidDataException>(() => text.VerticalAlignment = (UiTextVerticalAlignment)777);
+    }
+
+    [Fact]
+    public void Update_ShouldUseFontAtlasAdvanceAndLineHeight_WhenProvided()
+    {
+        var document = new UiDocument();
+        var text = new UiText("text", new TextureHandle(13), "WWW")
+        {
+            Width = 100,
+            Height = 50,
+            HorizontalAlignment = UiTextHorizontalAlignment.Right,
+            VerticalAlignment = UiTextVerticalAlignment.Bottom,
+            FontAtlas = new UiFontAtlas(
+                lineHeight: 20f,
+                defaultAdvance: 8f,
+                glyphs: new Dictionary<char, UiGlyphMetrics>
+                {
+                    ['W'] = new UiGlyphMetrics(12f)
+                })
+        };
+        document.AddRoot(text);
+
+        UiDrawCommand command = RenderSingleTextCommand(document);
+
+        Assert.Equal(new RectF(64, 30, 36, 20), command.Bounds);
+    }
+
+    [Fact]
+    public void Update_ShouldUseFontAtlasAdvanceForWordWrap()
+    {
+        var document = new UiDocument();
+        var text = new UiText("text", new TextureHandle(14), "WW WW")
+        {
+            Width = 24,
+            Height = 80,
+            WrapMode = UiTextWrapMode.WordWrap,
+            FontAtlas = new UiFontAtlas(
+                lineHeight: 20f,
+                defaultAdvance: 8f,
+                glyphs: new Dictionary<char, UiGlyphMetrics>
+                {
+                    ['W'] = new UiGlyphMetrics(12f),
+                    [' '] = new UiGlyphMetrics(6f)
+                })
+        };
+        document.AddRoot(text);
+
+        UiDrawCommand command = RenderSingleTextCommand(document);
+
+        Assert.Equal(new RectF(0, 0, 24, 40), command.Bounds);
     }
 
     private static UiDrawCommand RenderSingleTextCommand(UiDocument document)
