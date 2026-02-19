@@ -110,3 +110,66 @@ jobs:
           --artifacts-manifest artifacts/tests/manifest.json
           --verify-release-proof true
           --release-proof artifacts/nfr/release-proof.json
+
+  pack-clean-machine:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            runtime: win-x64
+          - os: ubuntu-latest
+            runtime: linux-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Initialize pack smoke project
+        shell: pwsh
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          init --name CiPackSmoke --output artifacts/clean-machine/project
+
+      - name: Run clean-machine pack smoke
+        shell: pwsh
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          pack --project artifacts/clean-machine/project/CiPackSmoke
+          --manifest assets/manifest.json
+          --output dist/content.pak
+          --runtime ${{ matrix.runtime }}
+          --configuration Release
+          --zip dist/package.zip
+
+      - name: Verify packaged portable layout
+        shell: pwsh
+        run: |
+          $root = "artifacts/clean-machine/project/CiPackSmoke/dist"
+          $required = @(
+            "$root/content.pak",
+            "$root/compiled.manifest.bin",
+            "$root/package.zip",
+            "$root/package/App",
+            "$root/package/Content/Game.pak",
+            "$root/package/Content/compiled.manifest.bin",
+            "$root/package/config/runtime.json"
+          )
+
+          foreach ($path in $required) {
+            if (-not (Test-Path $path)) {
+              throw "Required packaged artifact is missing: $path"
+            }
+          }
+
+      - name: Upload clean-machine package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: clean-machine-pack-${{ matrix.runtime }}
+          path: artifacts/clean-machine/project/CiPackSmoke/dist

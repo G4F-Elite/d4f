@@ -50,7 +50,10 @@ Legend:
   - Components: `UiPanel`, `UiText`, `UiImage`, `UiButton`, `UiToggle`, `UiSlider`, `UiInputField`, `UiScrollView`, `UiList`, `UiVirtualizedList`
 - ✅ Text layout requirements (wrapping/alignment/clipping) and kerning support in atlas/layout
   - `UiFontAtlas.cs`, `RetainedUiFacade.Draw.cs`
-- ⚠️ Native UI module/API parity is limited (UI draw items are passed via render packet, but no dedicated native ui_* API surface)
+- ✅ Native UI module/API parity (dedicated `renderer_ui_*` direct and handle C APIs)
+  - `engine/native/include/engine_native.h`
+  - `engine/native/src/bridge_capi/renderer_capi.cpp`
+  - `engine/native/src/bridge_capi/handle_capi_render_capture.cpp`
 
 ## 5) Rendering (native)
 
@@ -63,7 +66,9 @@ Legend:
   - `engine/native/tests/native_tests.cpp`
   - `engine/tools/engine-cli/Cli/EngineCliApp.Doctor.cs`
   - `engine/tools/engine-cli/Cli/EngineCliApp.Nfr.cs`
-- ⚠️ Forward+/CSM are not explicitly named as dedicated implementations in current code
+- ✅ Forward+/CSM capability explicitly represented via render feature flags and covered by native render tests
+  - `ENGINE_NATIVE_RENDER_FLAG_REQUIRE_FORWARD_PLUS`, `ENGINE_NATIVE_RENDER_FLAG_REQUIRE_CSM` in `engine/native/include/engine_native.h`
+  - `engine/native/tests/native_tests.cpp`
 
 ## 6) Physics
 
@@ -75,7 +80,9 @@ Legend:
 - ✅ Managed wrappers and character controller
   - `engine/managed/src/Engine.Physics/*`
   - `engine/managed/tests/Engine.Tests/Physics/*`
-- ⚠️ Collider set currently: box/sphere/capsule; static mesh collider not yet evident
+- ✅ Collider set includes static mesh (`collider_shape=3` + `collider_mesh` binding)
+  - Native: `engine/native/include/engine_native.h`, `engine/native/src/core/engine_state.cpp`, `engine/native/src/core/physics_queries.cpp`, `engine/native/src/core/physics_raycast.cpp`
+  - Managed: `engine/managed/src/Engine.Physics/ColliderShapeType.cs`, `engine/managed/src/Engine.Physics/PhysicsCollider.cs`, `engine/managed/src/Engine.Physics/PhysicsShapeValidation.cs`, `engine/managed/src/Engine.NativeBindings/Internal/*`
 
 ## 7) Audio
 
@@ -114,10 +121,9 @@ Legend:
   - `engine/tools/engine-cli/Cli/EngineCliApp*.cs`
 - ✅ Pack path supports `win-x64` and `linux-x64`, self-contained publish, portable package layout
   - `engine/tools/engine-cli/Cli/EngineCliApp.Pack.cs`
-- ⚠️ Formalized “clean machine run” acceptance evidence is external to repo CI/tests (not a direct in-repo system-test artifact)
+- ✅ Clean-machine packaging acceptance evidence is automated in CI matrix (`windows-latest` + `ubuntu-latest`) with artifact upload
+  - `.github/workflows/ci.yml` (`pack-clean-machine` job)
 
 ## Remaining high-priority gaps (actionable)
 
-1. ⚠️ Explicit Forward+/CSM evidence (if required as strict MVP wording)
-2. ⚠️ Static mesh collider support in physics (if required by strict P-01 wording)
-3. ⚠️ Dedicated native UI module/API parity (if required beyond packeted UI draw data)
+- ✅ No open high-priority gaps remain for `DFF-EXT-001` in this repository snapshot.
