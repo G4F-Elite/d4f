@@ -814,6 +814,112 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenTestHostConfigRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-test-host-config", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Test host config artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenTestHostConfigInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string testHostConfigPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "test-host.json");
+            WriteTestHostConfig(testHostConfigPath, mode: "invalid", fixedDeltaSeconds: 0.0);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-test-host-config", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Test host config check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenTestHostConfigValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string testHostConfigPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "test-host.json");
+            WriteTestHostConfig(testHostConfigPath, mode: "hidden-window", fixedDeltaSeconds: 0.0166667);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-test-host-config", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Test host config: mode=hidden-window", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -946,6 +1052,19 @@ public sealed class EngineCliDoctorToolChecksTests
               "uploadBytes": {{uploadBytes}},
               "gpuMemoryBytes": {{gpuMemoryBytes}},
               "presentCount": {{presentCount}}
+            }
+            """);
+    }
+
+    private static void WriteTestHostConfig(string filePath, string mode, double fixedDeltaSeconds)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "mode": "{{mode}}",
+              "fixedDeltaSeconds": {{fixedDeltaSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}}
             }
             """);
     }

@@ -53,6 +53,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
+        ValidateTestHostConfigArtifact(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -324,6 +325,60 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
             failures.Add($"Render stats check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateTestHostConfigArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.TestHostConfigPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.TestHostConfigPath!
+            : Path.Combine("artifacts", "tests", "runtime", "test-host.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyTestHostConfig || explicitPath)
+            {
+                failures.Add($"Test host config artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Test host config artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            string mode = ReadRequiredString(root, "mode", "Test host config artifact");
+            if (!string.Equals(mode, "headless-offscreen", StringComparison.Ordinal) &&
+                !string.Equals(mode, "hidden-window", StringComparison.Ordinal))
+            {
+                throw new InvalidDataException($"Test host config artifact has unsupported mode '{mode}'.");
+            }
+
+            double fixedDeltaSeconds = ReadRequiredDouble(root, "fixedDeltaSeconds", "Test host config artifact");
+            if (!double.IsFinite(fixedDeltaSeconds) || fixedDeltaSeconds <= 0.0)
+            {
+                throw new InvalidDataException("Test host config artifact has invalid positive number 'fixedDeltaSeconds'.");
+            }
+
+            _stdout.WriteLine($"Test host config: mode={mode}, fixedDeltaSeconds={fixedDeltaSeconds:F6}.");
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"Test host config check failed: {ex.Message}");
         }
     }
 

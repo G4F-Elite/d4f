@@ -66,7 +66,9 @@ public sealed record DoctorCommand(
     bool VerifyCaptureRgba16FloatBinary,
     string? CaptureRgba16FloatBinaryPath,
     bool VerifyRenderStatsArtifact,
-    string? RenderStatsArtifactPath) : EngineCliCommand;
+    string? RenderStatsArtifactPath,
+    bool VerifyTestHostConfig,
+    string? TestHostConfigPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

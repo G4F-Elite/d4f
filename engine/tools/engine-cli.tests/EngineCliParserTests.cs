@@ -277,6 +277,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.CaptureRgba16FloatBinaryPath);
         Assert.False(command.VerifyRenderStatsArtifact);
         Assert.Null(command.RenderStatsArtifactPath);
+        Assert.False(command.VerifyTestHostConfig);
+        Assert.Null(command.TestHostConfigPath);
     }
 
     [Fact]
@@ -299,7 +301,9 @@ public sealed class EngineCliParserTests
             "--verify-capture-rgba16f", "true",
             "--capture-rgba16f", "artifacts/tests/screenshots/frame-0001.rgba16f.bin",
             "--verify-render-stats", "true",
-            "--render-stats", "artifacts/tests/render/frame-stats.json"
+            "--render-stats", "artifacts/tests/render/frame-stats.json",
+            "--verify-test-host-config", "true",
+            "--test-host-config", "artifacts/tests/runtime/test-host.json"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -318,6 +322,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/screenshots/frame-0001.rgba16f.bin", command.CaptureRgba16FloatBinaryPath);
         Assert.True(command.VerifyRenderStatsArtifact);
         Assert.Equal("artifacts/tests/render/frame-stats.json", command.RenderStatsArtifactPath);
+        Assert.True(command.VerifyTestHostConfig);
+        Assert.Equal("artifacts/tests/runtime/test-host.json", command.TestHostConfigPath);
     }
 
     [Theory]
@@ -331,6 +337,7 @@ public sealed class EngineCliParserTests
     [InlineData("--verify-multiplayer-rpc", "yes", "Option '--verify-multiplayer-rpc' must be 'true' or 'false'.")]
     [InlineData("--verify-capture-rgba16f", "yes", "Option '--verify-capture-rgba16f' must be 'true' or 'false'.")]
     [InlineData("--verify-render-stats", "yes", "Option '--verify-render-stats' must be 'true' or 'false'.")]
+    [InlineData("--verify-test-host-config", "yes", "Option '--verify-test-host-config' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -412,6 +419,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--render-stats' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenTestHostConfigPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--test-host-config", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--test-host-config' cannot be empty.", result.Error);
     }
 
     [Fact]
