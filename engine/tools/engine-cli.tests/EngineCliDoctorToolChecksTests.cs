@@ -1166,6 +1166,126 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenArtifactsManifestRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-artifacts-manifest", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Artifacts manifest was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenArtifactsManifestInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string manifestPath = Path.Combine(tempRoot, "artifacts", "tests", "manifest.json");
+            WriteArtifactsManifest(manifestPath, ["screenshot", "runtime-perf-metrics"]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-artifacts-manifest", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Artifacts manifest check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenArtifactsManifestValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string manifestPath = Path.Combine(tempRoot, "artifacts", "tests", "manifest.json");
+            WriteArtifactsManifest(
+                manifestPath,
+                [
+                    "screenshot",
+                    "screenshot-buffer",
+                    "screenshot-buffer-rgba16f",
+                    "multiplayer-demo",
+                    "net-profile-log",
+                    "multiplayer-snapshot-bin",
+                    "multiplayer-rpc-bin",
+                    "render-stats-log",
+                    "test-host-config",
+                    "runtime-perf-metrics",
+                    "replay"
+                ]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-artifacts-manifest", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Artifacts manifest: entries=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -1324,6 +1444,24 @@ public sealed class EngineCliDoctorToolChecksTests
     private static void WriteReplayRecording(string filePath, string json)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(filePath, json);
+    }
+
+    private static void WriteArtifactsManifest(string filePath, IReadOnlyList<string> kinds)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        IEnumerable<string> entries = kinds.Select(
+            static kind => $"{{ \"kind\": \"{kind}\", \"relativePath\": \"x\", \"description\": \"d\" }}");
+        string artifactsJson = string.Join(",\n    ", entries);
+        string json =
+            $$"""
+            {
+              "generatedAtUtc": "2026-01-01T00:00:00Z",
+              "artifacts": [
+                {{artifactsJson}}
+              ]
+            }
+            """;
         File.WriteAllText(filePath, json);
     }
 

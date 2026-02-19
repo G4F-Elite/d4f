@@ -72,7 +72,9 @@ public sealed record DoctorCommand(
     bool VerifyNetProfileLog,
     string? NetProfileLogPath,
     bool VerifyReplayRecording,
-    string? ReplayRecordingPath) : EngineCliCommand;
+    string? ReplayRecordingPath,
+    bool VerifyArtifactsManifest,
+    string? ArtifactsManifestPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

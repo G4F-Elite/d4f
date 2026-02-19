@@ -56,6 +56,7 @@ public sealed partial class EngineCliApp
         ValidateTestHostConfigArtifact(command, projectDirectory, failures);
         ValidateNetProfileLogArtifact(command, projectDirectory, failures);
         ValidateReplayRecordingArtifact(command, projectDirectory, failures);
+        ValidateArtifactsManifest(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -547,6 +548,83 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
             failures.Add($"Replay recording check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateArtifactsManifest(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.ArtifactsManifestPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.ArtifactsManifestPath!
+            : Path.Combine("artifacts", "tests", "manifest.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyArtifactsManifest || explicitPath)
+            {
+                failures.Add($"Artifacts manifest was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Artifacts manifest not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+            if (!root.TryGetProperty("artifacts", out JsonElement artifacts) || artifacts.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException("Artifacts manifest is missing array property 'artifacts'.");
+            }
+
+            var kinds = new HashSet<string>(StringComparer.Ordinal);
+            foreach (JsonElement artifact in artifacts.EnumerateArray())
+            {
+                string kind = ReadRequiredString(artifact, "kind", "Artifacts manifest artifact entry");
+                kinds.Add(kind);
+            }
+
+            _stdout.WriteLine($"Artifacts manifest: entries={kinds.Count}.");
+            if (!command.VerifyArtifactsManifest)
+            {
+                return;
+            }
+
+            string[] requiredKinds =
+            [
+                "screenshot",
+                "screenshot-buffer",
+                "screenshot-buffer-rgba16f",
+                "multiplayer-demo",
+                "net-profile-log",
+                "multiplayer-snapshot-bin",
+                "multiplayer-rpc-bin",
+                "render-stats-log",
+                "test-host-config",
+                "runtime-perf-metrics",
+                "replay"
+            ];
+
+            string[] missingKinds = requiredKinds.Where(required => !kinds.Contains(required)).ToArray();
+            if (missingKinds.Length > 0)
+            {
+                failures.Add($"Artifacts manifest check failed: missing required kinds [{string.Join(", ", missingKinds)}].");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"Artifacts manifest check failed: {ex.Message}");
         }
     }
 

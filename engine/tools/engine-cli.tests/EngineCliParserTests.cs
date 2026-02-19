@@ -283,6 +283,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.NetProfileLogPath);
         Assert.False(command.VerifyReplayRecording);
         Assert.Null(command.ReplayRecordingPath);
+        Assert.False(command.VerifyArtifactsManifest);
+        Assert.Null(command.ArtifactsManifestPath);
     }
 
     [Fact]
@@ -311,7 +313,9 @@ public sealed class EngineCliParserTests
             "--verify-net-profile-log", "true",
             "--net-profile-log", "artifacts/tests/net/multiplayer-profile.log",
             "--verify-replay-recording", "true",
-            "--replay-recording", "artifacts/tests/replay/recording.json"
+            "--replay-recording", "artifacts/tests/replay/recording.json",
+            "--verify-artifacts-manifest", "true",
+            "--artifacts-manifest", "artifacts/tests/manifest.json"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -336,6 +340,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/net/multiplayer-profile.log", command.NetProfileLogPath);
         Assert.True(command.VerifyReplayRecording);
         Assert.Equal("artifacts/tests/replay/recording.json", command.ReplayRecordingPath);
+        Assert.True(command.VerifyArtifactsManifest);
+        Assert.Equal("artifacts/tests/manifest.json", command.ArtifactsManifestPath);
     }
 
     [Theory]
@@ -352,6 +358,7 @@ public sealed class EngineCliParserTests
     [InlineData("--verify-test-host-config", "yes", "Option '--verify-test-host-config' must be 'true' or 'false'.")]
     [InlineData("--verify-net-profile-log", "yes", "Option '--verify-net-profile-log' must be 'true' or 'false'.")]
     [InlineData("--verify-replay-recording", "yes", "Option '--verify-replay-recording' must be 'true' or 'false'.")]
+    [InlineData("--verify-artifacts-manifest", "yes", "Option '--verify-artifacts-manifest' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -475,6 +482,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--replay-recording' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenArtifactsManifestPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--artifacts-manifest", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--artifacts-manifest' cannot be empty.", result.Error);
     }
 
     [Fact]

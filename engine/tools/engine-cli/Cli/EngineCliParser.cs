@@ -465,6 +465,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--replay-recording' cannot be empty.");
         }
 
+        bool verifyArtifactsManifest = false;
+        if (options.TryGetValue("verify-artifacts-manifest", out string? verifyArtifactsManifestValue))
+        {
+            if (!bool.TryParse(verifyArtifactsManifestValue, out verifyArtifactsManifest))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-artifacts-manifest' must be 'true' or 'false'.");
+            }
+        }
+
+        string? artifactsManifestPath = options.TryGetValue("artifacts-manifest", out string? artifactsManifestPathValue)
+            ? artifactsManifestPathValue
+            : null;
+        if (artifactsManifestPath is not null && string.IsNullOrWhiteSpace(artifactsManifestPath))
+        {
+            return EngineCliParseResult.Failure("Option '--artifacts-manifest' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -487,7 +504,9 @@ public static partial class EngineCliParser
                 verifyNetProfileLog,
                 netProfileLogPath,
                 verifyReplayRecording,
-                replayRecordingPath));
+                replayRecordingPath,
+                verifyArtifactsManifest,
+                artifactsManifestPath));
     }
 
     private static string GetOutOrOutputPath(
