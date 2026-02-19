@@ -88,6 +88,7 @@ public sealed record DoctorCommand(
     string? MultiplayerOrchestrationPath,
     bool VerifyCaptureRgba16FloatBinary,
     string? CaptureRgba16FloatBinaryPath,
+    string? CaptureRgba16FloatExrPath,
     bool VerifyRenderStatsArtifact,
     string? RenderStatsArtifactPath,
     bool VerifyTestHostConfig,

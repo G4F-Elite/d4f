@@ -363,19 +363,20 @@ public sealed partial class EngineCliApp
     {
         ArgumentNullException.ThrowIfNull(failures);
 
-        bool explicitPath = !string.IsNullOrWhiteSpace(command.CaptureRgba16FloatBinaryPath);
-        string relativeOrConfiguredBinaryPath = explicitPath
-            ? command.CaptureRgba16FloatBinaryPath!
-            : Path.Combine("artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.CaptureRgba16FloatExrPath);
+        string relativeOrConfiguredExrPath = explicitPath
+            ? command.CaptureRgba16FloatExrPath!
+            : string.IsNullOrWhiteSpace(command.CaptureRgba16FloatBinaryPath)
+                ? Path.Combine("artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr")
+                : Path.ChangeExtension(command.CaptureRgba16FloatBinaryPath, ".exr") ?? string.Empty;
 
-        string? exrRelativePath = Path.ChangeExtension(relativeOrConfiguredBinaryPath, ".exr");
-        if (string.IsNullOrWhiteSpace(exrRelativePath))
+        if (string.IsNullOrWhiteSpace(relativeOrConfiguredExrPath))
         {
-            failures.Add($"Capture RGBA16F EXR check failed: unable to derive EXR path from '{relativeOrConfiguredBinaryPath}'.");
+            failures.Add($"Capture RGBA16F EXR check failed: unable to derive EXR path from '{command.CaptureRgba16FloatBinaryPath}'.");
             return;
         }
 
-        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, exrRelativePath);
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredExrPath);
 
         if (!File.Exists(resolvedPath))
         {

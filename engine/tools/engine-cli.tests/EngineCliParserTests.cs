@@ -468,6 +468,7 @@ public sealed class EngineCliParserTests
         Assert.Null(command.MultiplayerOrchestrationPath);
         Assert.False(command.VerifyCaptureRgba16FloatBinary);
         Assert.Null(command.CaptureRgba16FloatBinaryPath);
+        Assert.Null(command.CaptureRgba16FloatExrPath);
         Assert.False(command.VerifyRenderStatsArtifact);
         Assert.Null(command.RenderStatsArtifactPath);
         Assert.False(command.VerifyTestHostConfig);
@@ -503,6 +504,7 @@ public sealed class EngineCliParserTests
             "--multiplayer-orchestration", "artifacts/runtime-multiplayer-orchestration/net/multiplayer-orchestration.json",
             "--verify-capture-rgba16f", "true",
             "--capture-rgba16f", "artifacts/tests/screenshots/frame-0001.rgba16f.bin",
+            "--capture-rgba16f-exr", "artifacts/tests/screenshots/frame-0001.rgba16f.exr",
             "--verify-render-stats", "true",
             "--render-stats", "artifacts/tests/render/frame-stats.json",
             "--verify-test-host-config", "true",
@@ -533,6 +535,7 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/runtime-multiplayer-orchestration/net/multiplayer-orchestration.json", command.MultiplayerOrchestrationPath);
         Assert.True(command.VerifyCaptureRgba16FloatBinary);
         Assert.Equal("artifacts/tests/screenshots/frame-0001.rgba16f.bin", command.CaptureRgba16FloatBinaryPath);
+        Assert.Equal("artifacts/tests/screenshots/frame-0001.rgba16f.exr", command.CaptureRgba16FloatExrPath);
         Assert.True(command.VerifyRenderStatsArtifact);
         Assert.Equal("artifacts/tests/render/frame-stats.json", command.RenderStatsArtifactPath);
         Assert.True(command.VerifyTestHostConfig);
@@ -645,6 +648,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--capture-rgba16f' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenCaptureRgba16FExrPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--capture-rgba16f-exr", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--capture-rgba16f-exr' cannot be empty.", result.Error);
     }
 
     [Fact]

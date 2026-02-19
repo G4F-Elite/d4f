@@ -853,6 +853,43 @@ public sealed class EngineCliDoctorToolChecksTests
     }
 
     [Fact]
+    public void Run_ShouldFailDoctor_WhenExplicitCaptureRgba16FExrPathMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            WriteCaptureRgba16FloatBinary(capturePath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true",
+                "--capture-rgba16f-exr", "artifacts/tests/screenshots/custom-frame.rgba16f.exr"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F EXR artifact was not found", error.ToString(), StringComparison.Ordinal);
+            Assert.Contains("custom-frame.rgba16f.exr", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailDoctor_WhenCaptureRgba16FExrInvalid()
     {
         string tempRoot = CreateTempDirectory();

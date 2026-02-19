@@ -600,6 +600,14 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--capture-rgba16f' cannot be empty.");
         }
 
+        string? captureRgba16FloatExrPath = options.TryGetValue("capture-rgba16f-exr", out string? captureRgba16FExrPathValue)
+            ? captureRgba16FExrPathValue
+            : null;
+        if (captureRgba16FloatExrPath is not null && string.IsNullOrWhiteSpace(captureRgba16FloatExrPath))
+        {
+            return EngineCliParseResult.Failure("Option '--capture-rgba16f-exr' cannot be empty.");
+        }
+
         bool verifyRenderStatsArtifact = false;
         if (options.TryGetValue("verify-render-stats", out string? verifyRenderStatsValue))
         {
@@ -719,6 +727,7 @@ public static partial class EngineCliParser
                 multiplayerOrchestrationPath,
                 verifyCaptureRgba16FloatBinary,
                 captureRgba16FloatBinaryPath,
+                captureRgba16FloatExrPath,
                 verifyRenderStatsArtifact,
                 renderStatsArtifactPath,
                 verifyTestHostConfig,
