@@ -263,6 +263,50 @@ public sealed class EngineCliParserTests
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
         Assert.Equal("game", command.ProjectDirectory);
+        Assert.Null(command.RuntimePerfMetricsPath);
+        Assert.Null(command.MaxAverageCaptureCpuMs);
+        Assert.Null(command.MaxPeakCaptureAllocatedBytes);
+        Assert.False(command.RequireZeroAllocationCapturePath);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateDoctorCommand_WithPerfOptions()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--runtime-perf", "artifacts/tests/runtime/perf-metrics.json",
+            "--max-capture-cpu-ms", "2.5",
+            "--max-capture-alloc-bytes", "1024",
+            "--require-zero-alloc", "true"
+        ]);
+
+        DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("artifacts/tests/runtime/perf-metrics.json", command.RuntimePerfMetricsPath);
+        Assert.Equal(2.5, command.MaxAverageCaptureCpuMs);
+        Assert.Equal(1024L, command.MaxPeakCaptureAllocatedBytes);
+        Assert.True(command.RequireZeroAllocationCapturePath);
+    }
+
+    [Theory]
+    [InlineData("--max-capture-cpu-ms", "0", "Option '--max-capture-cpu-ms' must be a positive number.")]
+    [InlineData("--max-capture-cpu-ms", "abc", "Option '--max-capture-cpu-ms' must be a positive number.")]
+    [InlineData("--max-capture-alloc-bytes", "-1", "Option '--max-capture-alloc-bytes' must be a non-negative integer.")]
+    [InlineData("--max-capture-alloc-bytes", "1.25", "Option '--max-capture-alloc-bytes' must be a non-negative integer.")]
+    [InlineData("--require-zero-alloc", "yes", "Option '--require-zero-alloc' must be 'true' or 'false'.")]
+    public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            optionName, optionValue
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(expectedError, result.Error);
     }
 
     [Fact]

@@ -140,6 +140,136 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenExplicitRuntimePerfPathMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--runtime-perf", "artifacts/tests/runtime/missing-perf.json"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Runtime perf metrics artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRuntimePerfBudgetsExceeded()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string perfPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "perf-metrics.json");
+            WriteRuntimePerfMetrics(
+                perfPath,
+                backend: "native",
+                sampleCount: 8,
+                averageCaptureCpuMs: 3.2,
+                peakCaptureAllocatedBytes: 4096,
+                zeroAllocationCapturePath: false,
+                releaseRendererBudget: 3,
+                releasePhysicsBudget: 3);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--max-capture-cpu-ms", "2.5",
+                "--max-capture-alloc-bytes", "1024",
+                "--require-zero-alloc", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            string errorText = error.ToString();
+            Assert.Contains("average capture CPU", errorText, StringComparison.Ordinal);
+            Assert.Contains("peak capture allocation", errorText, StringComparison.Ordinal);
+            Assert.Contains("not zero-allocation", errorText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenRuntimePerfBudgetsWithinThresholds()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string perfPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "perf-metrics.json");
+            WriteRuntimePerfMetrics(
+                perfPath,
+                backend: "noop",
+                sampleCount: 5,
+                averageCaptureCpuMs: 0.8,
+                peakCaptureAllocatedBytes: 0,
+                zeroAllocationCapturePath: true,
+                releaseRendererBudget: 3,
+                releasePhysicsBudget: 3);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--max-capture-cpu-ms", "1.2",
+                "--max-capture-alloc-bytes", "0",
+                "--require-zero-alloc", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Runtime perf metrics: backend=noop", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.DoesNotContain("Runtime perf metrics artifact was not found", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -156,6 +286,35 @@ public sealed class EngineCliDoctorToolChecksTests
                   "kind": "text"
                 }
               ]
+            }
+            """);
+    }
+
+    private static void WriteRuntimePerfMetrics(
+        string filePath,
+        string backend,
+        int sampleCount,
+        double averageCaptureCpuMs,
+        long peakCaptureAllocatedBytes,
+        bool zeroAllocationCapturePath,
+        int releaseRendererBudget,
+        int releasePhysicsBudget)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "backend": "{{backend}}",
+              "captureSampleCount": {{sampleCount}},
+              "averageCaptureCpuMs": {{averageCaptureCpuMs.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}},
+              "peakCaptureCpuMs": {{averageCaptureCpuMs.ToString("0.####", System.Globalization.CultureInfo.InvariantCulture)}},
+              "averageCaptureAllocatedBytes": {{peakCaptureAllocatedBytes}},
+              "peakCaptureAllocatedBytes": {{peakCaptureAllocatedBytes}},
+              "totalCaptureAllocatedBytes": {{peakCaptureAllocatedBytes}},
+              "zeroAllocationCapturePath": {{zeroAllocationCapturePath.ToString().ToLowerInvariant()}},
+              "releaseRendererInteropBudgetPerFrame": {{releaseRendererBudget}},
+              "releasePhysicsInteropBudgetPerTick": {{releasePhysicsBudget}}
             }
             """);
     }

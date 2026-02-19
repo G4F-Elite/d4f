@@ -1,4 +1,5 @@
 using Engine.Rendering;
+using System.Globalization;
 
 namespace Engine.Cli;
 
@@ -286,7 +287,55 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--project' is required for 'doctor'.");
         }
 
-        return EngineCliParseResult.Success(new DoctorCommand(project));
+        string? runtimePerfMetricsPath = options.TryGetValue("runtime-perf", out string? runtimePerfValue)
+            ? runtimePerfValue
+            : null;
+        if (runtimePerfMetricsPath is not null && string.IsNullOrWhiteSpace(runtimePerfMetricsPath))
+        {
+            return EngineCliParseResult.Failure("Option '--runtime-perf' cannot be empty.");
+        }
+
+        double? maxAverageCaptureCpuMs = null;
+        if (options.TryGetValue("max-capture-cpu-ms", out string? maxCpuValue))
+        {
+            if (!double.TryParse(maxCpuValue, NumberStyles.Float, CultureInfo.InvariantCulture, out double parsedCpuMs) ||
+                !double.IsFinite(parsedCpuMs) ||
+                parsedCpuMs <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--max-capture-cpu-ms' must be a positive number.");
+            }
+
+            maxAverageCaptureCpuMs = parsedCpuMs;
+        }
+
+        long? maxPeakCaptureAllocatedBytes = null;
+        if (options.TryGetValue("max-capture-alloc-bytes", out string? maxAllocValue))
+        {
+            if (!long.TryParse(maxAllocValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out long parsedAllocBytes) ||
+                parsedAllocBytes < 0L)
+            {
+                return EngineCliParseResult.Failure("Option '--max-capture-alloc-bytes' must be a non-negative integer.");
+            }
+
+            maxPeakCaptureAllocatedBytes = parsedAllocBytes;
+        }
+
+        bool requireZeroAllocationCapturePath = false;
+        if (options.TryGetValue("require-zero-alloc", out string? requireZeroAllocValue))
+        {
+            if (!bool.TryParse(requireZeroAllocValue, out requireZeroAllocationCapturePath))
+            {
+                return EngineCliParseResult.Failure("Option '--require-zero-alloc' must be 'true' or 'false'.");
+            }
+        }
+
+        return EngineCliParseResult.Success(
+            new DoctorCommand(
+                project,
+                runtimePerfMetricsPath,
+                maxAverageCaptureCpuMs,
+                maxPeakCaptureAllocatedBytes,
+                requireZeroAllocationCapturePath));
     }
 
     private static string GetOutOrOutputPath(

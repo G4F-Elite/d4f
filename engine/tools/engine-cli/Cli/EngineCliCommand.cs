@@ -51,7 +51,12 @@ public sealed record TestCommand(
     double TolerantMinPsnrDb,
     string? ReplayPath) : EngineCliCommand;
 
-public sealed record DoctorCommand(string ProjectDirectory) : EngineCliCommand;
+public sealed record DoctorCommand(
+    string ProjectDirectory,
+    string? RuntimePerfMetricsPath,
+    double? MaxAverageCaptureCpuMs,
+    long? MaxPeakCaptureAllocatedBytes,
+    bool RequireZeroAllocationCapturePath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

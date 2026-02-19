@@ -1,3 +1,7 @@
+using System.Text.Json;
+using Engine.App;
+using Engine.AssetPipeline;
+
 namespace Engine.Cli;
 
 public sealed partial class EngineCliApp
@@ -42,6 +46,8 @@ public sealed partial class EngineCliApp
             failures.Add(cmakeCheck.BuildFailureMessage("cmake"));
         }
 
+        ValidateRuntimePerfMetrics(command, projectDirectory, failures);
+
         if (failures.Count > 0)
         {
             foreach (string failure in failures)
@@ -54,6 +60,181 @@ public sealed partial class EngineCliApp
 
         _stdout.WriteLine("Doctor checks passed.");
         return 0;
+    }
+
+    private void ValidateRuntimePerfMetrics(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.RuntimePerfMetricsPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.RuntimePerfMetricsPath!
+            : Path.Combine("artifacts", "tests", "runtime", "perf-metrics.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (explicitPath)
+            {
+                failures.Add($"Runtime perf metrics artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Runtime perf metrics artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        RuntimePerfMetricsSummary metrics;
+        try
+        {
+            metrics = ReadRuntimePerfMetricsSummary(resolvedPath);
+        }
+        catch (InvalidDataException ex)
+        {
+            failures.Add(ex.Message);
+            return;
+        }
+
+        if (command.MaxAverageCaptureCpuMs.HasValue &&
+            metrics.AverageCaptureCpuMs > command.MaxAverageCaptureCpuMs.Value)
+        {
+            failures.Add(
+                $"Runtime perf budget exceeded: average capture CPU {metrics.AverageCaptureCpuMs:F4}ms > {command.MaxAverageCaptureCpuMs.Value:F4}ms.");
+        }
+
+        if (command.MaxPeakCaptureAllocatedBytes.HasValue &&
+            metrics.PeakCaptureAllocatedBytes > command.MaxPeakCaptureAllocatedBytes.Value)
+        {
+            failures.Add(
+                $"Runtime perf budget exceeded: peak capture allocation {metrics.PeakCaptureAllocatedBytes} bytes > {command.MaxPeakCaptureAllocatedBytes.Value} bytes.");
+        }
+
+        if (command.RequireZeroAllocationCapturePath && !metrics.ZeroAllocationCapturePath)
+        {
+            failures.Add("Runtime perf budget exceeded: capture path is not zero-allocation.");
+        }
+
+        InteropBudgetOptions releaseBudgets = InteropBudgetOptions.ReleaseStrict;
+        if (metrics.ReleaseRendererInteropBudgetPerFrame != releaseBudgets.MaxRendererCallsPerFrame)
+        {
+            failures.Add(
+                $"Runtime perf metrics mismatch: release renderer interop budget {metrics.ReleaseRendererInteropBudgetPerFrame} != expected {releaseBudgets.MaxRendererCallsPerFrame}.");
+        }
+
+        if (metrics.ReleasePhysicsInteropBudgetPerTick != releaseBudgets.MaxPhysicsCallsPerTick)
+        {
+            failures.Add(
+                $"Runtime perf metrics mismatch: release physics interop budget {metrics.ReleasePhysicsInteropBudgetPerTick} != expected {releaseBudgets.MaxPhysicsCallsPerTick}.");
+        }
+
+        _stdout.WriteLine(
+            $"Runtime perf metrics: backend={metrics.Backend}, samples={metrics.CaptureSampleCount}, avgCaptureCpuMs={metrics.AverageCaptureCpuMs:F4}, peakCaptureAllocBytes={metrics.PeakCaptureAllocatedBytes}, zeroAlloc={metrics.ZeroAllocationCapturePath}.");
+    }
+
+    private static RuntimePerfMetricsSummary ReadRuntimePerfMetricsSummary(string statsPath)
+    {
+        string json = File.ReadAllText(statsPath);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+
+        string backend = ReadRequiredString(root, "backend", "Runtime perf metrics artifact");
+        int captureSampleCount = ReadRequiredInt(root, "captureSampleCount", "Runtime perf metrics artifact");
+        if (captureSampleCount <= 0)
+        {
+            throw new InvalidDataException("Runtime perf metrics artifact has invalid positive integer 'captureSampleCount'.");
+        }
+
+        double averageCaptureCpuMs = ReadRequiredDouble(root, "averageCaptureCpuMs", "Runtime perf metrics artifact");
+        if (!double.IsFinite(averageCaptureCpuMs) || averageCaptureCpuMs < 0.0)
+        {
+            throw new InvalidDataException("Runtime perf metrics artifact has invalid non-negative number 'averageCaptureCpuMs'.");
+        }
+
+        long peakCaptureAllocatedBytes = ReadRequiredLong(root, "peakCaptureAllocatedBytes", "Runtime perf metrics artifact");
+        if (peakCaptureAllocatedBytes < 0L)
+        {
+            throw new InvalidDataException("Runtime perf metrics artifact has invalid non-negative integer 'peakCaptureAllocatedBytes'.");
+        }
+
+        bool zeroAllocationCapturePath = ReadRequiredBool(root, "zeroAllocationCapturePath", "Runtime perf metrics artifact");
+
+        int releaseRendererInteropBudgetPerFrame = ReadRequiredInt(root, "releaseRendererInteropBudgetPerFrame", "Runtime perf metrics artifact");
+        int releasePhysicsInteropBudgetPerTick = ReadRequiredInt(root, "releasePhysicsInteropBudgetPerTick", "Runtime perf metrics artifact");
+        if (releaseRendererInteropBudgetPerFrame <= 0 || releasePhysicsInteropBudgetPerTick <= 0)
+        {
+            throw new InvalidDataException("Runtime perf metrics artifact has invalid positive release interop budget values.");
+        }
+
+        return new RuntimePerfMetricsSummary(
+            backend,
+            captureSampleCount,
+            averageCaptureCpuMs,
+            peakCaptureAllocatedBytes,
+            zeroAllocationCapturePath,
+            releaseRendererInteropBudgetPerFrame,
+            releasePhysicsInteropBudgetPerTick);
+    }
+
+    private static string ReadRequiredString(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind != JsonValueKind.String)
+        {
+            throw new InvalidDataException($"{context} is missing string property '{propertyName}'.");
+        }
+
+        string? value = property.GetString();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidDataException($"{context} has empty string property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static int ReadRequiredInt(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetInt32(out int value))
+        {
+            throw new InvalidDataException($"{context} is missing integer property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static long ReadRequiredLong(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetInt64(out long value))
+        {
+            throw new InvalidDataException($"{context} is missing integer property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static double ReadRequiredDouble(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetDouble(out double value))
+        {
+            throw new InvalidDataException($"{context} is missing numeric property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static bool ReadRequiredBool(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) ||
+            (property.ValueKind != JsonValueKind.True && property.ValueKind != JsonValueKind.False))
+        {
+            throw new InvalidDataException($"{context} is missing boolean property '{propertyName}'.");
+        }
+
+        return property.GetBoolean();
     }
 
     private ToolVersionCheckResult ExecuteToolVersionCheck(string executable, string workingDirectory)
@@ -102,4 +283,13 @@ public sealed partial class EngineCliApp
             return $"{executable} version check failed.";
         }
     }
+
+    private readonly record struct RuntimePerfMetricsSummary(
+        string Backend,
+        int CaptureSampleCount,
+        double AverageCaptureCpuMs,
+        long PeakCaptureAllocatedBytes,
+        bool ZeroAllocationCapturePath,
+        int ReleaseRendererInteropBudgetPerFrame,
+        int ReleasePhysicsInteropBudgetPerTick);
 }
