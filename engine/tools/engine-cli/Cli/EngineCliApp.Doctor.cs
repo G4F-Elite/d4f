@@ -51,6 +51,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerRuntimeTransport(command, projectDirectory, failures);
         ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
+        ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -215,6 +216,55 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
             failures.Add($"Multiplayer RPC binary check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateCaptureRgba16FloatBinary(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.CaptureRgba16FloatBinaryPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.CaptureRgba16FloatBinaryPath!
+            : Path.Combine("artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyCaptureRgba16FloatBinary || explicitPath)
+            {
+                failures.Add($"Capture RGBA16F binary artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Capture RGBA16F binary artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            byte[] payload = File.ReadAllBytes(resolvedPath);
+            if (payload.Length == 0)
+            {
+                throw new InvalidDataException("Capture RGBA16F binary payload is empty.");
+            }
+
+            if ((payload.Length % 8) != 0)
+            {
+                throw new InvalidDataException($"Capture RGBA16F binary payload length must be divisible by 8 bytes per pixel, got {payload.Length}.");
+            }
+
+            int pixelCount = payload.Length / 8;
+            _stdout.WriteLine($"Capture RGBA16F binary: pixels={pixelCount}, bytes={payload.Length}.");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            failures.Add($"Capture RGBA16F binary check failed: {ex.Message}");
         }
     }
 

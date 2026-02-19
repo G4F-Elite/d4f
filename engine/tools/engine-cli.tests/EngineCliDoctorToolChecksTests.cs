@@ -601,6 +601,113 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCaptureRgba16FRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F binary artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCaptureRgba16FBinaryIsInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            Directory.CreateDirectory(Path.GetDirectoryName(capturePath)!);
+            File.WriteAllBytes(capturePath, [1, 2, 3]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F binary check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenCaptureRgba16FBinaryIsValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            WriteCaptureRgba16FloatBinary(capturePath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Capture RGBA16F binary: pixels=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -706,6 +813,12 @@ public sealed class EngineCliDoctorToolChecksTests
 
         byte[] payload = NetRpcBinaryCodec.Encode(message);
         File.WriteAllBytes(filePath, payload);
+    }
+
+    private static void WriteCaptureRgba16FloatBinary(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllBytes(filePath, [1, 0, 2, 0, 3, 0, 4, 0]);
     }
 
     private static string CreateTempDirectory()
