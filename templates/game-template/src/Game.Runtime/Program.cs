@@ -53,6 +53,7 @@ try
 
     UiSummary ui = BuildUiPreviewSummary(level);
     NetSummary net = RunMultiplayerSummary(level, seed);
+    NativeTransportSummary nativeTransport = RunNativeTransportSummary();
 
     Console.WriteLine($"__GAME_NAME__ runtime demo (seed={seed}):");
     Console.WriteLine($"- Level: nodes={level.Graph.Nodes.Count}, chunks={level.MeshChunks.Count}, spawns={level.SpawnPoints.Count}");
@@ -61,6 +62,7 @@ try
     Console.WriteLine($"- Audio: blob-bytes={soundBlob.Length}");
     Console.WriteLine($"- UI: draw-commands={ui.DrawCommandCount}, visible-list-items={ui.VisibleItemCount}");
     Console.WriteLine($"- Net: tick={net.Tick}, clients={net.ClientCount}, replicated-entities={net.ReplicatedEntityCount}, server-rtt={net.ServerRttMs:F2}ms");
+    Console.WriteLine($"- Native transport: enabled={nativeTransport.Enabled}, succeeded={nativeTransport.Succeeded}, server-messages={nativeTransport.ServerMessagesReceived}, client-messages={nativeTransport.ClientMessagesReceived}");
 }
 finally
 {
@@ -219,6 +221,74 @@ static NetSummary RunMultiplayerSummary(LevelGenResult level, uint seed)
     return new NetSummary(tick, session.ConnectedClientCount, snapshot.Entities.Count, server.RoundTripTimeMs);
 }
 
+static NativeTransportSummary RunNativeTransportSummary()
+{
+    string? previousPeerId = Environment.GetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID");
+    try
+    {
+        using NativeFacadeSet? server = TryCreateNativePeer(100u);
+        using NativeFacadeSet? clientA = TryCreateNativePeer(200u);
+        using NativeFacadeSet? clientB = TryCreateNativePeer(300u);
+        if (server is null || clientA is null || clientB is null)
+        {
+            return new NativeTransportSummary(false, false, 0, 0);
+        }
+
+        _ = server.Net.Pump();
+        _ = clientA.Net.Pump();
+        _ = clientB.Net.Pump();
+
+        server.Net.Send(200u, NetworkChannel.Unreliable, [1, 2, 3, 4]);
+        server.Net.Send(300u, NetworkChannel.Unreliable, [5, 6, 7, 8]);
+        clientA.Net.Send(100u, NetworkChannel.ReliableOrdered, [11, 12]);
+        clientB.Net.Send(100u, NetworkChannel.ReliableOrdered, [13, 14, 15]);
+
+        int serverMessages = CountMessageEvents(server.Net.Pump());
+        int clientMessages = CountMessageEvents(clientA.Net.Pump()) + CountMessageEvents(clientB.Net.Pump());
+        bool success = serverMessages >= 2 && clientMessages >= 2;
+        return new NativeTransportSummary(true, success, serverMessages, clientMessages);
+    }
+    catch (Exception ex) when (
+        ex is DllNotFoundException or
+        EntryPointNotFoundException or
+        BadImageFormatException or
+        FileNotFoundException or
+        InvalidDataException or
+        InvalidOperationException or
+        TypeInitializationException)
+    {
+        return new NativeTransportSummary(false, false, 0, 0);
+    }
+    finally
+    {
+        Environment.SetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID", previousPeerId);
+    }
+}
+
+static NativeFacadeSet? TryCreateNativePeer(uint peerId)
+{
+    Environment.SetEnvironmentVariable("DFF_NET_LOCAL_PEER_ID", peerId.ToString(CultureInfo.InvariantCulture));
+    return NativeFacadeFactory.CreateNativeFacadeSet();
+}
+
+static int CountMessageEvents(IReadOnlyList<NetEvent> events)
+{
+    ArgumentNullException.ThrowIfNull(events);
+
+    int count = 0;
+    for (int i = 0; i < events.Count; i++)
+    {
+        if (events[i].Kind == NetEventKind.Message)
+        {
+            count++;
+        }
+    }
+
+    return count;
+}
+
 internal readonly record struct UiSummary(int DrawCommandCount, int VisibleItemCount);
 
 internal readonly record struct NetSummary(long Tick, int ClientCount, int ReplicatedEntityCount, double ServerRttMs);
+
+internal readonly record struct NativeTransportSummary(bool Enabled, bool Succeeded, int ServerMessagesReceived, int ClientMessagesReceived);
