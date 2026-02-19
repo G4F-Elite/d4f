@@ -40,6 +40,7 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "albedo-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "normals-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "depth-0012.png")));
+            Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "roughness-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "shadow-0012.png")));
             ExrHeaderInfo screenshotExr = ReadExrHeader(screenshotExrPath);
             Assert.Equal(64, screenshotExr.Width);
@@ -211,6 +212,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "render-stats-log",
                     StringComparison.Ordinal));
             Assert.True(hasRenderStatsLog);
+            bool hasRoughnessCapture = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "roughness",
+                    StringComparison.Ordinal));
+            Assert.True(hasRoughnessCapture);
             bool hasHostConfig = artifacts.EnumerateArray()
                 .Any(static artifact => string.Equals(
                     artifact.GetProperty("kind").GetString(),

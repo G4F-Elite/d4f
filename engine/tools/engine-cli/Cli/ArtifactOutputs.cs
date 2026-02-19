@@ -374,6 +374,7 @@ internal static class TestArtifactGenerator
             new("albedo", Path.Combine("dumps", $"albedo-{frameToken}.png")),
             new("normals", Path.Combine("dumps", $"normals-{frameToken}.png")),
             new("depth", Path.Combine("dumps", $"depth-{frameToken}.png")),
+            new("roughness", Path.Combine("dumps", $"roughness-{frameToken}.png")),
             new("shadow", Path.Combine("dumps", $"shadow-{frameToken}.png"))
         ];
     }
@@ -630,6 +631,7 @@ internal static class TestArtifactGenerator
             "depth" => RenderDebugViewMode.Depth,
             "normals" => RenderDebugViewMode.Normals,
             "albedo" => RenderDebugViewMode.Albedo,
+            "roughness" => RenderDebugViewMode.Roughness,
             "shadow" => RenderDebugViewMode.AmbientOcclusion,
             _ => RenderDebugViewMode.None
         };
