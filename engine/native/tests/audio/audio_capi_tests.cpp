@@ -236,11 +236,81 @@ void TestAudioListenerAndEmitterUpdates() {
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
 
+void TestAudioBuildMixSnapshotIncludesSpatialGainAndBusTotals() {
+  engine_native_engine_t* engine = CreateEngine();
+  auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
+
+  engine_native_audio_t* audio = nullptr;
+  assert(engine_get_audio(engine, &audio) == ENGINE_NATIVE_STATUS_OK);
+
+  const std::vector<uint8_t> sound_blob = CreateValidSoundBlob();
+  engine_native_resource_handle_t sound = 0u;
+  assert(audio_create_sound_from_blob(audio, sound_blob.data(), sound_blob.size(), &sound) ==
+         ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_listener_desc_t listener{};
+  listener.position[0] = 0.0f;
+  listener.position[1] = 0.0f;
+  listener.position[2] = 0.0f;
+  listener.forward[2] = -1.0f;
+  listener.up[1] = 1.0f;
+  assert(audio_set_listener(audio, &listener) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_audio_play_desc_t music_desc{};
+  music_desc.volume = 1.0f;
+  music_desc.pitch = 1.0f;
+  music_desc.bus = ENGINE_NATIVE_AUDIO_BUS_MUSIC;
+  music_desc.is_spatialized = 0u;
+  uint64_t music_emitter_id = 0u;
+  assert(audio_play(audio, sound, &music_desc, &music_emitter_id) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_audio_play_desc_t sfx_desc{};
+  sfx_desc.volume = 1.0f;
+  sfx_desc.pitch = 1.0f;
+  sfx_desc.bus = ENGINE_NATIVE_AUDIO_BUS_SFX;
+  sfx_desc.is_spatialized = 1u;
+  sfx_desc.position[0] = 3.0f;
+  sfx_desc.position[1] = 0.0f;
+  sfx_desc.position[2] = 0.0f;
+  uint64_t sfx_emitter_id = 0u;
+  assert(audio_play(audio, sound, &sfx_desc, &sfx_emitter_id) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_emitter_params_t sfx_params{};
+  sfx_params.volume = 1.0f;
+  sfx_params.pitch = 1.0f;
+  sfx_params.position[0] = 3.0f;
+  sfx_params.position[1] = 0.0f;
+  sfx_params.position[2] = 0.0f;
+  sfx_params.velocity[0] = 0.0f;
+  sfx_params.velocity[1] = 0.0f;
+  sfx_params.velocity[2] = 0.0f;
+  sfx_params.lowpass = 0.5f;
+  sfx_params.reverb_send = 0.2f;
+  assert(audio_set_emitter_params(audio, sfx_emitter_id, &sfx_params) ==
+         ENGINE_NATIVE_STATUS_OK);
+
+  const dff::native::AudioBusMixSnapshot snapshot =
+      internal_engine->state.audio.BuildMixSnapshot();
+  assert(snapshot.active_emitter_count == 2u);
+  assert(snapshot.spatialized_emitter_count == 1u);
+  assert(std::fabs(snapshot.music_gain - 1.0f) < 0.0001f);
+
+  // Spatialized SFX emitter at distance 3 with lowpass/reverb factors.
+  const float expected_sfx_gain =
+      (1.0f / (1.0f + 3.0f)) * 0.5f * (1.0f - 0.2f * 0.35f);
+  assert(std::fabs(snapshot.sfx_gain - expected_sfx_gain) < 0.0001f);
+  assert(std::fabs(snapshot.master_gain - (snapshot.music_gain + snapshot.sfx_gain)) <
+         0.0001f);
+
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+}
+
 }  // namespace
 
 int main() {
   TestEngineGetAudioValidation();
   TestAudioSoundLifecycleAndPlayback();
   TestAudioListenerAndEmitterUpdates();
+  TestAudioBuildMixSnapshotIncludesSpatialGainAndBusTotals();
   return 0;
 }

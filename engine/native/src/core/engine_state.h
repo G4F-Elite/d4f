@@ -4,7 +4,9 @@
 #include <cstddef>
 #include <stdint.h>
 
+#include <algorithm>
 #include <array>
+#include <cmath>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -187,6 +189,15 @@ struct AudioListenerState {
   std::array<float, 3> up{0.0f, 1.0f, 0.0f};
 };
 
+struct AudioBusMixSnapshot {
+  float master_gain = 0.0f;
+  float music_gain = 0.0f;
+  float sfx_gain = 0.0f;
+  float ambience_gain = 0.0f;
+  uint32_t active_emitter_count = 0u;
+  uint32_t spatialized_emitter_count = 0u;
+};
+
 class AudioState {
  public:
   engine_native_status_t CreateSoundFromBlob(
@@ -214,6 +225,8 @@ class AudioState {
     return &emitter_it->second;
   }
   const AudioListenerState& listener() const { return listener_; }
+  float ComputeEmitterGain(const AudioEmitterState& emitter) const;
+  AudioBusMixSnapshot BuildMixSnapshot() const;
 
  private:
   static bool IsSupportedBus(uint8_t bus);
@@ -226,6 +239,56 @@ class AudioState {
   uint64_t next_emitter_id_ = 1u;
   AudioListenerState listener_;
 };
+
+inline float AudioState::ComputeEmitterGain(const AudioEmitterState& emitter) const {
+  const float volume = std::max(0.0f, emitter.volume);
+  const float lowpass = std::clamp(emitter.lowpass, 0.0f, 1.0f);
+  const float reverb = std::clamp(emitter.reverb_send, 0.0f, 1.0f);
+
+  float gain = volume * lowpass;
+  if (emitter.is_spatialized != 0u) {
+    const float dx = emitter.position[0] - listener_.position[0];
+    const float dy = emitter.position[1] - listener_.position[1];
+    const float dz = emitter.position[2] - listener_.position[2];
+    const float distance = std::sqrt(std::max(0.0f, dx * dx + dy * dy + dz * dz));
+    const float attenuation = 1.0f / (1.0f + distance);
+    gain *= attenuation;
+  }
+
+  const float reverb_damping = 1.0f - (reverb * 0.35f);
+  gain *= std::max(0.0f, reverb_damping);
+  return std::isfinite(gain) ? std::max(0.0f, gain) : 0.0f;
+}
+
+inline AudioBusMixSnapshot AudioState::BuildMixSnapshot() const {
+  AudioBusMixSnapshot snapshot{};
+  for (const auto& pair : emitters_) {
+    const AudioEmitterState& emitter = pair.second;
+    const float gain = ComputeEmitterGain(emitter);
+    snapshot.active_emitter_count++;
+    if (emitter.is_spatialized != 0u) {
+      snapshot.spatialized_emitter_count++;
+    }
+
+    snapshot.master_gain += gain;
+    switch (emitter.bus) {
+      case ENGINE_NATIVE_AUDIO_BUS_MUSIC:
+        snapshot.music_gain += gain;
+        break;
+      case ENGINE_NATIVE_AUDIO_BUS_SFX:
+        snapshot.sfx_gain += gain;
+        break;
+      case ENGINE_NATIVE_AUDIO_BUS_AMBIENCE:
+        snapshot.ambience_gain += gain;
+        break;
+      case ENGINE_NATIVE_AUDIO_BUS_MASTER:
+      default:
+        break;
+    }
+  }
+
+  return snapshot;
+}
 
 struct EngineState {
   EngineState();
