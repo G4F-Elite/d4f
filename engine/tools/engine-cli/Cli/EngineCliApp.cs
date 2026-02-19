@@ -46,6 +46,7 @@ public sealed partial class EngineCliApp
                 PreviewAudioCommand cmd => HandlePreviewAudio(cmd),
                 PreviewDumpCommand cmd => HandlePreviewDump(cmd),
                 TestCommand cmd => HandleTest(cmd),
+                MultiplayerDemoCommand cmd => HandleMultiplayerDemo(cmd),
                 PackCommand cmd => HandlePack(cmd),
                 DoctorCommand cmd => HandleDoctor(cmd),
                 ApiDumpCommand cmd => HandleApiDump(cmd),

@@ -51,6 +51,13 @@ public sealed record TestCommand(
     double TolerantMinPsnrDb,
     string? ReplayPath) : EngineCliCommand;
 
+public sealed record MultiplayerDemoCommand(
+    string ProjectDirectory,
+    string OutputDirectory,
+    ulong Seed,
+    double FixedDeltaSeconds,
+    bool RequireNativeTransportSuccess) : EngineCliCommand;
+
 public sealed record DoctorCommand(
     string ProjectDirectory,
     string? RuntimePerfMetricsPath,

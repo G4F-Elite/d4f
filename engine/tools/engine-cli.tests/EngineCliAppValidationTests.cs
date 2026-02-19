@@ -132,6 +132,72 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailMultiplayerDemo_WhenProjectDirectoryMissing()
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        EngineCliApp app = new(output, error);
+
+        int code = app.Run(["multiplayer", "demo", "--project", "missing-project"]);
+
+        Assert.Equal(1, code);
+        Assert.Contains("Project directory does not exist", error.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Run_ShouldCreateMultiplayerRuntimeArtifacts_WhenCommandSucceeds()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(
+            [
+                "multiplayer",
+                "demo",
+                "--project", tempRoot,
+                "--out", "artifacts/runtime-multiplayer",
+                "--seed", "9001",
+                "--fixed-dt", "0.0166667"
+            ]);
+
+            Assert.Equal(0, code);
+
+            string outputRoot = Path.Combine(tempRoot, "artifacts", "runtime-multiplayer");
+            string summaryPath = Path.Combine(outputRoot, "net", "multiplayer-demo.json");
+            string profilePath = Path.Combine(outputRoot, "net", "multiplayer-profile.log");
+            string snapshotPath = Path.Combine(outputRoot, "net", "multiplayer-snapshot.bin");
+            string rpcPath = Path.Combine(outputRoot, "net", "multiplayer-rpc.bin");
+
+            Assert.True(File.Exists(summaryPath));
+            Assert.True(File.Exists(profilePath));
+            Assert.True(File.Exists(snapshotPath));
+            Assert.True(File.Exists(rpcPath));
+
+            using JsonDocument summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            JsonElement root = summary.RootElement;
+            Assert.Equal(9001L, root.GetProperty("seed").GetInt64());
+            Assert.True(root.GetProperty("connectedClients").GetInt32() >= 2);
+
+            JsonElement runtimeTransport = root.GetProperty("runtimeTransport");
+            Assert.True(runtimeTransport.TryGetProperty("enabled", out _));
+            Assert.True(runtimeTransport.TryGetProperty("succeeded", out _));
+
+            string stdout = output.ToString();
+            Assert.Contains("Multiplayer runtime demo artifacts created", stdout, StringComparison.Ordinal);
+            Assert.Contains("Native transport:", stdout, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();

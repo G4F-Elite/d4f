@@ -5,7 +5,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -75,6 +75,19 @@ public static partial class EngineCliParser
             }
 
             return ParsePreviewAudio(audioOptions);
+        }
+
+        if (string.Equals(commandName, "multiplayer", StringComparison.Ordinal) &&
+            args.Length > 1 &&
+            string.Equals(args[1], "demo", StringComparison.OrdinalIgnoreCase))
+        {
+            Dictionary<string, string> multiplayerOptions = ParseOptions(args[2..], out string? multiplayerError);
+            if (multiplayerError is not null)
+            {
+                return EngineCliParseResult.Failure(multiplayerError);
+            }
+
+            return ParseMultiplayerDemo(multiplayerOptions);
         }
 
         int optionsStartIndex = 1;
@@ -278,6 +291,59 @@ public static partial class EngineCliParser
         }
 
         return EngineCliParseResult.Success(new PreviewDumpCommand(project, manifest));
+    }
+
+    private static EngineCliParseResult ParseMultiplayerDemo(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'multiplayer demo'.");
+        }
+
+        string outputDirectory = GetOutOrOutputPath(
+            options,
+            defaultValue: Path.Combine(project, "artifacts", "runtime-multiplayer"),
+            out string? outError);
+        if (outError is not null)
+        {
+            return EngineCliParseResult.Failure(outError);
+        }
+
+        ulong seed = 1337UL;
+        if (options.TryGetValue("seed", out string? seedValue))
+        {
+            if (!ulong.TryParse(seedValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out seed))
+            {
+                return EngineCliParseResult.Failure("Option '--seed' must be an unsigned integer.");
+            }
+        }
+
+        double fixedDeltaSeconds = 1.0 / 60.0;
+        if (options.TryGetValue("fixed-dt", out string? fixedDtValue))
+        {
+            if (!double.TryParse(fixedDtValue, NumberStyles.Float, CultureInfo.InvariantCulture, out fixedDeltaSeconds) ||
+                !double.IsFinite(fixedDeltaSeconds) ||
+                fixedDeltaSeconds <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--fixed-dt' must be a positive number.");
+            }
+        }
+
+        bool requireNativeTransportSuccess = false;
+        if (options.TryGetValue("require-native-transport", out string? requireNativeTransportValue))
+        {
+            if (!bool.TryParse(requireNativeTransportValue, out requireNativeTransportSuccess))
+            {
+                return EngineCliParseResult.Failure("Option '--require-native-transport' must be 'true' or 'false'.");
+            }
+        }
+
+        return EngineCliParseResult.Success(new MultiplayerDemoCommand(
+            ProjectDirectory: project,
+            OutputDirectory: outputDirectory,
+            Seed: seed,
+            FixedDeltaSeconds: fixedDeltaSeconds,
+            RequireNativeTransportSuccess: requireNativeTransportSuccess));
     }
 
     private static EngineCliParseResult ParseDoctor(IReadOnlyDictionary<string, string> options)

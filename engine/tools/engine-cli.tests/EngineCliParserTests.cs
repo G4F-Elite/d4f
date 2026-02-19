@@ -12,7 +12,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, pack, doctor, api dump.",
             result.Error);
     }
 
@@ -129,6 +129,70 @@ public sealed class EngineCliParserTests
         Assert.Equal(1.0, command.TolerantMaxMae, 6);
         Assert.Equal(48.0, command.TolerantMinPsnrDb, 6);
         Assert.Null(command.ReplayPath);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateMultiplayerDemoCommand_WithDefaults()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["multiplayer", "demo", "--project", "game"]);
+
+        MultiplayerDemoCommand command = Assert.IsType<MultiplayerDemoCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal(Path.Combine("game", "artifacts", "runtime-multiplayer"), command.OutputDirectory);
+        Assert.Equal(1337UL, command.Seed);
+        Assert.Equal(1.0 / 60.0, command.FixedDeltaSeconds, 6);
+        Assert.False(command.RequireNativeTransportSuccess);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateMultiplayerDemoCommand_WithExplicitOptions()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "multiplayer",
+            "demo",
+            "--project", "game",
+            "--out", "artifacts/runtime-multiplayer",
+            "--seed", "9001",
+            "--fixed-dt", "0.0333333",
+            "--require-native-transport", "true"
+        ]);
+
+        MultiplayerDemoCommand command = Assert.IsType<MultiplayerDemoCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("artifacts/runtime-multiplayer", command.OutputDirectory);
+        Assert.Equal(9001UL, command.Seed);
+        Assert.Equal(0.0333333, command.FixedDeltaSeconds, 6);
+        Assert.True(command.RequireNativeTransportSuccess);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailMultiplayerDemo_WhenProjectMissing()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["multiplayer", "demo"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--project' is required for 'multiplayer demo'.", result.Error);
+    }
+
+    [Theory]
+    [InlineData("--seed", "not-a-number", "Option '--seed' must be an unsigned integer.")]
+    [InlineData("--fixed-dt", "0", "Option '--fixed-dt' must be a positive number.")]
+    [InlineData("--fixed-dt", "bad", "Option '--fixed-dt' must be a positive number.")]
+    [InlineData("--require-native-transport", "yes", "Option '--require-native-transport' must be 'true' or 'false'.")]
+    public void Parse_ShouldFailMultiplayerDemo_WhenOptionInvalid(string optionName, string optionValue, string expectedError)
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "multiplayer",
+            "demo",
+            "--project", "game",
+            optionName,
+            optionValue
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(expectedError, result.Error);
     }
 
     [Fact]
