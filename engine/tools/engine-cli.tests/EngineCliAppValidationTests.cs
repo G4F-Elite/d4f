@@ -377,6 +377,53 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailNfrProof_WhenArtifactsManifestMissesRgba16fExrKind()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            string manifestPath = Path.Combine(tempRoot, "artifacts", "tests", "manifest.json");
+            RemoveArtifactKindFromManifest(manifestPath, "screenshot-buffer-rgba16f-exr");
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(1, code);
+            string stderr = error.ToString();
+            Assert.Contains("NFR proof artifacts manifest missing required kinds", stderr, StringComparison.Ordinal);
+
+            string proofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            Assert.True(File.Exists(proofPath));
+            using JsonDocument proof = JsonDocument.Parse(File.ReadAllText(proofPath));
+            JsonElement root = proof.RootElement;
+            Assert.False(root.GetProperty("isSuccess").GetBoolean());
+            JsonElement checks = root.GetProperty("checks");
+            Assert.False(checks.GetProperty("artifactsManifest").GetBoolean());
+            Assert.False(checks.GetProperty("allArtifactsPresent").GetBoolean());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();
@@ -691,6 +738,37 @@ public sealed class EngineCliAppValidationTests
         uint width = ((uint)bytes[16] << 24) | ((uint)bytes[17] << 16) | ((uint)bytes[18] << 8) | bytes[19];
         uint height = ((uint)bytes[20] << 24) | ((uint)bytes[21] << 16) | ((uint)bytes[22] << 8) | bytes[23];
         return (width, height);
+    }
+
+    private static void RemoveArtifactKindFromManifest(string manifestPath, string artifactKind)
+    {
+        using JsonDocument document = JsonDocument.Parse(File.ReadAllText(manifestPath));
+        JsonElement root = document.RootElement;
+        JsonElement artifacts = root.GetProperty("artifacts");
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("generatedAtUtc", root.GetProperty("generatedAtUtc").GetString());
+            writer.WritePropertyName("artifacts");
+            writer.WriteStartArray();
+            foreach (JsonElement artifact in artifacts.EnumerateArray())
+            {
+                string? kind = artifact.GetProperty("kind").GetString();
+                if (string.Equals(kind, artifactKind, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                artifact.WriteTo(writer);
+            }
+
+            writer.WriteEndArray();
+            writer.WriteEndObject();
+        }
+
+        File.WriteAllBytes(manifestPath, stream.ToArray());
     }
 
     private sealed class RecordingCommandRunner : IExternalCommandRunner

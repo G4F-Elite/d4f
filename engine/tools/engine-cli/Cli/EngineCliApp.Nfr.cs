@@ -261,7 +261,38 @@ public sealed partial class EngineCliApp
             try
             {
                 TestingArtifactManifest manifest = TestingArtifactManifestCodec.Read(manifestPath);
-                artifactsManifestOk = manifest.Artifacts.Count > 0;
+                if (manifest.Artifacts.Count == 0)
+                {
+                    failures.Add("NFR proof artifacts manifest invalid: manifest does not contain any artifacts.");
+                }
+                else
+                {
+                    string[] requiredKinds =
+                    [
+                        "screenshot",
+                        "screenshot-buffer",
+                        "screenshot-buffer-rgba16f",
+                        "screenshot-buffer-rgba16f-exr",
+                        "multiplayer-demo",
+                        "net-profile-log",
+                        "multiplayer-snapshot-bin",
+                        "multiplayer-rpc-bin",
+                        "render-stats-log",
+                        "test-host-config",
+                        "runtime-perf-metrics",
+                        "replay"
+                    ];
+                    var kinds = new HashSet<string>(manifest.Artifacts.Select(static entry => entry.Kind), StringComparer.Ordinal);
+                    string[] missingKinds = requiredKinds.Where(required => !kinds.Contains(required)).ToArray();
+                    if (missingKinds.Length > 0)
+                    {
+                        failures.Add($"NFR proof artifacts manifest missing required kinds: [{string.Join(", ", missingKinds)}].");
+                    }
+                    else
+                    {
+                        artifactsManifestOk = true;
+                    }
+                }
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
