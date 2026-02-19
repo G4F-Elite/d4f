@@ -30,3 +30,83 @@ jobs:
 
       - name: Run native tests
         run: ctest --test-dir engine/native/build -C Debug --output-on-failure
+
+      - name: Build native (Release)
+        run: cmake --build engine/native/build --config Release
+
+      - name: Run native tests (Release)
+        run: ctest --test-dir engine/native/build -C Release --output-on-failure
+
+      - name: Generate release test artifacts
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          test --project . --configuration Release --out artifacts/tests
+
+      - name: Run process-level multiplayer orchestration
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          multiplayer orchestrate --project . --configuration Release
+          --out artifacts/runtime-multiplayer-orchestration
+          --require-native-transport false
+          --cli-project engine/tools/engine-cli/Engine.Cli.csproj
+
+      - name: Generate NFR release proof
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          nfr proof --project . --configuration Release --out artifacts/nfr/release-proof.json
+
+      - name: Prepare root project markers for doctor
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "project.json")) {
+            @"
+            {
+              "name": "ci-root",
+              "assetRoot": "assets",
+              "scripts": {}
+            }
+            "@ | Set-Content -Path "project.json" -Encoding UTF8
+          }
+
+          if (-not (Test-Path "assets")) {
+            New-Item -ItemType Directory -Path "assets" | Out-Null
+          }
+
+          if (-not (Test-Path "assets/manifest.json")) {
+            @"
+            {
+              "version": 1,
+              "assets": []
+            }
+            "@ | Set-Content -Path "assets/manifest.json" -Encoding UTF8
+          }
+
+          if (-not (Test-Path "src")) {
+            New-Item -ItemType Directory -Path "src" | Out-Null
+          }
+
+      - name: Validate release artifacts with doctor
+        run: >-
+          dotnet run --project engine/tools/engine-cli/Engine.Cli.csproj -c Release --
+          doctor --project .
+          --runtime-perf artifacts/tests/runtime/perf-metrics.json
+          --verify-multiplayer-snapshot true
+          --multiplayer-snapshot artifacts/tests/net/multiplayer-snapshot.bin
+          --verify-multiplayer-rpc true
+          --multiplayer-rpc artifacts/tests/net/multiplayer-rpc.bin
+          --verify-multiplayer-orchestration true
+          --multiplayer-orchestration artifacts/runtime-multiplayer-orchestration/net/multiplayer-orchestration.json
+          --verify-capture-rgba16f true
+          --capture-rgba16f artifacts/tests/screenshots/frame-0001.rgba16f.bin
+          --verify-render-stats true
+          --render-stats artifacts/tests/render/frame-stats.json
+          --verify-test-host-config true
+          --test-host-config artifacts/tests/runtime/test-host.json
+          --verify-net-profile-log true
+          --net-profile-log artifacts/tests/net/multiplayer-profile.log
+          --verify-replay-recording true
+          --replay-recording artifacts/tests/replay/recording.json
+          --verify-artifacts-manifest true
+          --artifacts-manifest artifacts/tests/manifest.json
+          --verify-release-proof true
+          --release-proof artifacts/nfr/release-proof.json

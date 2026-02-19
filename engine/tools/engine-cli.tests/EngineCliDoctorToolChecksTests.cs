@@ -602,6 +602,112 @@ public sealed class EngineCliDoctorToolChecksTests
     }
 
     [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerOrchestrationRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-orchestration", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer orchestration artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerOrchestrationInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string orchestrationPath = Path.Combine(tempRoot, "artifacts", "runtime-multiplayer-orchestration", "net", "multiplayer-orchestration.json");
+            WriteMultiplayerOrchestration(orchestrationPath, allSucceeded: false, requireNativeTransportSuccess: true);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-orchestration", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer orchestration check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenMultiplayerOrchestrationValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string orchestrationPath = Path.Combine(tempRoot, "artifacts", "runtime-multiplayer-orchestration", "net", "multiplayer-orchestration.json");
+            WriteMultiplayerOrchestration(orchestrationPath, allSucceeded: true, requireNativeTransportSuccess: true);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-orchestration", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Multiplayer orchestration: nodes=3", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailDoctor_WhenCaptureRgba16FRequiredButMissing()
     {
         string tempRoot = CreateTempDirectory();
@@ -1497,6 +1603,56 @@ public sealed class EngineCliDoctorToolChecksTests
 
         byte[] payload = NetRpcBinaryCodec.Encode(message);
         File.WriteAllBytes(filePath, payload);
+    }
+
+    private static void WriteMultiplayerOrchestration(string filePath, bool allSucceeded, bool requireNativeTransportSuccess)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        string lowerAllSucceeded = allSucceeded.ToString().ToLowerInvariant();
+        string lowerRequireNativeTransport = requireNativeTransportSuccess.ToString().ToLowerInvariant();
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "generatedAtUtc": "2026-01-01T00:00:00Z",
+              "configuration": "Release",
+              "fixedDeltaSeconds": 0.0166667,
+              "requireNativeTransportSuccess": {{lowerRequireNativeTransport}},
+              "nodes": [
+                {
+                  "role": "server",
+                  "seed": 9001,
+                  "exitCode": 0,
+                  "summaryPath": "server/net/multiplayer-demo.json",
+                  "runtimeTransportEnabled": true,
+                  "runtimeTransportSucceeded": true,
+                  "serverMessagesReceived": 3,
+                  "clientMessagesReceived": 4
+                },
+                {
+                  "role": "client-1",
+                  "seed": 9002,
+                  "exitCode": 0,
+                  "summaryPath": "client-1/net/multiplayer-demo.json",
+                  "runtimeTransportEnabled": true,
+                  "runtimeTransportSucceeded": true,
+                  "serverMessagesReceived": 3,
+                  "clientMessagesReceived": 4
+                },
+                {
+                  "role": "client-2",
+                  "seed": 9003,
+                  "exitCode": 0,
+                  "summaryPath": "client-2/net/multiplayer-demo.json",
+                  "runtimeTransportEnabled": true,
+                  "runtimeTransportSucceeded": true,
+                  "serverMessagesReceived": 3,
+                  "clientMessagesReceived": 4
+                }
+              ],
+              "allSucceeded": {{lowerAllSucceeded}}
+            }
+            """);
     }
 
     private static void WriteCaptureRgba16FloatBinary(string filePath)

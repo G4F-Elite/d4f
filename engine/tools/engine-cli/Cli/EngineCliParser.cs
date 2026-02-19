@@ -566,6 +566,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--multiplayer-rpc' cannot be empty.");
         }
 
+        bool verifyMultiplayerOrchestration = false;
+        if (options.TryGetValue("verify-multiplayer-orchestration", out string? verifyMultiplayerOrchestrationValue))
+        {
+            if (!bool.TryParse(verifyMultiplayerOrchestrationValue, out verifyMultiplayerOrchestration))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-multiplayer-orchestration' must be 'true' or 'false'.");
+            }
+        }
+
+        string? multiplayerOrchestrationPath = options.TryGetValue("multiplayer-orchestration", out string? multiplayerOrchestrationPathValue)
+            ? multiplayerOrchestrationPathValue
+            : null;
+        if (multiplayerOrchestrationPath is not null && string.IsNullOrWhiteSpace(multiplayerOrchestrationPath))
+        {
+            return EngineCliParseResult.Failure("Option '--multiplayer-orchestration' cannot be empty.");
+        }
+
         bool verifyCaptureRgba16FloatBinary = false;
         if (options.TryGetValue("verify-capture-rgba16f", out string? verifyCaptureRgba16FValue))
         {
@@ -698,6 +715,8 @@ public static partial class EngineCliParser
                 multiplayerSnapshotBinaryPath,
                 verifyMultiplayerRpcBinary,
                 multiplayerRpcBinaryPath,
+                verifyMultiplayerOrchestration,
+                multiplayerOrchestrationPath,
                 verifyCaptureRgba16FloatBinary,
                 captureRgba16FloatBinaryPath,
                 verifyRenderStatsArtifact,

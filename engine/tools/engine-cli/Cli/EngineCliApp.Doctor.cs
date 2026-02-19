@@ -51,6 +51,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerRuntimeTransport(command, projectDirectory, failures);
         ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
+        ValidateMultiplayerOrchestrationArtifact(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
         ValidateTestHostConfigArtifact(command, projectDirectory, failures);
@@ -222,6 +223,86 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
             failures.Add($"Multiplayer RPC binary check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateMultiplayerOrchestrationArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.MultiplayerOrchestrationPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.MultiplayerOrchestrationPath!
+            : Path.Combine("artifacts", "runtime-multiplayer-orchestration", "net", "multiplayer-orchestration.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyMultiplayerOrchestration || explicitPath)
+            {
+                failures.Add($"Multiplayer orchestration artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Multiplayer orchestration artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            bool allSucceeded = ReadRequiredBool(root, "allSucceeded", "Multiplayer orchestration artifact");
+            bool requireNativeTransport = ReadRequiredBool(root, "requireNativeTransportSuccess", "Multiplayer orchestration artifact");
+            if (!root.TryGetProperty("nodes", out JsonElement nodes) || nodes.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException("Multiplayer orchestration artifact is missing array property 'nodes'.");
+            }
+
+            int nodeCount = nodes.GetArrayLength();
+            bool hasServer = false;
+            bool hasClient1 = false;
+            bool hasClient2 = false;
+            bool allNodeExitCodesZero = true;
+            bool allNodeNativeTransportSucceeded = true;
+            for (int i = 0; i < nodeCount; i++)
+            {
+                JsonElement node = nodes[i];
+                string role = ReadRequiredString(node, "role", "Multiplayer orchestration node");
+                int exitCode = ReadRequiredInt(node, "exitCode", "Multiplayer orchestration node");
+                bool runtimeTransportSucceeded = ReadRequiredBool(node, "runtimeTransportSucceeded", "Multiplayer orchestration node");
+                hasServer |= string.Equals(role, "server", StringComparison.Ordinal);
+                hasClient1 |= string.Equals(role, "client-1", StringComparison.Ordinal);
+                hasClient2 |= string.Equals(role, "client-2", StringComparison.Ordinal);
+                allNodeExitCodesZero &= exitCode == 0;
+                allNodeNativeTransportSucceeded &= runtimeTransportSucceeded;
+            }
+
+            _stdout.WriteLine(
+                $"Multiplayer orchestration: nodes={nodeCount}, allSucceeded={allSucceeded}, requireNativeTransport={requireNativeTransport}.");
+
+            if (!command.VerifyMultiplayerOrchestration)
+            {
+                return;
+            }
+
+            bool requiredRolesPresent = hasServer && hasClient1 && hasClient2;
+            bool nativeTransportSatisfied = !requireNativeTransport || allNodeNativeTransportSucceeded;
+            if (nodeCount < 3 || !requiredRolesPresent || !allSucceeded || !allNodeExitCodesZero || !nativeTransportSatisfied)
+            {
+                failures.Add("Multiplayer orchestration check failed: expected server/client-1/client-2 nodes, zero exits, success=true and native transport success when required.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"Multiplayer orchestration check failed: {ex.Message}");
         }
     }
 

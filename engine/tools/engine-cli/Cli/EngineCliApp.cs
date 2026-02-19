@@ -223,10 +223,13 @@ public sealed partial class EngineCliApp
             return 1;
         }
 
+        string? runtimeProjectPathForTests = ResolvePublishProjectPath(projectDirectory, configuredPath: null);
+        string testTargetPath = ResolveDotnetTestTarget(projectDirectory, runtimeProjectPathForTests);
+
         string[] arguments =
         [
             "test",
-            projectDirectory,
+            testTargetPath,
             "-c",
             command.Configuration,
             "--nologo"
@@ -382,6 +385,86 @@ public sealed partial class EngineCliApp
             throw new InvalidDataException(
                 $"Replay does not contain tick '{captureTick}' required by '--capture-frame {captureFrame}'.");
         }
+    }
+
+    private static string ResolveDotnetTestTarget(string projectDirectory, string? runtimeProjectPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+
+        string testsDirectory = Path.Combine(projectDirectory, "tests");
+        if (Directory.Exists(testsDirectory))
+        {
+            string? testProjectPath = Directory.EnumerateFiles(testsDirectory, "*.csproj", SearchOption.AllDirectories)
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(testProjectPath))
+            {
+                return testProjectPath;
+            }
+        }
+
+        string managedEngineTestsProject = Path.Combine(projectDirectory, "engine", "managed", "tests", "Engine.Tests", "Engine.Tests.csproj");
+        if (File.Exists(managedEngineTestsProject))
+        {
+            return managedEngineTestsProject;
+        }
+
+        string? solutionPath = Directory.EnumerateFiles(projectDirectory, "*.sln", SearchOption.TopDirectoryOnly)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(solutionPath))
+        {
+            return solutionPath;
+        }
+
+        string? projectPath = Directory.EnumerateFiles(projectDirectory, "*.csproj", SearchOption.TopDirectoryOnly)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(projectPath))
+        {
+            return projectPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(runtimeProjectPath))
+        {
+            return runtimeProjectPath;
+        }
+
+        return projectDirectory;
+    }
+
+    private static string? ResolveDotnetBuildTarget(string projectDirectory, string? runtimeProjectPath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+
+        if (!string.IsNullOrWhiteSpace(runtimeProjectPath))
+        {
+            return runtimeProjectPath;
+        }
+
+        string managedEngineTestsProject = Path.Combine(projectDirectory, "engine", "managed", "tests", "Engine.Tests", "Engine.Tests.csproj");
+        if (File.Exists(managedEngineTestsProject))
+        {
+            return managedEngineTestsProject;
+        }
+
+        string? solutionPath = Directory.EnumerateFiles(projectDirectory, "*.sln", SearchOption.TopDirectoryOnly)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(solutionPath))
+        {
+            return solutionPath;
+        }
+
+        string? projectPath = Directory.EnumerateFiles(projectDirectory, "*.csproj", SearchOption.TopDirectoryOnly)
+            .OrderBy(static path => path, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(projectPath))
+        {
+            return projectPath;
+        }
+
+        return null;
     }
 
 }

@@ -18,17 +18,24 @@ public sealed partial class EngineCliApp
         }
 
         string? runtimeProjectPath = ResolvePublishProjectPath(projectDirectory, configuredPath: null);
-        if (runtimeProjectPath is null)
+        string? buildTargetPath = ResolveDotnetBuildTarget(projectDirectory, runtimeProjectPath);
+        if (buildTargetPath is null)
         {
             _stderr.WriteLine($"Runtime .csproj was not found under '{Path.Combine(projectDirectory, "src")}'.");
+            _stderr.WriteLine("No solution or project file found in project root for NFR proof fallback.");
             return 1;
+        }
+
+        if (runtimeProjectPath is null)
+        {
+            _stdout.WriteLine($"Runtime .csproj not found under '{Path.Combine(projectDirectory, "src")}', using build target '{buildTargetPath}'.");
         }
 
         var failures = new List<string>();
 
         int buildExitCode = _commandRunner.Run(
             "dotnet",
-            ["build", runtimeProjectPath, "-c", command.Configuration, "--nologo"],
+            ["build", buildTargetPath, "-c", command.Configuration, "--nologo"],
             projectDirectory,
             _stdout,
             _stderr);
@@ -38,9 +45,11 @@ public sealed partial class EngineCliApp
             failures.Add($"NFR proof build step failed with exit code {buildExitCode}.");
         }
 
+        string testTargetPath = ResolveDotnetTestTarget(projectDirectory, runtimeProjectPath);
+
         int testExitCode = _commandRunner.Run(
             "dotnet",
-            ["test", projectDirectory, "-c", command.Configuration, "--nologo"],
+            ["test", testTargetPath, "-c", command.Configuration, "--nologo"],
             projectDirectory,
             _stdout,
             _stderr);
@@ -63,7 +72,7 @@ public sealed partial class EngineCliApp
         var document = new NfrReleaseProofDocument(
             GeneratedAtUtc: DateTime.UtcNow,
             Configuration: command.Configuration,
-            RuntimeProjectPath: runtimeProjectPath,
+            RuntimeProjectPath: buildTargetPath,
             Build: new NfrReleaseProofStepResult(buildSucceeded, buildExitCode),
             Tests: new NfrReleaseProofStepResult(testsSucceeded, testExitCode),
             Checks: artifactSummary.Checks,

@@ -464,6 +464,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.MultiplayerSnapshotBinaryPath);
         Assert.False(command.VerifyMultiplayerRpcBinary);
         Assert.Null(command.MultiplayerRpcBinaryPath);
+        Assert.False(command.VerifyMultiplayerOrchestration);
+        Assert.Null(command.MultiplayerOrchestrationPath);
         Assert.False(command.VerifyCaptureRgba16FloatBinary);
         Assert.Null(command.CaptureRgba16FloatBinaryPath);
         Assert.False(command.VerifyRenderStatsArtifact);
@@ -497,6 +499,8 @@ public sealed class EngineCliParserTests
             "--multiplayer-snapshot", "artifacts/tests/net/multiplayer-snapshot.bin",
             "--verify-multiplayer-rpc", "true",
             "--multiplayer-rpc", "artifacts/tests/net/multiplayer-rpc.bin",
+            "--verify-multiplayer-orchestration", "true",
+            "--multiplayer-orchestration", "artifacts/runtime-multiplayer-orchestration/net/multiplayer-orchestration.json",
             "--verify-capture-rgba16f", "true",
             "--capture-rgba16f", "artifacts/tests/screenshots/frame-0001.rgba16f.bin",
             "--verify-render-stats", "true",
@@ -525,6 +529,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/net/multiplayer-snapshot.bin", command.MultiplayerSnapshotBinaryPath);
         Assert.True(command.VerifyMultiplayerRpcBinary);
         Assert.Equal("artifacts/tests/net/multiplayer-rpc.bin", command.MultiplayerRpcBinaryPath);
+        Assert.True(command.VerifyMultiplayerOrchestration);
+        Assert.Equal("artifacts/runtime-multiplayer-orchestration/net/multiplayer-orchestration.json", command.MultiplayerOrchestrationPath);
         Assert.True(command.VerifyCaptureRgba16FloatBinary);
         Assert.Equal("artifacts/tests/screenshots/frame-0001.rgba16f.bin", command.CaptureRgba16FloatBinaryPath);
         Assert.True(command.VerifyRenderStatsArtifact);
@@ -550,6 +556,7 @@ public sealed class EngineCliParserTests
     [InlineData("--require-runtime-transport", "yes", "Option '--require-runtime-transport' must be 'true' or 'false'.")]
     [InlineData("--verify-multiplayer-snapshot", "yes", "Option '--verify-multiplayer-snapshot' must be 'true' or 'false'.")]
     [InlineData("--verify-multiplayer-rpc", "yes", "Option '--verify-multiplayer-rpc' must be 'true' or 'false'.")]
+    [InlineData("--verify-multiplayer-orchestration", "yes", "Option '--verify-multiplayer-orchestration' must be 'true' or 'false'.")]
     [InlineData("--verify-capture-rgba16f", "yes", "Option '--verify-capture-rgba16f' must be 'true' or 'false'.")]
     [InlineData("--verify-render-stats", "yes", "Option '--verify-render-stats' must be 'true' or 'false'.")]
     [InlineData("--verify-test-host-config", "yes", "Option '--verify-test-host-config' must be 'true' or 'false'.")]
@@ -610,6 +617,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--multiplayer-rpc' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenMultiplayerOrchestrationPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--multiplayer-orchestration", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--multiplayer-orchestration' cannot be empty.", result.Error);
     }
 
     [Fact]
