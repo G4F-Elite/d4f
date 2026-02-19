@@ -284,13 +284,39 @@ public sealed partial class EngineCliApp
                         "runtime-perf-metrics",
                         "replay"
                     ];
-                    var kinds = new HashSet<string>(manifest.Artifacts.Select(static entry => entry.Kind), StringComparer.Ordinal);
-                    string[] missingKinds = requiredKinds.Where(required => !kinds.Contains(required)).ToArray();
+                    var entriesByKind = manifest.Artifacts
+                        .GroupBy(static entry => entry.Kind, StringComparer.Ordinal)
+                        .ToDictionary(static group => group.Key, static group => group.ToArray(), StringComparer.Ordinal);
+
+                    string[] missingKinds = requiredKinds.Where(required => !entriesByKind.ContainsKey(required)).ToArray();
                     if (missingKinds.Length > 0)
                     {
                         failures.Add($"NFR proof artifacts manifest missing required kinds: [{string.Join(", ", missingKinds)}].");
                     }
-                    else
+
+                    string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? projectDirectory;
+                    var missingArtifactFiles = new List<string>();
+                    foreach (string requiredKind in requiredKinds)
+                    {
+                        if (!entriesByKind.TryGetValue(requiredKind, out TestingArtifactEntry[]? entriesForKind) || entriesForKind.Length == 0)
+                        {
+                            continue;
+                        }
+
+                        string relativePath = entriesForKind[0].RelativePath;
+                        string resolvedArtifactPath = AssetPipelineService.ResolveRelativePath(manifestDirectory, relativePath);
+                        if (!File.Exists(resolvedArtifactPath))
+                        {
+                            missingArtifactFiles.Add($"{requiredKind} ({resolvedArtifactPath})");
+                        }
+                    }
+
+                    if (missingArtifactFiles.Count > 0)
+                    {
+                        failures.Add($"NFR proof artifacts manifest missing required artifact files: [{string.Join(", ", missingArtifactFiles)}].");
+                    }
+
+                    if (missingKinds.Length == 0 && missingArtifactFiles.Count == 0)
                     {
                         artifactsManifestOk = true;
                     }

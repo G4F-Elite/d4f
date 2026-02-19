@@ -424,6 +424,55 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailNfrProof_WhenArtifactsManifestRequiredFileIsMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            string exrPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr");
+            Assert.True(File.Exists(exrPath));
+            File.Delete(exrPath);
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(1, code);
+            string stderr = error.ToString();
+            Assert.Contains("NFR proof artifacts manifest missing required artifact files", stderr, StringComparison.Ordinal);
+            Assert.Contains("screenshot-buffer-rgba16f-exr", stderr, StringComparison.Ordinal);
+
+            string proofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            Assert.True(File.Exists(proofPath));
+            using JsonDocument proof = JsonDocument.Parse(File.ReadAllText(proofPath));
+            JsonElement root = proof.RootElement;
+            Assert.False(root.GetProperty("isSuccess").GetBoolean());
+            JsonElement checks = root.GetProperty("checks");
+            Assert.False(checks.GetProperty("artifactsManifest").GetBoolean());
+            Assert.False(checks.GetProperty("allArtifactsPresent").GetBoolean());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();
