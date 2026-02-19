@@ -275,6 +275,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.MultiplayerRpcBinaryPath);
         Assert.False(command.VerifyCaptureRgba16FloatBinary);
         Assert.Null(command.CaptureRgba16FloatBinaryPath);
+        Assert.False(command.VerifyRenderStatsArtifact);
+        Assert.Null(command.RenderStatsArtifactPath);
     }
 
     [Fact]
@@ -295,7 +297,9 @@ public sealed class EngineCliParserTests
             "--verify-multiplayer-rpc", "true",
             "--multiplayer-rpc", "artifacts/tests/net/multiplayer-rpc.bin",
             "--verify-capture-rgba16f", "true",
-            "--capture-rgba16f", "artifacts/tests/screenshots/frame-0001.rgba16f.bin"
+            "--capture-rgba16f", "artifacts/tests/screenshots/frame-0001.rgba16f.bin",
+            "--verify-render-stats", "true",
+            "--render-stats", "artifacts/tests/render/frame-stats.json"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -312,6 +316,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/net/multiplayer-rpc.bin", command.MultiplayerRpcBinaryPath);
         Assert.True(command.VerifyCaptureRgba16FloatBinary);
         Assert.Equal("artifacts/tests/screenshots/frame-0001.rgba16f.bin", command.CaptureRgba16FloatBinaryPath);
+        Assert.True(command.VerifyRenderStatsArtifact);
+        Assert.Equal("artifacts/tests/render/frame-stats.json", command.RenderStatsArtifactPath);
     }
 
     [Theory]
@@ -324,6 +330,7 @@ public sealed class EngineCliParserTests
     [InlineData("--verify-multiplayer-snapshot", "yes", "Option '--verify-multiplayer-snapshot' must be 'true' or 'false'.")]
     [InlineData("--verify-multiplayer-rpc", "yes", "Option '--verify-multiplayer-rpc' must be 'true' or 'false'.")]
     [InlineData("--verify-capture-rgba16f", "yes", "Option '--verify-capture-rgba16f' must be 'true' or 'false'.")]
+    [InlineData("--verify-render-stats", "yes", "Option '--verify-render-stats' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -391,6 +398,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--capture-rgba16f' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenRenderStatsPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--render-stats", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--render-stats' cannot be empty.", result.Error);
     }
 
     [Fact]

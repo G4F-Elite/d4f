@@ -52,6 +52,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
+        ValidateRenderStatsArtifact(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -268,6 +269,64 @@ public sealed partial class EngineCliApp
         }
     }
 
+    private void ValidateRenderStatsArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.RenderStatsArtifactPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.RenderStatsArtifactPath!
+            : Path.Combine("artifacts", "tests", "render", "frame-stats.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyRenderStatsArtifact || explicitPath)
+            {
+                failures.Add($"Render stats artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Render stats artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            int drawItemCount = ReadRequiredInt(root, "drawItemCount", "Render stats artifact");
+            ulong triangleCount = ReadRequiredUInt64(root, "triangleCount", "Render stats artifact");
+            ulong uploadBytes = ReadRequiredUInt64(root, "uploadBytes", "Render stats artifact");
+            ulong gpuMemoryBytes = ReadRequiredUInt64(root, "gpuMemoryBytes", "Render stats artifact");
+            ulong presentCount = ReadRequiredUInt64(root, "presentCount", "Render stats artifact");
+
+            _stdout.WriteLine(
+                $"Render stats: drawItems={drawItemCount}, triangles={triangleCount}, uploadBytes={uploadBytes}, gpuMemoryBytes={gpuMemoryBytes}, presents={presentCount}.");
+
+            if (!command.VerifyRenderStatsArtifact)
+            {
+                return;
+            }
+
+            if (drawItemCount <= 0 || triangleCount == 0UL || uploadBytes == 0UL || gpuMemoryBytes == 0UL || presentCount == 0UL)
+            {
+                failures.Add("Render stats check failed: draw/triangle/upload/gpu memory/present counters must all be greater than zero.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"Render stats check failed: {ex.Message}");
+        }
+    }
+
     private void ValidateRuntimePerfMetrics(
         DoctorCommand command,
         string projectDirectory,
@@ -444,6 +503,16 @@ public sealed partial class EngineCliApp
         if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetInt64(out long value))
         {
             throw new InvalidDataException($"{context} is missing integer property '{propertyName}'.");
+        }
+
+        return value;
+    }
+
+    private static ulong ReadRequiredUInt64(JsonElement root, string propertyName, string context)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement property) || !property.TryGetUInt64(out ulong value))
+        {
+            throw new InvalidDataException($"{context} is missing unsigned integer property '{propertyName}'.");
         }
 
         return value;

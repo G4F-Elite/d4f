@@ -397,6 +397,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--capture-rgba16f' cannot be empty.");
         }
 
+        bool verifyRenderStatsArtifact = false;
+        if (options.TryGetValue("verify-render-stats", out string? verifyRenderStatsValue))
+        {
+            if (!bool.TryParse(verifyRenderStatsValue, out verifyRenderStatsArtifact))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-render-stats' must be 'true' or 'false'.");
+            }
+        }
+
+        string? renderStatsArtifactPath = options.TryGetValue("render-stats", out string? renderStatsPathValue)
+            ? renderStatsPathValue
+            : null;
+        if (renderStatsArtifactPath is not null && string.IsNullOrWhiteSpace(renderStatsArtifactPath))
+        {
+            return EngineCliParseResult.Failure("Option '--render-stats' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -411,7 +428,9 @@ public static partial class EngineCliParser
                 verifyMultiplayerRpcBinary,
                 multiplayerRpcBinaryPath,
                 verifyCaptureRgba16FloatBinary,
-                captureRgba16FloatBinaryPath));
+                captureRgba16FloatBinaryPath,
+                verifyRenderStatsArtifact,
+                renderStatsArtifactPath));
     }
 
     private static string GetOutOrOutputPath(

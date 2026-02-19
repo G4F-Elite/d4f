@@ -708,6 +708,112 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRenderStatsRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-render-stats", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Render stats artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRenderStatsInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string statsPath = Path.Combine(tempRoot, "artifacts", "tests", "render", "frame-stats.json");
+            WriteRenderStats(statsPath, drawItemCount: 0, triangleCount: 0UL, uploadBytes: 0UL, gpuMemoryBytes: 0UL, presentCount: 0UL);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-render-stats", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Render stats check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenRenderStatsValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string statsPath = Path.Combine(tempRoot, "artifacts", "tests", "render", "frame-stats.json");
+            WriteRenderStats(statsPath, drawItemCount: 2, triangleCount: 12UL, uploadBytes: 128UL, gpuMemoryBytes: 256UL, presentCount: 1UL);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-render-stats", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Render stats: drawItems=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -819,6 +925,29 @@ public sealed class EngineCliDoctorToolChecksTests
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         File.WriteAllBytes(filePath, [1, 0, 2, 0, 3, 0, 4, 0]);
+    }
+
+    private static void WriteRenderStats(
+        string filePath,
+        int drawItemCount,
+        ulong triangleCount,
+        ulong uploadBytes,
+        ulong gpuMemoryBytes,
+        ulong presentCount)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "drawItemCount": {{drawItemCount}},
+              "uiItemCount": 0,
+              "triangleCount": {{triangleCount}},
+              "uploadBytes": {{uploadBytes}},
+              "gpuMemoryBytes": {{gpuMemoryBytes}},
+              "presentCount": {{presentCount}}
+            }
+            """);
     }
 
     private static string CreateTempDirectory()

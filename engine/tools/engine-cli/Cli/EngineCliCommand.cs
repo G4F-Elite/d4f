@@ -64,7 +64,9 @@ public sealed record DoctorCommand(
     bool VerifyMultiplayerRpcBinary,
     string? MultiplayerRpcBinaryPath,
     bool VerifyCaptureRgba16FloatBinary,
-    string? CaptureRgba16FloatBinaryPath) : EngineCliCommand;
+    string? CaptureRgba16FloatBinaryPath,
+    bool VerifyRenderStatsArtifact,
+    string? RenderStatsArtifactPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 
