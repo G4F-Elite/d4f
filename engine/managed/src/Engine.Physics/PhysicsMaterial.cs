@@ -8,6 +8,16 @@ public readonly record struct PhysicsMaterial
 
     public PhysicsMaterial(float friction, float restitution)
     {
+        if (!float.IsFinite(friction))
+        {
+            throw new ArgumentOutOfRangeException(nameof(friction), "Friction must be finite.");
+        }
+
+        if (!float.IsFinite(restitution))
+        {
+            throw new ArgumentOutOfRangeException(nameof(restitution), "Restitution must be finite.");
+        }
+
         if (friction is < 0.0f or > 1.0f)
         {
             throw new ArgumentOutOfRangeException(nameof(friction), "Friction must be in [0, 1].");

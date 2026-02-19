@@ -18,6 +18,8 @@ public sealed class PhysicsMaterialTests
     [Fact]
     public void Constructor_ValidatesRanges()
     {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsMaterial(float.NaN, 0.1f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsMaterial(0.1f, float.PositiveInfinity));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsMaterial(-0.1f, 0.1f));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsMaterial(0.5f, 1.1f));
     }
