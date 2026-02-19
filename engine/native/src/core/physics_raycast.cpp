@@ -134,6 +134,98 @@ bool RayIntersectsSphere(const std::array<float, 3>& origin,
   return true;
 }
 
+bool RayIntersectsVerticalCapsule(const std::array<float, 3>& origin,
+                                  const std::array<float, 3>& direction,
+                                  const std::array<float, 3>& center,
+                                  float radius,
+                                  float half_height,
+                                  float max_distance,
+                                  float* out_distance,
+                                  std::array<float, 3>* out_normal) {
+  if (out_distance == nullptr || out_normal == nullptr || radius <= 0.0f ||
+      half_height <= 0.0f || max_distance <= 0.0f) {
+    return false;
+  }
+
+  bool found = false;
+  float best_distance = max_distance;
+  std::array<float, 3> best_normal{0.0f, 1.0f, 0.0f};
+
+  const std::array<float, 3> local_origin = Subtract(origin, center);
+  const float half_cylinder = std::max(0.0f, half_height - radius);
+
+  const float a = direction[0] * direction[0] + direction[2] * direction[2];
+  if (a > kEpsilon) {
+    const float b = 2.0f * (local_origin[0] * direction[0] +
+                            local_origin[2] * direction[2]);
+    const float c = local_origin[0] * local_origin[0] +
+                    local_origin[2] * local_origin[2] - radius * radius;
+    const float discriminant = b * b - 4.0f * a * c;
+    if (discriminant >= 0.0f) {
+      const float sqrt_discriminant = std::sqrt(discriminant);
+      const float inv_denominator = 0.5f / a;
+      const float roots[2] = {
+          (-b - sqrt_discriminant) * inv_denominator,
+          (-b + sqrt_discriminant) * inv_denominator,
+      };
+
+      for (float distance : roots) {
+        if (distance < 0.0f || distance > best_distance) {
+          continue;
+        }
+
+        const float y = local_origin[1] + direction[1] * distance;
+        if (y < -half_cylinder || y > half_cylinder) {
+          continue;
+        }
+
+        const std::array<float, 3> local_hit =
+            Add(local_origin, Scale(direction, distance));
+        std::array<float, 3> normal{local_hit[0], 0.0f, local_hit[2]};
+        if (!Normalize(normal, &normal)) {
+          normal = {0.0f, 1.0f, 0.0f};
+        }
+
+        found = true;
+        best_distance = distance;
+        best_normal = normal;
+      }
+    }
+  }
+
+  const std::array<float, 3> cap_offsets[2] = {
+      {0.0f, half_cylinder, 0.0f},
+      {0.0f, -half_cylinder, 0.0f},
+  };
+  for (const std::array<float, 3>& cap_offset : cap_offsets) {
+    const std::array<float, 3> cap_center = Add(center, cap_offset);
+    float distance = 0.0f;
+    if (!RayIntersectsSphere(origin, direction, cap_center, radius,
+                             max_distance, &distance) ||
+        distance > best_distance) {
+      continue;
+    }
+
+    const std::array<float, 3> hit_point = Add(origin, Scale(direction, distance));
+    std::array<float, 3> normal = Subtract(hit_point, cap_center);
+    if (!Normalize(normal, &normal)) {
+      normal = {0.0f, 1.0f, 0.0f};
+    }
+
+    found = true;
+    best_distance = distance;
+    best_normal = normal;
+  }
+
+  if (!found) {
+    return false;
+  }
+
+  *out_distance = best_distance;
+  *out_normal = best_normal;
+  return true;
+}
+
 }  // namespace
 
 engine_native_status_t PhysicsState::Raycast(
@@ -199,13 +291,8 @@ engine_native_status_t PhysicsState::Raycast(
         break;
       }
 
-      case kColliderShapeSphere:
-      case kColliderShapeCapsule: {
-        float radius = state.collider_dimensions[0] * 0.5f;
-        if (state.collider_shape == kColliderShapeCapsule) {
-          radius = std::max(radius, state.collider_dimensions[1] * 0.5f);
-        }
-
+      case kColliderShapeSphere: {
+        const float radius = state.collider_dimensions[0] * 0.5f;
         has_hit = RayIntersectsSphere(origin, direction, state.position, radius,
                                       query.max_distance, &hit_distance);
         if (has_hit) {
@@ -217,6 +304,20 @@ engine_native_status_t PhysicsState::Raycast(
           }
           hit_normal = normal;
         }
+        break;
+      }
+
+      case kColliderShapeCapsule: {
+        const float radius = state.collider_dimensions[0] * 0.5f;
+        const float half_height = state.collider_dimensions[1] * 0.5f;
+        has_hit = RayIntersectsVerticalCapsule(origin,
+                                               direction,
+                                               state.position,
+                                               radius,
+                                               half_height,
+                                               query.max_distance,
+                                               &hit_distance,
+                                               &hit_normal);
         break;
       }
 

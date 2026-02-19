@@ -223,7 +223,7 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_INVALID_STATE);
 
   assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_INVALID_STATE);
-  engine_native_body_write_t writes[1]{};
+  engine_native_body_write_t writes[2]{};
   writes[0].body = 1001u;
   writes[0].body_type = 1u;
   writes[0].collider_shape = 0u;
@@ -236,7 +236,21 @@ void TestEngineAndSubsystemFlow() {
   writes[0].position[0] = 2.0f;
   writes[0].rotation[3] = 1.0f;
   writes[0].linear_velocity[0] = 3.0f;
-  assert(physics_sync_from_world(physics, writes, 1u) == ENGINE_NATIVE_STATUS_OK);
+
+  writes[1].body = 2002u;
+  writes[1].body_type = 1u;
+  writes[1].collider_shape = 2u;
+  writes[1].is_trigger = 0u;
+  writes[1].collider_dimensions[0] = 1.0f;
+  writes[1].collider_dimensions[1] = 4.0f;
+  writes[1].collider_dimensions[2] = 1.0f;
+  writes[1].friction = 0.4f;
+  writes[1].restitution = 0.2f;
+  writes[1].position[0] = 5.0f;
+  writes[1].position[1] = 2.0f;
+  writes[1].rotation[3] = 1.0f;
+
+  assert(physics_sync_from_world(physics, writes, 2u) == ENGINE_NATIVE_STATUS_OK);
   assert(physics_step(physics, 0.0) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_OK);
   engine_native_raycast_query_t query{};
@@ -253,6 +267,20 @@ void TestEngineAndSubsystemFlow() {
   assert(raycast_hit.has_hit == 1u);
   assert(raycast_hit.body == 1001u);
   assert(std::fabs(raycast_hit.distance - 1.55f) < 0.001f);
+
+  engine_native_raycast_query_t capsule_query{};
+  capsule_query.origin[0] = 0.0f;
+  capsule_query.origin[1] = 2.0f;
+  capsule_query.origin[2] = 0.0f;
+  capsule_query.direction[0] = 1.0f;
+  capsule_query.direction[1] = 0.0f;
+  capsule_query.direction[2] = 0.0f;
+  capsule_query.max_distance = 10.0f;
+  capsule_query.include_triggers = 1u;
+  assert(physics_raycast(physics, &capsule_query, &raycast_hit) == ENGINE_NATIVE_STATUS_OK);
+  assert(raycast_hit.has_hit == 1u);
+  assert(raycast_hit.body == 2002u);
+  assert(std::fabs(raycast_hit.distance - 4.5f) < 0.01f);
   engine_native_sweep_query_t sweep_query{};
   sweep_query.origin[0] = 0.0f;
   sweep_query.origin[1] = 0.0f;
@@ -293,10 +321,24 @@ void TestEngineAndSubsystemFlow() {
   uint32_t read_count = 0u;
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_OK);
-  assert(read_count == 1u);
-  assert(reads[0].body == 1001u);
-  assert(std::fabs(reads[0].position[0] - 2.05f) < 0.001f);
-  assert(reads[0].linear_velocity[0] == 3.0f);
+  assert(read_count == 2u);
+
+  bool found_primary_body = false;
+  bool found_capsule_body = false;
+  for (uint32_t i = 0u; i < read_count; ++i) {
+    if (reads[i].body == 1001u) {
+      found_primary_body = true;
+      assert(std::fabs(reads[i].position[0] - 2.05f) < 0.001f);
+      assert(reads[i].linear_velocity[0] == 3.0f);
+    }
+    if (reads[i].body == 2002u) {
+      found_capsule_body = true;
+      assert(std::fabs(reads[i].position[0] - 5.0f) < 0.001f);
+      assert(std::fabs(reads[i].position[1] - 2.0f) < 0.001f);
+    }
+  }
+  assert(found_primary_body);
+  assert(found_capsule_body);
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_INVALID_STATE);
 
