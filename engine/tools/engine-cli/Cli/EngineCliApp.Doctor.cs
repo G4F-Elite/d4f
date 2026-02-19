@@ -53,6 +53,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
         ValidateMultiplayerOrchestrationArtifact(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
+        ValidateCaptureRgba16FloatExr(command, projectDirectory, failures);
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
         ValidateTestHostConfigArtifact(command, projectDirectory, failures);
         ValidateNetProfileLogArtifact(command, projectDirectory, failures);
@@ -352,6 +353,73 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
             failures.Add($"Capture RGBA16F binary check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateCaptureRgba16FloatExr(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.CaptureRgba16FloatBinaryPath);
+        string relativeOrConfiguredBinaryPath = explicitPath
+            ? command.CaptureRgba16FloatBinaryPath!
+            : Path.Combine("artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+
+        string? exrRelativePath = Path.ChangeExtension(relativeOrConfiguredBinaryPath, ".exr");
+        if (string.IsNullOrWhiteSpace(exrRelativePath))
+        {
+            failures.Add($"Capture RGBA16F EXR check failed: unable to derive EXR path from '{relativeOrConfiguredBinaryPath}'.");
+            return;
+        }
+
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, exrRelativePath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyCaptureRgba16FloatBinary || explicitPath)
+            {
+                failures.Add($"Capture RGBA16F EXR artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Capture RGBA16F EXR artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            byte[] payload = File.ReadAllBytes(resolvedPath);
+            if (payload.Length < 8)
+            {
+                throw new InvalidDataException("Capture RGBA16F EXR payload is too small.");
+            }
+
+            const uint exrMagic = 20000630u;
+            const uint exrBaseVersion = 2u;
+            uint magic = BitConverter.ToUInt32(payload, 0);
+            uint version = BitConverter.ToUInt32(payload, 4);
+            uint baseVersion = version & 0xFFu;
+
+            if (magic != exrMagic)
+            {
+                throw new InvalidDataException($"Capture RGBA16F EXR has invalid magic value {magic}.");
+            }
+
+            if (baseVersion != exrBaseVersion)
+            {
+                throw new InvalidDataException($"Capture RGBA16F EXR has unsupported base version {baseVersion}.");
+            }
+
+            _stdout.WriteLine($"Capture RGBA16F EXR: bytes={payload.Length}, version={baseVersion}.");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            failures.Add($"Capture RGBA16F EXR check failed: {ex.Message}");
         }
     }
 
@@ -688,6 +756,7 @@ public sealed partial class EngineCliApp
                 "screenshot",
                 "screenshot-buffer",
                 "screenshot-buffer-rgba16f",
+                "screenshot-buffer-rgba16f-exr",
                 "multiplayer-demo",
                 "net-profile-log",
                 "multiplayer-snapshot-bin",

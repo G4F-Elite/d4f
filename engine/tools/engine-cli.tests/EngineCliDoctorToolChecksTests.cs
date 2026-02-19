@@ -785,6 +785,8 @@ public sealed class EngineCliDoctorToolChecksTests
             PrepareDoctorProject(tempRoot);
             string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
             WriteCaptureRgba16FloatBinary(capturePath);
+            string exrPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr");
+            WriteCaptureRgba16FloatExr(exrPath);
 
             var runner = new SelectiveDoctorRunner
             {
@@ -805,8 +807,82 @@ public sealed class EngineCliDoctorToolChecksTests
             Assert.Equal(0, code);
             string outputText = output.ToString();
             Assert.Contains("Capture RGBA16F binary: pixels=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Capture RGBA16F EXR: bytes=", outputText, StringComparison.Ordinal);
             Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
             Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCaptureRgba16FExrMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            WriteCaptureRgba16FloatBinary(capturePath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F EXR artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenCaptureRgba16FExrInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            WriteCaptureRgba16FloatBinary(capturePath);
+            string exrPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr");
+            Directory.CreateDirectory(Path.GetDirectoryName(exrPath)!);
+            File.WriteAllBytes(exrPath, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F EXR check failed", error.ToString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -1354,6 +1430,7 @@ public sealed class EngineCliDoctorToolChecksTests
                     "screenshot",
                     "screenshot-buffer",
                     "screenshot-buffer-rgba16f",
+                    "screenshot-buffer-rgba16f-exr",
                     "multiplayer-demo",
                     "net-profile-log",
                     "multiplayer-snapshot-bin",
@@ -1659,6 +1736,15 @@ public sealed class EngineCliDoctorToolChecksTests
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         File.WriteAllBytes(filePath, [1, 0, 2, 0, 3, 0, 4, 0]);
+    }
+
+    private static void WriteCaptureRgba16FloatExr(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        var payload = new byte[8];
+        BitConverter.GetBytes(20000630u).CopyTo(payload, 0);
+        BitConverter.GetBytes(2u).CopyTo(payload, 4);
+        File.WriteAllBytes(filePath, payload);
     }
 
     private static void WriteRenderStats(
