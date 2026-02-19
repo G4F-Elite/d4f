@@ -13,6 +13,13 @@ public sealed record AmbienceLayer(
             throw new ArgumentException("Event id cannot be empty.", nameof(EventId));
         }
 
+        if (!float.IsFinite(AverageIntervalSeconds) ||
+            !float.IsFinite(TriggerProbability) ||
+            !float.IsFinite(Gain))
+        {
+            throw new ArgumentOutOfRangeException(nameof(AverageIntervalSeconds), "Layer values must be finite.");
+        }
+
         if (AverageIntervalSeconds <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(AverageIntervalSeconds), "Average interval must be greater than zero.");

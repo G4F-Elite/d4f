@@ -112,6 +112,17 @@ public sealed class NativeFacadeFactoryAudioTests
         Assert.Equal(0.2f, backend.LastAudioBusParams.Value.ReverbSend);
     }
 
+    [Fact]
+    public void NativeAudioFacade_ShouldRejectNonFiniteListenerBeforeInterop()
+    {
+        var backend = new FakeNativeInteropApi();
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            nativeSet.Audio.SetListener(new ListenerState(float.NaN, 0f, 0f)));
+        Assert.Equal(0, backend.CountCall("audio_set_listener"));
+    }
+
     private static ProceduralSoundRecipe CreateRecipe(uint seed)
     {
         return new ProceduralSoundRecipe(

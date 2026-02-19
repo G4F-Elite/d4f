@@ -5,7 +5,18 @@ public readonly record struct AudioEmitterHandle(ulong Value)
     public bool IsValid => Value != 0u;
 }
 
-public readonly record struct ListenerState(float PositionX, float PositionY, float PositionZ);
+public readonly record struct ListenerState(float PositionX, float PositionY, float PositionZ)
+{
+    public ListenerState Validate()
+    {
+        if (!float.IsFinite(PositionX) || !float.IsFinite(PositionY) || !float.IsFinite(PositionZ))
+        {
+            throw new ArgumentOutOfRangeException(nameof(PositionX), "Listener position components must be finite.");
+        }
+
+        return this;
+    }
+}
 
 public readonly record struct AudioBusParameters(
     AudioBus Bus,
@@ -19,6 +30,11 @@ public readonly record struct AudioBusParameters(
         if (!Enum.IsDefined(Bus))
         {
             throw new InvalidDataException($"Unsupported audio bus value: {Bus}.");
+        }
+
+        if (!float.IsFinite(Gain) || !float.IsFinite(Lowpass) || !float.IsFinite(ReverbSend))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Gain), "Bus parameters must be finite.");
         }
 
         if (Gain < 0f)
@@ -49,6 +65,12 @@ public readonly record struct AudioEmitterParameters(
 {
     public AudioEmitterParameters Validate()
     {
+        if (!float.IsFinite(Volume) || !float.IsFinite(Pitch) ||
+            !float.IsFinite(PositionX) || !float.IsFinite(PositionY) || !float.IsFinite(PositionZ))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Volume), "Emitter parameters must be finite.");
+        }
+
         if (Volume < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(Volume), "Volume cannot be negative.");
@@ -75,6 +97,11 @@ public sealed record AudioPlayRequest(
         if (!Enum.IsDefined(Bus))
         {
             throw new InvalidDataException($"Unsupported audio bus value: {Bus}.");
+        }
+
+        if (!float.IsFinite(Volume) || !float.IsFinite(Pitch))
+        {
+            throw new ArgumentOutOfRangeException(nameof(Volume), "Play request volume and pitch must be finite.");
         }
 
         if (Volume < 0f)

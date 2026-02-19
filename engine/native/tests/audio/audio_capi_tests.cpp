@@ -366,6 +366,66 @@ void TestAudioBusParamsAffectMixSnapshotAndValidation() {
   assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
 }
 
+void TestAudioMasterBusParamsAffectAllEmitterBuses() {
+  engine_native_engine_t* engine = CreateEngine();
+  auto* internal_engine = reinterpret_cast<const engine_native_engine*>(engine);
+
+  engine_native_audio_t* audio = nullptr;
+  assert(engine_get_audio(engine, &audio) == ENGINE_NATIVE_STATUS_OK);
+
+  const std::vector<uint8_t> sound_blob = CreateValidSoundBlob();
+  engine_native_resource_handle_t sound = 0u;
+  assert(audio_create_sound_from_blob(audio, sound_blob.data(), sound_blob.size(), &sound) ==
+         ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_audio_play_desc_t music_desc{};
+  music_desc.volume = 1.0f;
+  music_desc.pitch = 1.0f;
+  music_desc.bus = ENGINE_NATIVE_AUDIO_BUS_MUSIC;
+  uint64_t music_emitter_id = 0u;
+  assert(audio_play(audio, sound, &music_desc, &music_emitter_id) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(music_emitter_id != 0u);
+
+  engine_native_audio_play_desc_t sfx_desc{};
+  sfx_desc.volume = 1.0f;
+  sfx_desc.pitch = 1.0f;
+  sfx_desc.bus = ENGINE_NATIVE_AUDIO_BUS_SFX;
+  uint64_t sfx_emitter_id = 0u;
+  assert(audio_play(audio, sound, &sfx_desc, &sfx_emitter_id) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(sfx_emitter_id != 0u);
+
+  engine_native_audio_bus_params_t master_bus{};
+  master_bus.bus = ENGINE_NATIVE_AUDIO_BUS_MASTER;
+  master_bus.gain = 0.5f;
+  master_bus.lowpass = 0.5f;
+  master_bus.reverb_send = 0.2f;
+  master_bus.muted = 0u;
+  assert(audio_set_bus_params(audio, &master_bus) == ENGINE_NATIVE_STATUS_OK);
+
+  const dff::native::AudioBusMixSnapshot snapshot_with_master_fx =
+      internal_engine->state.audio.BuildMixSnapshot();
+  const float expected_per_bus_gain = 1.0f * 0.5f * 0.5f * (1.0f - 0.2f * 0.35f);
+  assert(std::fabs(snapshot_with_master_fx.music_gain - expected_per_bus_gain) <
+         0.0001f);
+  assert(std::fabs(snapshot_with_master_fx.sfx_gain - expected_per_bus_gain) <
+         0.0001f);
+  assert(std::fabs(snapshot_with_master_fx.master_gain - expected_per_bus_gain * 2.0f) <
+         0.0001f);
+
+  master_bus.muted = 1u;
+  assert(audio_set_bus_params(audio, &master_bus) == ENGINE_NATIVE_STATUS_OK);
+
+  const dff::native::AudioBusMixSnapshot snapshot_muted =
+      internal_engine->state.audio.BuildMixSnapshot();
+  assert(std::fabs(snapshot_muted.music_gain) < 0.0001f);
+  assert(std::fabs(snapshot_muted.sfx_gain) < 0.0001f);
+  assert(std::fabs(snapshot_muted.master_gain) < 0.0001f);
+
+  assert(engine_destroy(engine) == ENGINE_NATIVE_STATUS_OK);
+}
+
 }  // namespace
 
 int main() {
@@ -374,5 +434,6 @@ int main() {
   TestAudioListenerAndEmitterUpdates();
   TestAudioBuildMixSnapshotIncludesSpatialGainAndBusTotals();
   TestAudioBusParamsAffectMixSnapshotAndValidation();
+  TestAudioMasterBusParamsAffectAllEmitterBuses();
   return 0;
 }

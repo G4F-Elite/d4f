@@ -7,7 +7,7 @@ public static class ProceduralSoundSynthesizer
         ArgumentNullException.ThrowIfNull(recipe);
         _ = recipe.Validate();
 
-        if (durationSeconds <= 0f)
+        if (!float.IsFinite(durationSeconds) || durationSeconds <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(durationSeconds), "Duration must be greater than zero.");
         }

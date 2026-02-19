@@ -17,6 +17,14 @@ public readonly record struct AdsrEnvelope(
 {
     public AdsrEnvelope Validate()
     {
+        if (!float.IsFinite(AttackSeconds) ||
+            !float.IsFinite(DecaySeconds) ||
+            !float.IsFinite(SustainLevel) ||
+            !float.IsFinite(ReleaseSeconds))
+        {
+            throw new ArgumentOutOfRangeException(nameof(AttackSeconds), "Envelope values must be finite.");
+        }
+
         if (AttackSeconds < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(AttackSeconds), "Attack cannot be negative.");
@@ -45,6 +53,11 @@ public readonly record struct LfoSettings(float FrequencyHz, float Depth)
 {
     public LfoSettings Validate()
     {
+        if (!float.IsFinite(FrequencyHz) || !float.IsFinite(Depth))
+        {
+            throw new ArgumentOutOfRangeException(nameof(FrequencyHz), "LFO values must be finite.");
+        }
+
         if (FrequencyHz < 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(FrequencyHz), "LFO frequency cannot be negative.");
@@ -63,6 +76,11 @@ public readonly record struct OnePoleLowPassFilter(float CutoffHz)
 {
     public OnePoleLowPassFilter Validate()
     {
+        if (!float.IsFinite(CutoffHz))
+        {
+            throw new ArgumentOutOfRangeException(nameof(CutoffHz), "Filter cutoff must be finite.");
+        }
+
         if (CutoffHz <= 0f)
         {
             throw new ArgumentOutOfRangeException(nameof(CutoffHz), "Filter cutoff must be greater than zero.");
@@ -87,6 +105,11 @@ public sealed record ProceduralSoundRecipe(
         if (!Enum.IsDefined(Oscillator))
         {
             throw new InvalidDataException($"Unsupported oscillator value: {Oscillator}.");
+        }
+
+        if (!float.IsFinite(FrequencyHz) || !float.IsFinite(Gain))
+        {
+            throw new ArgumentOutOfRangeException(nameof(FrequencyHz), "Frequency and gain must be finite.");
         }
 
         if (FrequencyHz <= 0f)

@@ -49,6 +49,7 @@ public sealed class ProceduralAudioTests
         ProceduralSoundRecipe recipe = CreateRecipe(seed: 5u, oscillator: OscillatorType.Sine);
 
         Assert.Throws<ArgumentOutOfRangeException>(() => ProceduralSoundSynthesizer.GenerateMono(recipe, durationSeconds: 0f));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ProceduralSoundSynthesizer.GenerateMono(recipe, durationSeconds: float.NaN));
     }
 
     [Fact]
@@ -60,6 +61,31 @@ public sealed class ProceduralAudioTests
         };
 
         Assert.Throws<ArgumentOutOfRangeException>(() => recipe.Validate());
+    }
+
+    [Fact]
+    public void AudioValueValidation_ShouldFail_ForNonFiniteInputs()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AudioBusParameters(AudioBus.Sfx, float.NaN, 1f, 0f, false).Validate());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AudioEmitterParameters(float.PositiveInfinity, 1f, 0f, 0f, 0f).Validate());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new AudioPlayRequest(AudioBus.Music, 1f, float.NaN, false).Validate());
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new ListenerState(float.NaN, 0f, 0f).Validate());
+
+        ProceduralSoundRecipe nonFiniteRecipe = CreateRecipe(seed: 13u, oscillator: OscillatorType.Sine) with
+        {
+            FrequencyHz = float.PositiveInfinity
+        };
+        Assert.Throws<ArgumentOutOfRangeException>(() => nonFiniteRecipe.Validate());
+
+        var nonFiniteLayer = new AmbienceLayer("wind", float.NaN, 0.5f, 0.5f);
+        Assert.Throws<ArgumentOutOfRangeException>(() => nonFiniteLayer.Validate());
     }
 
     [Fact]
@@ -115,9 +141,13 @@ public sealed class ProceduralAudioTests
         Assert.True(second.IsValid);
         Assert.NotEqual(first, second);
 
+        audio.SetListener(new ListenerState(0f, 1f, 2f));
         audio.SetEmitterParameters(second, new AudioEmitterParameters(Volume: 0.5f, Pitch: 1.2f, PositionX: 1f, PositionY: 2f, PositionZ: 3f));
         audio.Stop(first);
         audio.Stop(second);
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            audio.SetListener(new ListenerState(float.NaN, 0f, 0f)));
     }
 
     private static ProceduralSoundRecipe CreateRecipe(uint seed, OscillatorType oscillator)

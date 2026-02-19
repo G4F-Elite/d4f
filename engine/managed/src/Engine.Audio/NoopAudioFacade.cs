@@ -32,7 +32,7 @@ public sealed class NoopAudioFacade : IAudioFacade
 
     public void SetListener(in ListenerState listener)
     {
-        _ = listener;
+        _ = listener.Validate();
     }
 
     public void SetEmitterParameters(AudioEmitterHandle emitter, in AudioEmitterParameters parameters)

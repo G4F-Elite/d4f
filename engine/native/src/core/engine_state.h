@@ -282,18 +282,28 @@ inline float AudioState::ComputeEmitterGain(const AudioEmitterState& emitter) co
   }
 
   const AudioBusState& bus = bus_states_[BusIndex(emitter.bus)];
-  if (bus.muted != 0u) {
+  const AudioBusState& master_bus = bus_states_[BusIndex(ENGINE_NATIVE_AUDIO_BUS_MASTER)];
+  if (bus.muted != 0u || master_bus.muted != 0u) {
     return 0.0f;
   }
 
   const float volume = std::max(0.0f, emitter.volume);
-  const float lowpass =
+  float lowpass =
       std::clamp(emitter.lowpass, 0.0f, 1.0f) * std::clamp(bus.lowpass, 0.0f, 1.0f);
-  const float reverb = std::clamp(
+  float reverb = std::clamp(
       emitter.reverb_send + std::clamp(bus.reverb_send, 0.0f, 1.0f),
       0.0f,
       1.0f);
-  const float bus_gain = std::max(0.0f, bus.gain);
+  float bus_gain = std::max(0.0f, bus.gain);
+
+  if (emitter.bus != ENGINE_NATIVE_AUDIO_BUS_MASTER) {
+    lowpass *= std::clamp(master_bus.lowpass, 0.0f, 1.0f);
+    reverb = std::clamp(
+        reverb + std::clamp(master_bus.reverb_send, 0.0f, 1.0f),
+        0.0f,
+        1.0f);
+    bus_gain *= std::max(0.0f, master_bus.gain);
+  }
 
   float gain = volume * bus_gain * lowpass;
   if (emitter.is_spatialized != 0u) {

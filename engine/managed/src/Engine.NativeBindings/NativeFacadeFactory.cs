@@ -209,11 +209,12 @@ public static class NativeFacadeFactory
 
         public void SetListener(in ListenerState listener)
         {
+            ListenerState validatedListener = listener.Validate();
             var nativeListener = new EngineNativeListenerDesc
             {
-                Position0 = listener.PositionX,
-                Position1 = listener.PositionY,
-                Position2 = listener.PositionZ,
+                Position0 = validatedListener.PositionX,
+                Position1 = validatedListener.PositionY,
+                Position2 = validatedListener.PositionZ,
                 Forward0 = 0f,
                 Forward1 = 0f,
                 Forward2 = -1f,
