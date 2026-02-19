@@ -376,12 +376,20 @@ internal sealed partial class NativeRuntime
     private static EngineNativeBodyWrite[] BuildBodyWrites(World world)
     {
         var writes = new List<EngineNativeBodyWrite>(world.GetComponentCount<PhysicsBody>());
+        var seenBodies = new HashSet<ulong>();
 
         foreach (var (_, body) in world.Query<PhysicsBody>())
         {
+            ulong encodedBody = EncodeBodyHandle(body.Body);
+            if (!seenBodies.Add(encodedBody))
+            {
+                throw new InvalidOperationException(
+                    $"Duplicate physics body handle '{encodedBody}' detected in world state.");
+            }
+
             writes.Add(new EngineNativeBodyWrite
             {
-                Body = EncodeBodyHandle(body.Body),
+                Body = encodedBody,
                 Position0 = body.Position.X,
                 Position1 = body.Position.Y,
                 Position2 = body.Position.Z,

@@ -1013,7 +1013,11 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     std::copy_n(write.collider_dimensions, 3, state.collider_dimensions.data());
     state.friction = write.friction;
     state.restitution = write.restitution;
-    next_bodies[write.body] = state;
+    if (next_bodies.find(write.body) != next_bodies.end()) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+
+    next_bodies.emplace(write.body, state);
   }
 
   bodies_ = std::move(next_bodies);
@@ -1038,18 +1042,32 @@ engine_native_status_t PhysicsState::SyncToWorld(engine_native_body_read_t* read
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
-  uint32_t written = 0u;
+  std::vector<engine_native_resource_handle_t> sorted_body_handles;
+  sorted_body_handles.reserve(bodies_.size());
   for (const auto& body_pair : bodies_) {
+    sorted_body_handles.push_back(body_pair.first);
+  }
+  std::sort(sorted_body_handles.begin(), sorted_body_handles.end());
+
+  uint32_t written = 0u;
+  for (const engine_native_resource_handle_t body_handle : sorted_body_handles) {
     if (written >= read_capacity) {
       break;
     }
 
+    const auto body_it = bodies_.find(body_handle);
+    if (body_it == bodies_.end()) {
+      continue;
+    }
+
+    const PhysicsBodyState& body_state = body_it->second;
+
     engine_native_body_read_t& read = reads[written];
-    read.body = body_pair.first;
-    std::copy_n(body_pair.second.position.data(), 3, read.position);
-    std::copy_n(body_pair.second.rotation.data(), 4, read.rotation);
-    std::copy_n(body_pair.second.linear_velocity.data(), 3, read.linear_velocity);
-    std::copy_n(body_pair.second.angular_velocity.data(), 3, read.angular_velocity);
+    read.body = body_handle;
+    std::copy_n(body_state.position.data(), 3, read.position);
+    std::copy_n(body_state.rotation.data(), 4, read.rotation);
+    std::copy_n(body_state.linear_velocity.data(), 3, read.linear_velocity);
+    std::copy_n(body_state.angular_velocity.data(), 3, read.angular_velocity);
     read.is_active = 1u;
     ++written;
   }

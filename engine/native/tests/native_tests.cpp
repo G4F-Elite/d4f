@@ -324,6 +324,8 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(read_count == 2u);
+  assert(reads[0].body == 1001u);
+  assert(reads[1].body == 2002u);
 
   bool found_primary_body = false;
   bool found_capsule_body = false;
@@ -422,6 +424,8 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(read_count == 2u);
+  assert(reads[0].body == 3001u);
+  assert(reads[1].body == 3002u);
 
   assert(physics_sync_from_world(physics, nullptr, 1u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
@@ -429,6 +433,12 @@ void TestEngineAndSubsystemFlow() {
   non_finite_write[0] = writes[0];
   non_finite_write[0].position[0] = std::numeric_limits<float>::quiet_NaN();
   assert(physics_sync_from_world(physics, non_finite_write, 1u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_body_write_t duplicate_writes[2]{};
+  duplicate_writes[0] = writes[0];
+  duplicate_writes[1] = writes[0];
+  duplicate_writes[1].position[0] = duplicate_writes[1].position[0] + 1.0f;
+  assert(physics_sync_from_world(physics, duplicate_writes, 2u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_step(physics, std::numeric_limits<double>::quiet_NaN()) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

@@ -288,6 +288,45 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     }
 
     [Fact]
+    public void NativeRuntimePhysicsSyncToPhysics_RejectsDuplicateBodyHandles()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        var firstEntity = world.CreateEntity();
+        var secondEntity = world.CreateEntity();
+
+        world.AddComponent(
+            firstEntity,
+            new PhysicsBody(
+                new BodyHandle(900),
+                PhysicsBodyType.Dynamic,
+                PhysicsCollider.Default,
+                Vector3.Zero,
+                Quaternion.Identity,
+                Vector3.Zero,
+                Vector3.Zero,
+                isActive: true));
+
+        world.AddComponent(
+            secondEntity,
+            new PhysicsBody(
+                new BodyHandle(900),
+                PhysicsBodyType.Kinematic,
+                PhysicsCollider.Default,
+                new Vector3(1.0f, 0.0f, 0.0f),
+                Quaternion.Identity,
+                Vector3.Zero,
+                Vector3.Zero,
+                isActive: true));
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => nativeSet.Physics.SyncToPhysics(world));
+        Assert.Contains("Duplicate physics body handle", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(0, backend.CountCall("physics_sync_from_world"));
+    }
+
+    [Fact]
     public void NativeRuntimePhysicsRaycast_UsesInteropAndMapsHit()
     {
         var backend = new FakeNativeInteropApi
