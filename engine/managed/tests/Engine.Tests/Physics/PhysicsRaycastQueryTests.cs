@@ -26,6 +26,14 @@ public sealed class PhysicsRaycastQueryTests
     public void Constructor_ValidatesInputs()
     {
         Assert.Throws<ArgumentException>(() => new PhysicsRaycastQuery(Vector3.Zero, Vector3.Zero, 1.0f));
+        Assert.Throws<ArgumentException>(() => new PhysicsRaycastQuery(
+            new Vector3(float.NaN, 0.0f, 0.0f),
+            Vector3.UnitX,
+            1.0f));
+        Assert.Throws<ArgumentException>(() => new PhysicsRaycastQuery(
+            Vector3.Zero,
+            new Vector3(float.PositiveInfinity, 0.0f, 0.0f),
+            1.0f));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsRaycastQuery(Vector3.Zero, Vector3.UnitX, 0.0f));
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsRaycastQuery(Vector3.Zero, Vector3.UnitX, float.NaN));
     }

@@ -45,12 +45,21 @@ bool Normalize(const std::array<float, 3>& source, std::array<float, 3>* out) {
   return true;
 }
 
+bool IsFiniteVector3(const std::array<float, 3>& value) {
+  return std::isfinite(value[0]) && std::isfinite(value[1]) &&
+         std::isfinite(value[2]);
+}
+
 bool IsSupportedShape(uint8_t shape) {
   return shape == kColliderShapeBox || shape == kColliderShapeSphere ||
          shape == kColliderShapeCapsule;
 }
 
 bool IsValidShapeDimensions(uint8_t shape, const std::array<float, 3>& dimensions) {
+  if (!IsFiniteVector3(dimensions)) {
+    return false;
+  }
+
   if (dimensions[0] <= 0.0f || dimensions[1] <= 0.0f || dimensions[2] <= 0.0f) {
     return false;
   }
@@ -123,7 +132,8 @@ engine_native_status_t PhysicsState::Sweep(const engine_native_sweep_query_t& qu
   const std::array<float, 3> shape_dimensions{
       query.shape_dimensions[0], query.shape_dimensions[1], query.shape_dimensions[2]};
 
-  if (!Normalize(direction, &direction) || !std::isfinite(query.max_distance) ||
+  if (!IsFiniteVector3(origin) || !Normalize(direction, &direction) ||
+      !std::isfinite(query.max_distance) ||
       query.max_distance <= 0.0f || query.include_triggers > 1u ||
       !IsSupportedShape(query.shape_type) ||
       !IsValidShapeDimensions(query.shape_type, shape_dimensions)) {
@@ -211,7 +221,8 @@ engine_native_status_t PhysicsState::Overlap(const engine_native_overlap_query_t
   const std::array<float, 3> shape_dimensions{
       query.shape_dimensions[0], query.shape_dimensions[1], query.shape_dimensions[2]};
 
-  if (query.include_triggers > 1u || !IsSupportedShape(query.shape_type) ||
+  if (!IsFiniteVector3(center) || query.include_triggers > 1u ||
+      !IsSupportedShape(query.shape_type) ||
       !IsValidShapeDimensions(query.shape_type, shape_dimensions)) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }

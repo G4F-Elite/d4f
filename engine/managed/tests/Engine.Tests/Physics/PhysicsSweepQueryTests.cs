@@ -36,6 +36,20 @@ public sealed class PhysicsSweepQueryTests
             ColliderShapeType.Box,
             new Vector3(1.0f, 1.0f, 1.0f)));
 
+        Assert.Throws<ArgumentException>(() => new PhysicsSweepQuery(
+            new Vector3(float.NaN, 0.0f, 0.0f),
+            Vector3.UnitX,
+            1.0f,
+            ColliderShapeType.Box,
+            new Vector3(1.0f, 1.0f, 1.0f)));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsSweepQuery(
+            Vector3.Zero,
+            new Vector3(float.NaN, 0.0f, 0.0f),
+            1.0f,
+            ColliderShapeType.Box,
+            new Vector3(1.0f, 1.0f, 1.0f)));
+
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsSweepQuery(
             Vector3.Zero,
             Vector3.UnitX,
@@ -63,5 +77,12 @@ public sealed class PhysicsSweepQueryTests
             1.0f,
             ColliderShapeType.Capsule,
             new Vector3(1.0f, 1.9f, 1.0f)));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsSweepQuery(
+            Vector3.Zero,
+            Vector3.UnitX,
+            1.0f,
+            ColliderShapeType.Box,
+            new Vector3(float.NaN, 1.0f, 1.0f)));
     }
 }

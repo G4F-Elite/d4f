@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
+#include <limits>
 #include <initializer_list>
 #include <string>
 #include <vector>
@@ -376,6 +377,13 @@ void TestEngineAndSubsystemFlow() {
 
   assert(physics_sync_from_world(physics, nullptr, 1u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_body_write_t non_finite_write[1]{};
+  non_finite_write[0] = writes[0];
+  non_finite_write[0].position[0] = std::numeric_limits<float>::quiet_NaN();
+  assert(physics_sync_from_world(physics, non_finite_write, 1u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_step(physics, std::numeric_limits<double>::quiet_NaN()) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   engine_native_body_write_t invalid_write[1]{};
   invalid_write[0].body = 555u;
   invalid_write[0].body_type = 9u;
@@ -410,17 +418,29 @@ void TestEngineAndSubsystemFlow() {
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_raycast(physics, &invalid_query, &raycast_hit) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_raycast_query_t non_finite_raycast_query = query;
+  non_finite_raycast_query.origin[0] = std::numeric_limits<float>::infinity();
+  assert(physics_raycast(physics, &non_finite_raycast_query, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_raycast(physics, &query, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_sweep(physics, nullptr, &sweep_hit) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_sweep(physics, &invalid_sweep_query, &sweep_hit) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_sweep_query_t non_finite_sweep_query = sweep_query;
+  non_finite_sweep_query.origin[1] = std::numeric_limits<float>::quiet_NaN();
+  assert(physics_sweep(physics, &non_finite_sweep_query, &sweep_hit) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_sweep(physics, &sweep_query, nullptr) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_overlap(physics, nullptr, overlap_hits, 1u, &overlap_count) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_overlap(physics, &invalid_overlap_query, overlap_hits, 1u,
+                         &overlap_count) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  engine_native_overlap_query_t non_finite_overlap_query = overlap_query;
+  non_finite_overlap_query.center[2] = std::numeric_limits<float>::quiet_NaN();
+  assert(physics_overlap(physics, &non_finite_overlap_query, overlap_hits, 1u,
                          &overlap_count) == ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   assert(physics_overlap(physics, &overlap_query, nullptr, 1u, &overlap_count) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);

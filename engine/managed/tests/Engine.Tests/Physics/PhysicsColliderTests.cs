@@ -26,6 +26,12 @@ public sealed class PhysicsColliderTests
     [Fact]
     public void Constructor_ValidatesDimensionsAndShapeRules()
     {
+        Assert.Throws<ArgumentException>(() => new PhysicsCollider(
+            ColliderShapeType.Box,
+            new Vector3(float.NaN, 1.0f, 1.0f),
+            false,
+            PhysicsMaterial.Default));
+
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsCollider(
             ColliderShapeType.Box,
             new Vector3(0.0f, 1.0f, 1.0f),

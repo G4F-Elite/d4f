@@ -11,6 +11,9 @@ public readonly record struct PhysicsRaycastQuery
         float maxDistance,
         bool includeTriggers = false)
     {
+        PhysicsShapeValidation.ValidateFiniteVector(origin, nameof(origin));
+        PhysicsShapeValidation.ValidateFiniteVector(direction, nameof(direction));
+
         if (direction == Vector3.Zero)
         {
             throw new ArgumentException("Ray direction cannot be zero.", nameof(direction));

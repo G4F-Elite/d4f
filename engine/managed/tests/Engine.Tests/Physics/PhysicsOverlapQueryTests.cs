@@ -25,10 +25,20 @@ public sealed class PhysicsOverlapQueryTests
     [Fact]
     public void Constructor_ValidatesShapeDimensions()
     {
+        Assert.Throws<ArgumentException>(() => new PhysicsOverlapQuery(
+            new Vector3(float.NaN, 0.0f, 0.0f),
+            ColliderShapeType.Box,
+            new Vector3(1.0f, 1.0f, 1.0f)));
+
         Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsOverlapQuery(
             Vector3.Zero,
             ColliderShapeType.Box,
             new Vector3(0.0f, 1.0f, 1.0f)));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsOverlapQuery(
+            Vector3.Zero,
+            ColliderShapeType.Box,
+            new Vector3(float.PositiveInfinity, 1.0f, 1.0f)));
 
         Assert.Throws<ArgumentException>(() => new PhysicsOverlapQuery(
             Vector3.Zero,

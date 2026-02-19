@@ -5,8 +5,33 @@ namespace Engine.Physics;
 
 internal static class PhysicsShapeValidation
 {
+    public static void ValidateFiniteVector(Vector3 value, string paramName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) || !float.IsFinite(value.Z))
+        {
+            throw new ArgumentException("Vector components must be finite.", paramName);
+        }
+    }
+
+    public static void ValidateFiniteQuaternion(Quaternion value, string paramName)
+    {
+        if (!float.IsFinite(value.X) || !float.IsFinite(value.Y) ||
+            !float.IsFinite(value.Z) || !float.IsFinite(value.W))
+        {
+            throw new ArgumentException("Quaternion components must be finite.", paramName);
+        }
+
+        float lengthSquared = value.LengthSquared();
+        if (!float.IsFinite(lengthSquared) || lengthSquared <= 0.0f)
+        {
+            throw new ArgumentException("Quaternion length must be positive and finite.", paramName);
+        }
+    }
+
     public static void ValidateDimensions(ColliderShapeType shapeType, Vector3 dimensions, string paramName)
     {
+        ValidateFiniteVector(dimensions, paramName);
+
         if (dimensions.X <= 0.0f || dimensions.Y <= 0.0f || dimensions.Z <= 0.0f)
         {
             throw new ArgumentOutOfRangeException(paramName, "Collider dimensions must be positive.");

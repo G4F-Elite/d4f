@@ -40,6 +40,16 @@ public struct PhysicsBody
             throw new ArgumentException("Body handle must be valid.", nameof(body));
         }
 
+        if (!Enum.IsDefined(typeof(PhysicsBodyType), bodyType))
+        {
+            throw new ArgumentOutOfRangeException(nameof(bodyType), "Body type is not supported.");
+        }
+
+        PhysicsShapeValidation.ValidateFiniteVector(position, nameof(position));
+        PhysicsShapeValidation.ValidateFiniteQuaternion(rotation, nameof(rotation));
+        PhysicsShapeValidation.ValidateFiniteVector(linearVelocity, nameof(linearVelocity));
+        PhysicsShapeValidation.ValidateFiniteVector(angularVelocity, nameof(angularVelocity));
+
         Body = body;
         BodyType = bodyType;
         Collider = collider;

@@ -17,6 +17,54 @@ public sealed class PhysicsBodyTests
             Quaternion.Identity,
             Vector3.Zero,
             Vector3.Zero));
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new PhysicsBody(
+            new BodyHandle(1),
+            (PhysicsBodyType)255,
+            PhysicsCollider.Default,
+            Vector3.Zero,
+            Quaternion.Identity,
+            Vector3.Zero,
+            Vector3.Zero));
+    }
+
+    [Fact]
+    public void Constructor_ValidatesFiniteTransformsAndVelocities()
+    {
+        Assert.Throws<ArgumentException>(() => new PhysicsBody(
+            new BodyHandle(2),
+            new Vector3(float.NaN, 0.0f, 0.0f),
+            Quaternion.Identity,
+            Vector3.Zero,
+            Vector3.Zero));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsBody(
+            new BodyHandle(3),
+            Vector3.Zero,
+            new Quaternion(float.NaN, 0.0f, 0.0f, 1.0f),
+            Vector3.Zero,
+            Vector3.Zero));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsBody(
+            new BodyHandle(4),
+            Vector3.Zero,
+            new Quaternion(0.0f, 0.0f, 0.0f, 0.0f),
+            Vector3.Zero,
+            Vector3.Zero));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsBody(
+            new BodyHandle(5),
+            Vector3.Zero,
+            Quaternion.Identity,
+            new Vector3(float.PositiveInfinity, 0.0f, 0.0f),
+            Vector3.Zero));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsBody(
+            new BodyHandle(6),
+            Vector3.Zero,
+            Quaternion.Identity,
+            Vector3.Zero,
+            new Vector3(float.NaN, 0.0f, 0.0f)));
     }
 
     [Fact]

@@ -99,6 +99,23 @@ bool IsUnitRange(float value) {
   return value >= 0.0f && value <= 1.0f;
 }
 
+bool IsFiniteVector3(const float values[3]) {
+  return std::isfinite(values[0]) && std::isfinite(values[1]) &&
+         std::isfinite(values[2]);
+}
+
+bool IsFiniteQuaternion(const float values[4]) {
+  if (!std::isfinite(values[0]) || !std::isfinite(values[1]) ||
+      !std::isfinite(values[2]) || !std::isfinite(values[3])) {
+    return false;
+  }
+
+  const float length_squared =
+      values[0] * values[0] + values[1] * values[1] + values[2] * values[2] +
+      values[3] * values[3];
+  return std::isfinite(length_squared) && length_squared > 0.0f;
+}
+
 bool IsFiniteNonNegative(float value) {
   return std::isfinite(value) && value >= 0.0f;
 }
@@ -919,7 +936,7 @@ void RendererState::ResetFrameState() {
 }
 
 engine_native_status_t PhysicsState::Step(double dt_seconds) {
-  if (dt_seconds <= 0.0) {
+  if (!std::isfinite(dt_seconds) || dt_seconds <= 0.0) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
   if (!synced_from_world_) {
@@ -964,7 +981,11 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     }
     if (!IsSupportedBodyType(write.body_type) ||
         !IsSupportedColliderShape(write.collider_shape) || write.is_trigger > 1u ||
-        !IsUnitRange(write.friction) || !IsUnitRange(write.restitution)) {
+        !IsUnitRange(write.friction) || !IsUnitRange(write.restitution) ||
+        !IsFiniteVector3(write.position) || !IsFiniteQuaternion(write.rotation) ||
+        !IsFiniteVector3(write.linear_velocity) ||
+        !IsFiniteVector3(write.angular_velocity) ||
+        !IsFiniteVector3(write.collider_dimensions)) {
       return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
     }
     if (write.collider_dimensions[0] <= 0.0f || write.collider_dimensions[1] <= 0.0f ||

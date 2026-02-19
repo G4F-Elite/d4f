@@ -46,6 +46,11 @@ bool Normalize(const std::array<float, 3>& source, std::array<float, 3>* out) {
   return true;
 }
 
+bool IsFiniteVector3(const std::array<float, 3>& value) {
+  return std::isfinite(value[0]) && std::isfinite(value[1]) &&
+         std::isfinite(value[2]);
+}
+
 std::array<float, 3> ComputeAabbNormal(const std::array<float, 3>& point,
                                        const std::array<float, 3>& center,
                                        const std::array<float, 3>& extents) {
@@ -238,7 +243,8 @@ engine_native_status_t PhysicsState::Raycast(
   std::array<float, 3> origin{query.origin[0], query.origin[1], query.origin[2]};
   std::array<float, 3> direction{query.direction[0], query.direction[1],
                                  query.direction[2]};
-  if (!Normalize(direction, &direction) || !std::isfinite(query.max_distance) ||
+  if (!IsFiniteVector3(origin) || !Normalize(direction, &direction) ||
+      !std::isfinite(query.max_distance) ||
       query.max_distance <= 0.0f) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
