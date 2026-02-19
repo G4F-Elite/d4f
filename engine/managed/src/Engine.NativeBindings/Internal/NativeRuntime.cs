@@ -338,13 +338,24 @@ internal sealed partial class NativeRuntime
             nativeStats.PassMask,
             nativeStats.TriangleCount,
             nativeStats.UploadBytes,
-            nativeStats.GpuMemoryBytes);
+            nativeStats.GpuMemoryBytes,
+            MapRenderingBackend(nativeStats.Reserved0));
     }
 
     public RenderingFrameStats GetLastFrameStats()
     {
         ThrowIfDisposed();
         return _lastFrameStats;
+    }
+
+    private static RenderingBackendKind MapRenderingBackend(uint backend)
+    {
+        return (EngineNativeRenderBackend)backend switch
+        {
+            EngineNativeRenderBackend.Vulkan => RenderingBackendKind.Vulkan,
+            EngineNativeRenderBackend.Noop => RenderingBackendKind.Noop,
+            _ => RenderingBackendKind.Unknown
+        };
     }
 
     public void Dispose()

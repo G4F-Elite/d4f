@@ -1018,6 +1018,11 @@ public sealed partial class EngineCliApp
         JsonElement root = document.RootElement;
 
         string backend = ReadRequiredString(root, "backend", "Runtime perf metrics artifact");
+        if (!string.Equals(backend, "vulkan", StringComparison.Ordinal) &&
+            !string.Equals(backend, "noop", StringComparison.Ordinal))
+        {
+            throw new InvalidDataException("Runtime perf metrics artifact has invalid 'backend'; expected 'vulkan' or 'noop'.");
+        }
         int captureSampleCount = ReadRequiredInt(root, "captureSampleCount", "Runtime perf metrics artifact");
         if (captureSampleCount <= 0)
         {

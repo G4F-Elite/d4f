@@ -63,7 +63,8 @@ public sealed class NoopRenderingFacade : IRenderingFacade, IAdvancedCaptureRend
                 0u,
                 _submittedTriangleCount,
                 _pendingUploadBytes,
-                _gpuMemoryBytes);
+                _gpuMemoryBytes,
+                RenderingBackendKind.Noop);
             _pendingUploadBytes = 0u;
             _submittedDrawItemCount = 0u;
             _submittedUiItemCount = 0u;

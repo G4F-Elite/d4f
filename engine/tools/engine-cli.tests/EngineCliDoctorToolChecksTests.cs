@@ -185,7 +185,7 @@ public sealed class EngineCliDoctorToolChecksTests
             string perfPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "perf-metrics.json");
             WriteRuntimePerfMetrics(
                 perfPath,
-                backend: "native",
+                backend: "vulkan",
                 sampleCount: 8,
                 averageCaptureCpuMs: 3.2,
                 peakCaptureAllocatedBytes: 4096,
@@ -216,6 +216,48 @@ public sealed class EngineCliDoctorToolChecksTests
             Assert.Contains("average capture CPU", errorText, StringComparison.Ordinal);
             Assert.Contains("peak capture allocation", errorText, StringComparison.Ordinal);
             Assert.Contains("not zero-allocation", errorText, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRuntimePerfBackendIsUnsupported()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string perfPath = Path.Combine(tempRoot, "artifacts", "tests", "runtime", "perf-metrics.json");
+            WriteRuntimePerfMetrics(
+                perfPath,
+                backend: "native",
+                sampleCount: 5,
+                averageCaptureCpuMs: 0.8,
+                peakCaptureAllocatedBytes: 0,
+                zeroAllocationCapturePath: true,
+                releaseRendererBudget: 3,
+                releasePhysicsBudget: 3);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("invalid 'backend'; expected 'vulkan' or 'noop'", error.ToString(), StringComparison.Ordinal);
         }
         finally
         {

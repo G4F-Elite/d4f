@@ -102,6 +102,7 @@ public sealed class NoopRenderingFacadeCaptureTests
             Assert.Equal((ulong)2, firstFrame.TriangleCount);
             Assert.Equal(expectedResourceBytes, firstFrame.UploadBytes);
             Assert.Equal(expectedResourceBytes, firstFrame.GpuMemoryBytes);
+            Assert.Equal(RenderingBackendKind.Noop, firstFrame.BackendKind);
 
             using (facade.BeginFrame(512, 16))
             {
@@ -112,6 +113,7 @@ public sealed class NoopRenderingFacadeCaptureTests
             RenderingFrameStats secondFrame = facade.GetLastFrameStats();
             Assert.Equal((ulong)0, secondFrame.UploadBytes);
             Assert.Equal(expectedResourceBytes, secondFrame.GpuMemoryBytes);
+            Assert.Equal(RenderingBackendKind.Noop, secondFrame.BackendKind);
 
             facade.DestroyResource(mesh.Value);
             mesh = default;
@@ -129,6 +131,7 @@ public sealed class NoopRenderingFacadeCaptureTests
             RenderingFrameStats thirdFrame = facade.GetLastFrameStats();
             Assert.Equal((ulong)0, thirdFrame.UploadBytes);
             Assert.Equal((ulong)0, thirdFrame.GpuMemoryBytes);
+            Assert.Equal(RenderingBackendKind.Noop, thirdFrame.BackendKind);
         }
         finally
         {

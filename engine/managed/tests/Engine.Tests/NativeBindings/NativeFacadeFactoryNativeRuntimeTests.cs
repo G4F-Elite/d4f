@@ -24,6 +24,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 DrawItemCount = 1,
                 UiItemCount = 0,
                 ExecutedPassCount = 5,
+                Reserved0 = (uint)EngineNativeRenderBackend.Vulkan,
                 PresentCount = 1,
                 PipelineCacheHits = 3,
                 PipelineCacheMisses = 2,
@@ -59,6 +60,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal((ulong)144, stats.TriangleCount);
         Assert.Equal((ulong)4096, stats.UploadBytes);
         Assert.Equal((ulong)16384, stats.GpuMemoryBytes);
+        Assert.Equal(RenderingBackendKind.Vulkan, stats.BackendKind);
 
         nativeSet.Physics.SyncToPhysics(world);
         nativeSet.Physics.Step(TimeSpan.FromSeconds(1.0 / 60.0));

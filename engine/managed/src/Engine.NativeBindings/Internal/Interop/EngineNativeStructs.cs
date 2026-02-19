@@ -120,6 +120,13 @@ internal struct EngineNativeRendererFrameStats
     public ulong GpuMemoryBytes;
 }
 
+internal enum EngineNativeRenderBackend : uint
+{
+    Unknown = 0,
+    Vulkan = 1,
+    Noop = 2
+}
+
 [StructLayout(LayoutKind.Sequential)]
 internal struct EngineNativeCaptureRequest
 {

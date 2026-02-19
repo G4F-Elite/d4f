@@ -1,6 +1,7 @@
 #include "core/engine_state.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
@@ -8,6 +9,7 @@
 #include <limits>
 #include <new>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -42,6 +44,7 @@ constexpr size_t kMeshBlobIndexFormatOffset = sizeof(uint32_t) * 4u;
 constexpr size_t kMeshBlobIndexDataSizeOffset = sizeof(uint32_t) * 5u;
 constexpr size_t kMeshCpuIndexCountOffset = sizeof(uint32_t) * 2u;
 constexpr const char* kPipelineCachePathEnv = "DFF_PIPELINE_CACHE_PATH";
+constexpr const char* kRenderBackendEnv = "DFF_RENDER_BACKEND";
 
 const char* PassNameForKind(rhi::RhiDevice::PassKind pass_kind) {
   switch (pass_kind) {
@@ -107,17 +110,21 @@ bool HasValidUiScissor(const engine_native_ui_draw_item_t& item) {
          IsFiniteNonNegative(item.scissor_height);
 }
 
-std::string ResolvePipelineCachePath() {
+std::string ResolveEnvironmentValue(const char* variable_name) {
+  if (variable_name == nullptr || variable_name[0] == '\0') {
+    return {};
+  }
+
 #if defined(_WIN32)
   const DWORD required_size =
-      ::GetEnvironmentVariableA(kPipelineCachePathEnv, nullptr, 0u);
+      ::GetEnvironmentVariableA(variable_name, nullptr, 0u);
   if (required_size == 0u) {
     return {};
   }
 
   std::string value(static_cast<size_t>(required_size), '\0');
   const DWORD written =
-      ::GetEnvironmentVariableA(kPipelineCachePathEnv, value.data(), required_size);
+      ::GetEnvironmentVariableA(variable_name, value.data(), required_size);
   if (written == 0u || written >= required_size) {
     return {};
   }
@@ -125,13 +132,46 @@ std::string ResolvePipelineCachePath() {
   value.resize(static_cast<size_t>(written));
   return value;
 #else
-  const char* path = std::getenv(kPipelineCachePathEnv);
+  const char* path = std::getenv(variable_name);
   if (path == nullptr || path[0] == '\0') {
     return {};
   }
 
   return path;
 #endif
+}
+
+bool EqualsIgnoreCase(std::string_view lhs, std::string_view rhs) {
+  if (lhs.size() != rhs.size()) {
+    return false;
+  }
+
+  for (size_t i = 0u; i < lhs.size(); ++i) {
+    const int lhs_char = std::tolower(static_cast<unsigned char>(lhs[i]));
+    const int rhs_char = std::tolower(static_cast<unsigned char>(rhs[i]));
+    if (lhs_char != rhs_char) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+std::string ResolvePipelineCachePath() {
+  return ResolveEnvironmentValue(kPipelineCachePathEnv);
+}
+
+rhi::RhiDevice::BackendKind ResolveRenderBackendKind() {
+  const std::string configured_backend = ResolveEnvironmentValue(kRenderBackendEnv);
+  if (configured_backend.empty()) {
+    return rhi::RhiDevice::BackendKind::kVulkan;
+  }
+
+  if (EqualsIgnoreCase(configured_backend, "noop")) {
+    return rhi::RhiDevice::BackendKind::kNoop;
+  }
+
+  return rhi::RhiDevice::BackendKind::kVulkan;
 }
 
 bool IsSupportedDebugViewMode(uint8_t mode) {
@@ -307,6 +347,7 @@ bool IsValidResourceBlob(RendererState::ResourceKind kind,
 }  // namespace
 
 EngineState::EngineState() {
+  rhi_device.SetBackendKind(ResolveRenderBackendKind());
   renderer.AttachDevice(&rhi_device);
   const std::string cache_path = ResolvePipelineCachePath();
   if (!cache_path.empty()) {
@@ -537,7 +578,7 @@ engine_native_status_t RendererState::Present() {
   last_frame_stats_.ui_item_count = submitted_ui_count_;
   last_frame_stats_.executed_pass_count =
       static_cast<uint32_t>(last_executed_rhi_passes_.size());
-  last_frame_stats_.reserved0 = 0u;
+  last_frame_stats_.reserved0 = static_cast<uint32_t>(rhi_device_->backend_kind());
   last_frame_stats_.present_count = present_count();
   last_frame_stats_.pipeline_cache_hits = pipeline_cache_hits();
   last_frame_stats_.pipeline_cache_misses = pipeline_cache_misses();

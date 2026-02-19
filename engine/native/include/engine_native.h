@@ -114,6 +114,10 @@ typedef enum engine_native_debug_view_mode {
 #define ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE 0x01u
 #define ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS 0x02u
 
+#define ENGINE_NATIVE_RENDER_BACKEND_UNKNOWN 0u
+#define ENGINE_NATIVE_RENDER_BACKEND_VULKAN 1u
+#define ENGINE_NATIVE_RENDER_BACKEND_NOOP 2u
+
 typedef struct engine_native_render_packet {
   const engine_native_draw_item_t* draw_items;
   uint32_t draw_item_count;

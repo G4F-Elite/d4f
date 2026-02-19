@@ -14,6 +14,7 @@ namespace dff::native::tests {
 namespace {
 
 constexpr const char* kPipelineCachePathEnv = "DFF_PIPELINE_CACHE_PATH";
+constexpr const char* kRenderBackendEnv = "DFF_RENDER_BACKEND";
 
 std::filesystem::path MakeTempCachePath() {
   const auto stamp =
@@ -36,6 +37,22 @@ bool ClearPipelineCachePathEnv() {
 #else
   return unsetenv(kPipelineCachePathEnv) == 0;
 #endif
+}
+
+bool SetRenderBackendEnv(const char* backend) {
+#if defined(_WIN32)
+  return _putenv_s(kRenderBackendEnv, backend == nullptr ? "" : backend) == 0;
+#else
+  if (backend == nullptr || backend[0] == '\0') {
+    return unsetenv(kRenderBackendEnv) == 0;
+  }
+
+  return setenv(kRenderBackendEnv, backend, 1) == 0;
+#endif
+}
+
+bool ClearRenderBackendEnv() {
+  return SetRenderBackendEnv(nullptr);
 }
 
 engine_native_status_t ExecuteSingleDrawFrame(
@@ -190,12 +207,45 @@ void TestPipelineCachePathIsCapturedAtEngineCreate() {
   std::filesystem::remove(second_path, remove_error);
 }
 
+void TestRenderBackendCanBeSelectedFromEnvironment() {
+  assert(SetRenderBackendEnv("noop"));
+
+  engine_native_create_desc_t create_desc{
+      .api_version = ENGINE_NATIVE_API_VERSION,
+      .user_data = nullptr};
+
+  engine_native_engine_t* noop_engine = nullptr;
+  assert(engine_create(&create_desc, &noop_engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(noop_engine != nullptr);
+
+  engine_native_renderer_frame_stats_t noop_stats{};
+  assert(ExecuteSingleDrawFrame(noop_engine, 1201u, &noop_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(noop_stats.reserved0 == ENGINE_NATIVE_RENDER_BACKEND_NOOP);
+  assert(engine_destroy(noop_engine) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(SetRenderBackendEnv("invalid-backend"));
+
+  engine_native_engine_t* fallback_engine = nullptr;
+  assert(engine_create(&create_desc, &fallback_engine) == ENGINE_NATIVE_STATUS_OK);
+  assert(fallback_engine != nullptr);
+
+  engine_native_renderer_frame_stats_t fallback_stats{};
+  assert(ExecuteSingleDrawFrame(fallback_engine, 1202u, &fallback_stats) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(fallback_stats.reserved0 == ENGINE_NATIVE_RENDER_BACKEND_VULKAN);
+  assert(engine_destroy(fallback_engine) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(ClearRenderBackendEnv());
+}
+
 }  // namespace
 
 void RunEnginePipelineCachePersistenceTests() {
   TestPipelineCachePersistsAcrossEngineLifetime();
   TestPipelineCacheCorruptedFileIsIgnored();
   TestPipelineCachePathIsCapturedAtEngineCreate();
+  TestRenderBackendCanBeSelectedFromEnvironment();
 }
 
 }  // namespace dff::native::tests

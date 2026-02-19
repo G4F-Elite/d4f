@@ -192,6 +192,7 @@ void TestEngineAndSubsystemFlow() {
   assert(renderer_stats.draw_item_count == 2u);
   assert(renderer_stats.ui_item_count == 0u);
   assert(renderer_stats.executed_pass_count == 8u);
+  assert(renderer_stats.reserved0 == ENGINE_NATIVE_RENDER_BACKEND_VULKAN);
   assert(renderer_stats.present_count == 1u);
   assert(renderer_stats.pipeline_cache_hits == 0u);
   assert(renderer_stats.pipeline_cache_misses == 2u);

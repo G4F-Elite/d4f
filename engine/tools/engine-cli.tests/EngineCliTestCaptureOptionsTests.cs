@@ -168,7 +168,7 @@ public sealed class EngineCliTestCaptureOptionsTests
             JsonElement runtimePerfRoot = runtimePerfJson.RootElement;
             string? runtimeBackend = runtimePerfRoot.GetProperty("backend").GetString();
             Assert.True(
-                string.Equals(runtimeBackend, "native", StringComparison.Ordinal) ||
+                string.Equals(runtimeBackend, "vulkan", StringComparison.Ordinal) ||
                 string.Equals(runtimeBackend, "noop", StringComparison.Ordinal));
             int captureSampleCount = runtimePerfRoot.GetProperty("captureSampleCount").GetInt32();
             Assert.True(captureSampleCount >= 5);

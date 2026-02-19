@@ -156,6 +156,7 @@ internal static class TestArtifactGenerator
         private double _peakCaptureCpuMs;
         private long _totalCaptureAllocatedBytes;
         private long _peakCaptureAllocatedBytes;
+        private RenderingBackendKind _observedBackendKind = RenderingBackendKind.Unknown;
 
         public void AddSample(double captureCpuMs, long captureAllocatedBytes)
         {
@@ -176,6 +177,19 @@ internal static class TestArtifactGenerator
             _peakCaptureAllocatedBytes = Math.Max(_peakCaptureAllocatedBytes, captureAllocatedBytes);
         }
 
+        public void ObserveFrameStats(RenderingFrameStats stats)
+        {
+            if (_observedBackendKind != RenderingBackendKind.Unknown)
+            {
+                return;
+            }
+
+            if (stats.BackendKind is RenderingBackendKind.Vulkan or RenderingBackendKind.Noop)
+            {
+                _observedBackendKind = stats.BackendKind;
+            }
+        }
+
         public RuntimePerfMetricsArtifact BuildArtifact(string backend)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(backend);
@@ -188,8 +202,9 @@ internal static class TestArtifactGenerator
                 ? 0d
                 : _totalCaptureCpuMs / _sampleCount;
             bool zeroAllocationCapturePath = _peakCaptureAllocatedBytes == 0L;
+            string resolvedBackend = ResolveBackendLabel(backend);
             return new RuntimePerfMetricsArtifact(
-                Backend: backend,
+                Backend: resolvedBackend,
                 CaptureSampleCount: _sampleCount,
                 AverageCaptureCpuMs: averageCpuMs,
                 PeakCaptureCpuMs: _peakCaptureCpuMs,
@@ -199,6 +214,26 @@ internal static class TestArtifactGenerator
                 ZeroAllocationCapturePath: zeroAllocationCapturePath,
                 ReleaseRendererInteropBudgetPerFrame: releaseBudgets.MaxRendererCallsPerFrame,
                 ReleasePhysicsInteropBudgetPerTick: releaseBudgets.MaxPhysicsCallsPerTick);
+        }
+
+        private string ResolveBackendLabel(string fallbackBackend)
+        {
+            if (_observedBackendKind == RenderingBackendKind.Vulkan)
+            {
+                return "vulkan";
+            }
+
+            if (_observedBackendKind == RenderingBackendKind.Noop)
+            {
+                return "noop";
+            }
+
+            if (string.Equals(fallbackBackend, "native", StringComparison.Ordinal))
+            {
+                return "vulkan";
+            }
+
+            return fallbackBackend;
         }
     }
 
@@ -357,6 +392,7 @@ internal static class TestArtifactGenerator
         long allocationAfter = GC.GetAllocatedBytesForCurrentThread();
         long allocationDelta = Math.Max(0L, allocationAfter - allocationBefore);
         capturePerfAccumulator.AddSample(captureCpuMs, allocationDelta);
+        capturePerfAccumulator.ObserveFrameStats(captureFacade.GetLastFrameStats());
         return new GoldenImageBuffer(checked((int)CaptureWidth), checked((int)CaptureHeight), rgba);
     }
 
