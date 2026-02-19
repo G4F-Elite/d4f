@@ -57,6 +57,7 @@ public sealed partial class EngineCliApp
         ValidateNetProfileLogArtifact(command, projectDirectory, failures);
         ValidateReplayRecordingArtifact(command, projectDirectory, failures);
         ValidateArtifactsManifest(command, projectDirectory, failures);
+        ValidateReleaseProofArtifact(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -625,6 +626,87 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
             failures.Add($"Artifacts manifest check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateReleaseProofArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.ReleaseProofPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.ReleaseProofPath!
+            : Path.Combine("artifacts", "nfr", "release-proof.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyReleaseProof || explicitPath)
+            {
+                failures.Add($"NFR release proof artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"NFR release proof artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            bool isSuccess = ReadRequiredBool(root, "isSuccess", "NFR release proof artifact");
+            string configuration = ReadRequiredString(root, "configuration", "NFR release proof artifact");
+            if (!root.TryGetProperty("checks", out JsonElement checks) || checks.ValueKind != JsonValueKind.Object)
+            {
+                throw new InvalidDataException("NFR release proof artifact is missing object property 'checks'.");
+            }
+
+            bool runtimePerfMetrics = ReadRequiredBool(checks, "runtimePerfMetrics", "NFR release proof checks");
+            bool renderStats = ReadRequiredBool(checks, "renderStats", "NFR release proof checks");
+            bool multiplayerSummary = ReadRequiredBool(checks, "multiplayerSummary", "NFR release proof checks");
+            bool netProfileLog = ReadRequiredBool(checks, "netProfileLog", "NFR release proof checks");
+            bool multiplayerSnapshotBinary = ReadRequiredBool(checks, "multiplayerSnapshotBinary", "NFR release proof checks");
+            bool multiplayerRpcBinary = ReadRequiredBool(checks, "multiplayerRpcBinary", "NFR release proof checks");
+            bool replayRecording = ReadRequiredBool(checks, "replayRecording", "NFR release proof checks");
+            bool artifactsManifest = ReadRequiredBool(checks, "artifactsManifest", "NFR release proof checks");
+            bool releaseInteropBudgetsMatch = ReadRequiredBool(checks, "releaseInteropBudgetsMatch", "NFR release proof checks");
+            bool allArtifactsPresent = ReadRequiredBool(checks, "allArtifactsPresent", "NFR release proof checks");
+
+            _stdout.WriteLine(
+                $"NFR release proof: success={isSuccess}, configuration={configuration}, allArtifacts={allArtifactsPresent}, releaseBudgets={releaseInteropBudgetsMatch}.");
+
+            if (!command.VerifyReleaseProof)
+            {
+                return;
+            }
+
+            bool allChecksPassed = isSuccess &&
+                allArtifactsPresent &&
+                releaseInteropBudgetsMatch &&
+                runtimePerfMetrics &&
+                renderStats &&
+                multiplayerSummary &&
+                netProfileLog &&
+                multiplayerSnapshotBinary &&
+                multiplayerRpcBinary &&
+                replayRecording &&
+                artifactsManifest;
+            if (!allChecksPassed)
+            {
+                failures.Add("NFR release proof check failed: expected successful proof with all checks passing.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"NFR release proof check failed: {ex.Message}");
         }
     }
 

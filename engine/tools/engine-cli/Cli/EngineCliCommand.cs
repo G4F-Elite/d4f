@@ -58,6 +58,11 @@ public sealed record MultiplayerDemoCommand(
     double FixedDeltaSeconds,
     bool RequireNativeTransportSuccess) : EngineCliCommand;
 
+public sealed record NfrProofCommand(
+    string ProjectDirectory,
+    string OutputPath,
+    string Configuration) : EngineCliCommand;
+
 public sealed record DoctorCommand(
     string ProjectDirectory,
     string? RuntimePerfMetricsPath,
@@ -81,7 +86,9 @@ public sealed record DoctorCommand(
     bool VerifyReplayRecording,
     string? ReplayRecordingPath,
     bool VerifyArtifactsManifest,
-    string? ArtifactsManifestPath) : EngineCliCommand;
+    string? ArtifactsManifestPath,
+    bool VerifyReleaseProof,
+    string? ReleaseProofPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

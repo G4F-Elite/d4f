@@ -12,7 +12,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, nfr proof, pack, doctor, api dump.",
             result.Error);
     }
 
@@ -196,6 +196,62 @@ public sealed class EngineCliParserTests
     }
 
     [Fact]
+    public void Parse_ShouldCreateNfrProofCommand_WithDefaults()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["nfr", "proof", "--project", "game"]);
+
+        NfrProofCommand command = Assert.IsType<NfrProofCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal(Path.Combine("game", "artifacts", "nfr", "release-proof.json"), command.OutputPath);
+        Assert.Equal("Release", command.Configuration);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateNfrProofCommand_WithExplicitOptions()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "nfr",
+            "proof",
+            "--project", "game",
+            "--out", "artifacts/nfr/custom-proof.json",
+            "--configuration", "Debug"
+        ]);
+
+        NfrProofCommand command = Assert.IsType<NfrProofCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("artifacts/nfr/custom-proof.json", command.OutputPath);
+        Assert.Equal("Debug", command.Configuration);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailNfrProof_WhenProjectMissing()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["nfr", "proof"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--project' is required for 'nfr proof'.", result.Error);
+    }
+
+    [Theory]
+    [InlineData("--configuration", "Prod", "Option '--configuration' must be 'Debug' or 'Release'.")]
+    [InlineData("--out", " ", "Output path cannot be empty.")]
+    public void Parse_ShouldFailNfrProof_WhenOptionInvalid(string optionName, string optionValue, string expectedError)
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "nfr",
+            "proof",
+            "--project", "game",
+            optionName,
+            optionValue
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(expectedError, result.Error);
+    }
+
+    [Fact]
     public void Parse_ShouldReadGoldenAndComparison_ForTestCommand()
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -349,6 +405,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.ReplayRecordingPath);
         Assert.False(command.VerifyArtifactsManifest);
         Assert.Null(command.ArtifactsManifestPath);
+        Assert.False(command.VerifyReleaseProof);
+        Assert.Null(command.ReleaseProofPath);
     }
 
     [Fact]
@@ -379,7 +437,9 @@ public sealed class EngineCliParserTests
             "--verify-replay-recording", "true",
             "--replay-recording", "artifacts/tests/replay/recording.json",
             "--verify-artifacts-manifest", "true",
-            "--artifacts-manifest", "artifacts/tests/manifest.json"
+            "--artifacts-manifest", "artifacts/tests/manifest.json",
+            "--verify-release-proof", "true",
+            "--release-proof", "artifacts/nfr/release-proof.json"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -406,6 +466,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/replay/recording.json", command.ReplayRecordingPath);
         Assert.True(command.VerifyArtifactsManifest);
         Assert.Equal("artifacts/tests/manifest.json", command.ArtifactsManifestPath);
+        Assert.True(command.VerifyReleaseProof);
+        Assert.Equal("artifacts/nfr/release-proof.json", command.ReleaseProofPath);
     }
 
     [Theory]
@@ -423,6 +485,7 @@ public sealed class EngineCliParserTests
     [InlineData("--verify-net-profile-log", "yes", "Option '--verify-net-profile-log' must be 'true' or 'false'.")]
     [InlineData("--verify-replay-recording", "yes", "Option '--verify-replay-recording' must be 'true' or 'false'.")]
     [InlineData("--verify-artifacts-manifest", "yes", "Option '--verify-artifacts-manifest' must be 'true' or 'false'.")]
+    [InlineData("--verify-release-proof", "yes", "Option '--verify-release-proof' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -560,6 +623,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--artifacts-manifest' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenReleaseProofPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--release-proof", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--release-proof' cannot be empty.", result.Error);
     }
 
     [Fact]

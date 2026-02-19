@@ -5,7 +5,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, nfr proof, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -88,6 +88,19 @@ public static partial class EngineCliParser
             }
 
             return ParseMultiplayerDemo(multiplayerOptions);
+        }
+
+        if (string.Equals(commandName, "nfr", StringComparison.Ordinal) &&
+            args.Length > 1 &&
+            string.Equals(args[1], "proof", StringComparison.OrdinalIgnoreCase))
+        {
+            Dictionary<string, string> nfrOptions = ParseOptions(args[2..], out string? nfrError);
+            if (nfrError is not null)
+            {
+                return EngineCliParseResult.Failure(nfrError);
+            }
+
+            return ParseNfrProof(nfrOptions);
         }
 
         int optionsStartIndex = 1;
@@ -346,6 +359,31 @@ public static partial class EngineCliParser
             RequireNativeTransportSuccess: requireNativeTransportSuccess));
     }
 
+    private static EngineCliParseResult ParseNfrProof(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'nfr proof'.");
+        }
+
+        string outputPath = GetOutOrOutputPath(
+            options,
+            defaultValue: Path.Combine(project, "artifacts", "nfr", "release-proof.json"),
+            out string? outError);
+        if (outError is not null)
+        {
+            return EngineCliParseResult.Failure(outError);
+        }
+
+        string configuration = options.TryGetValue("configuration", out string? cfg) ? cfg : "Release";
+        if (!ValidConfigurations.Contains(configuration))
+        {
+            return EngineCliParseResult.Failure("Option '--configuration' must be 'Debug' or 'Release'.");
+        }
+
+        return EngineCliParseResult.Success(new NfrProofCommand(project, outputPath, configuration));
+    }
+
     private static EngineCliParseResult ParseDoctor(IReadOnlyDictionary<string, string> options)
     {
         if (!options.TryGetValue("project", out string? project))
@@ -548,6 +586,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--artifacts-manifest' cannot be empty.");
         }
 
+        bool verifyReleaseProof = false;
+        if (options.TryGetValue("verify-release-proof", out string? verifyReleaseProofValue))
+        {
+            if (!bool.TryParse(verifyReleaseProofValue, out verifyReleaseProof))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-release-proof' must be 'true' or 'false'.");
+            }
+        }
+
+        string? releaseProofPath = options.TryGetValue("release-proof", out string? releaseProofPathValue)
+            ? releaseProofPathValue
+            : null;
+        if (releaseProofPath is not null && string.IsNullOrWhiteSpace(releaseProofPath))
+        {
+            return EngineCliParseResult.Failure("Option '--release-proof' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -572,7 +627,9 @@ public static partial class EngineCliParser
                 verifyReplayRecording,
                 replayRecordingPath,
                 verifyArtifactsManifest,
-                artifactsManifestPath));
+                artifactsManifestPath,
+                verifyReleaseProof,
+                releaseProofPath));
     }
 
     private static string GetOutOrOutputPath(

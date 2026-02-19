@@ -1286,6 +1286,112 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenReleaseProofRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-release-proof", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("NFR release proof artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenReleaseProofInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string releaseProofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            WriteReleaseProof(releaseProofPath, isSuccess: false, allChecksPassing: false);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-release-proof", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("NFR release proof check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenReleaseProofValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string releaseProofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            WriteReleaseProof(releaseProofPath, isSuccess: true, allChecksPassing: true);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-release-proof", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("NFR release proof: success=True", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -1463,6 +1569,37 @@ public sealed class EngineCliDoctorToolChecksTests
             }
             """;
         File.WriteAllText(filePath, json);
+    }
+
+    private static void WriteReleaseProof(string filePath, bool isSuccess, bool allChecksPassing)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        string lowerIsSuccess = isSuccess.ToString().ToLowerInvariant();
+        string lowerChecks = allChecksPassing.ToString().ToLowerInvariant();
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "generatedAtUtc": "2026-01-01T00:00:00Z",
+              "configuration": "Release",
+              "runtimeProjectPath": "src/Game.Runtime/Game.Runtime.csproj",
+              "build": { "succeeded": true, "exitCode": 0 },
+              "tests": { "succeeded": true, "exitCode": 0 },
+              "checks": {
+                "runtimePerfMetrics": {{lowerChecks}},
+                "renderStats": {{lowerChecks}},
+                "multiplayerSummary": {{lowerChecks}},
+                "netProfileLog": {{lowerChecks}},
+                "multiplayerSnapshotBinary": {{lowerChecks}},
+                "multiplayerRpcBinary": {{lowerChecks}},
+                "replayRecording": {{lowerChecks}},
+                "artifactsManifest": {{lowerChecks}},
+                "releaseInteropBudgetsMatch": {{lowerChecks}},
+                "allArtifactsPresent": {{lowerChecks}}
+              },
+              "isSuccess": {{lowerIsSuccess}}
+            }
+            """);
     }
 
     private static string CreateTempDirectory()

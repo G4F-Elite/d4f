@@ -47,6 +47,7 @@ public sealed partial class EngineCliApp
                 PreviewDumpCommand cmd => HandlePreviewDump(cmd),
                 TestCommand cmd => HandleTest(cmd),
                 MultiplayerDemoCommand cmd => HandleMultiplayerDemo(cmd),
+                NfrProofCommand cmd => HandleNfrProof(cmd),
                 PackCommand cmd => HandlePack(cmd),
                 DoctorCommand cmd => HandleDoctor(cmd),
                 ApiDumpCommand cmd => HandleApiDump(cmd),
@@ -304,7 +305,7 @@ public sealed partial class EngineCliApp
         {
             RenderStatsSummary renderStats = ReadRenderStatsSummary(renderStatsPath);
             _stdout.WriteLine(
-                $"Render stats: draw={renderStats.DrawItemCount}, ui={renderStats.UiItemCount}, triangles={renderStats.TriangleCount}, uploadBytes={renderStats.UploadBytes}, gpuMemoryBytes={renderStats.GpuMemoryBytes}.");
+                $"Render stats: draw={renderStats.DrawItemCount}, ui={renderStats.UiItemCount}, triangles={renderStats.TriangleCount}, uploadBytes={renderStats.UploadBytes}, gpuMemoryBytes={renderStats.GpuMemoryBytes}, presents={renderStats.PresentCount}.");
         }
 
         return 0;
@@ -328,7 +329,8 @@ public sealed partial class EngineCliApp
             UiItemCount: ReadRequiredUInt(root, "uiItemCount"),
             TriangleCount: ReadRequiredULong(root, "triangleCount"),
             UploadBytes: ReadRequiredULong(root, "uploadBytes"),
-            GpuMemoryBytes: ReadRequiredULong(root, "gpuMemoryBytes"));
+            GpuMemoryBytes: ReadRequiredULong(root, "gpuMemoryBytes"),
+            PresentCount: ReadRequiredULong(root, "presentCount"));
     }
 
     private static uint ReadRequiredUInt(JsonElement root, string propertyName)
@@ -356,7 +358,8 @@ public sealed partial class EngineCliApp
         uint UiItemCount,
         ulong TriangleCount,
         ulong UploadBytes,
-        ulong GpuMemoryBytes);
+        ulong GpuMemoryBytes,
+        ulong PresentCount);
 
     private static void EnsureReplayContainsCaptureTick(ReplayRecording replay, int captureFrame)
     {

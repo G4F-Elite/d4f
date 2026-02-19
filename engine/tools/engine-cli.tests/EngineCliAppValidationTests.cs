@@ -198,6 +198,77 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailNfrProof_WhenRuntimeProjectMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(tempRoot, "src"));
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(["nfr", "proof", "--project", tempRoot]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Runtime .csproj was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldWriteNfrProof_WhenChecksPass()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(0, code);
+            string proofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            Assert.True(File.Exists(proofPath));
+
+            using JsonDocument proof = JsonDocument.Parse(File.ReadAllText(proofPath));
+            JsonElement root = proof.RootElement;
+            Assert.True(root.GetProperty("isSuccess").GetBoolean());
+            Assert.Equal("Release", root.GetProperty("configuration").GetString());
+            JsonElement checks = root.GetProperty("checks");
+            Assert.True(checks.GetProperty("allArtifactsPresent").GetBoolean());
+            Assert.True(checks.GetProperty("releaseInteropBudgetsMatch").GetBoolean());
+
+            string stdout = output.ToString();
+            Assert.Contains("NFR release proof written", stdout, StringComparison.Ordinal);
+            Assert.Contains("NFR release proof checks passed.", stdout, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();
