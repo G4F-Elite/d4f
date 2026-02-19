@@ -1,4 +1,5 @@
 using Engine.Cli;
+using Engine.Net;
 
 namespace Engine.Cli.Tests;
 
@@ -386,6 +387,113 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerSnapshotRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-snapshot", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer snapshot binary artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerSnapshotBinaryInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string snapshotPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-snapshot.bin");
+            Directory.CreateDirectory(Path.GetDirectoryName(snapshotPath)!);
+            File.WriteAllBytes(snapshotPath, [1, 2, 3, 4]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-snapshot", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer snapshot binary check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenMultiplayerSnapshotBinaryValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string snapshotPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-snapshot.bin");
+            WriteMultiplayerSnapshotBinary(snapshotPath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-snapshot", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Multiplayer snapshot binary: tick=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -456,6 +564,26 @@ public sealed class EngineCliDoctorToolChecksTests
               }
             }
             """);
+    }
+
+    private static void WriteMultiplayerSnapshotBinary(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+        var snapshot = new NetSnapshot(
+            tick: 7,
+            entities:
+            [
+                new NetEntityState(
+                    entityId: 1u,
+                    ownerClientId: 10u,
+                    proceduralSeed: 42UL,
+                    assetKey: "proc/chunk/1/ABCDEF",
+                    components: [new NetComponentState("transform", [1, 2, 3])])
+            ]);
+
+        byte[] payload = NetSnapshotBinaryCodec.Encode(snapshot);
+        File.WriteAllBytes(filePath, payload);
     }
 
     private static string CreateTempDirectory()

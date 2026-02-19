@@ -346,6 +346,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--multiplayer-demo' cannot be empty.");
         }
 
+        bool verifyMultiplayerSnapshotBinary = false;
+        if (options.TryGetValue("verify-multiplayer-snapshot", out string? verifySnapshotValue))
+        {
+            if (!bool.TryParse(verifySnapshotValue, out verifyMultiplayerSnapshotBinary))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-multiplayer-snapshot' must be 'true' or 'false'.");
+            }
+        }
+
+        string? multiplayerSnapshotBinaryPath = options.TryGetValue("multiplayer-snapshot", out string? multiplayerSnapshotPathValue)
+            ? multiplayerSnapshotPathValue
+            : null;
+        if (multiplayerSnapshotBinaryPath is not null && string.IsNullOrWhiteSpace(multiplayerSnapshotBinaryPath))
+        {
+            return EngineCliParseResult.Failure("Option '--multiplayer-snapshot' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -354,7 +371,9 @@ public static partial class EngineCliParser
                 maxPeakCaptureAllocatedBytes,
                 requireZeroAllocationCapturePath,
                 requireRuntimeTransportSuccess,
-                multiplayerDemoSummaryPath));
+                multiplayerDemoSummaryPath,
+                verifyMultiplayerSnapshotBinary,
+                multiplayerSnapshotBinaryPath));
     }
 
     private static string GetOutOrOutputPath(

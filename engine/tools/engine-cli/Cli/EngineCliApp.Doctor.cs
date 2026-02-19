@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Engine.App;
 using Engine.AssetPipeline;
+using Engine.Net;
 
 namespace Engine.Cli;
 
@@ -48,6 +49,7 @@ public sealed partial class EngineCliApp
 
         ValidateRuntimePerfMetrics(command, projectDirectory, failures);
         ValidateMultiplayerRuntimeTransport(command, projectDirectory, failures);
+        ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -124,6 +126,50 @@ public sealed partial class EngineCliApp
         if (summary.ServerMessagesReceived <= 0 || summary.ClientMessagesReceived <= 0)
         {
             failures.Add("Multiplayer runtime transport check failed: message counters must be greater than zero.");
+        }
+    }
+
+    private void ValidateMultiplayerSnapshotBinary(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.MultiplayerSnapshotBinaryPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.MultiplayerSnapshotBinaryPath!
+            : Path.Combine("artifacts", "tests", "net", "multiplayer-snapshot.bin");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyMultiplayerSnapshotBinary || explicitPath)
+            {
+                failures.Add($"Multiplayer snapshot binary artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Multiplayer snapshot binary artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            byte[] payload = File.ReadAllBytes(resolvedPath);
+            NetSnapshot snapshot = NetSnapshotBinaryCodec.Decode(payload);
+            _stdout.WriteLine(
+                $"Multiplayer snapshot binary: tick={snapshot.Tick}, entities={snapshot.Entities.Count}.");
+            if (command.VerifyMultiplayerSnapshotBinary && snapshot.Entities.Count == 0)
+            {
+                failures.Add("Multiplayer snapshot binary check failed: decoded snapshot is empty.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            failures.Add($"Multiplayer snapshot binary check failed: {ex.Message}");
         }
     }
 

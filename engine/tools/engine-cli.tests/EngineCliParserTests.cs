@@ -269,6 +269,8 @@ public sealed class EngineCliParserTests
         Assert.False(command.RequireZeroAllocationCapturePath);
         Assert.False(command.RequireRuntimeTransportSuccess);
         Assert.Null(command.MultiplayerDemoSummaryPath);
+        Assert.False(command.VerifyMultiplayerSnapshotBinary);
+        Assert.Null(command.MultiplayerSnapshotBinaryPath);
     }
 
     [Fact]
@@ -283,7 +285,9 @@ public sealed class EngineCliParserTests
             "--max-capture-alloc-bytes", "1024",
             "--require-zero-alloc", "true",
             "--require-runtime-transport", "true",
-            "--multiplayer-demo", "artifacts/tests/net/multiplayer-demo.json"
+            "--multiplayer-demo", "artifacts/tests/net/multiplayer-demo.json",
+            "--verify-multiplayer-snapshot", "true",
+            "--multiplayer-snapshot", "artifacts/tests/net/multiplayer-snapshot.bin"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -294,6 +298,8 @@ public sealed class EngineCliParserTests
         Assert.True(command.RequireZeroAllocationCapturePath);
         Assert.True(command.RequireRuntimeTransportSuccess);
         Assert.Equal("artifacts/tests/net/multiplayer-demo.json", command.MultiplayerDemoSummaryPath);
+        Assert.True(command.VerifyMultiplayerSnapshotBinary);
+        Assert.Equal("artifacts/tests/net/multiplayer-snapshot.bin", command.MultiplayerSnapshotBinaryPath);
     }
 
     [Theory]
@@ -303,6 +309,7 @@ public sealed class EngineCliParserTests
     [InlineData("--max-capture-alloc-bytes", "1.25", "Option '--max-capture-alloc-bytes' must be a non-negative integer.")]
     [InlineData("--require-zero-alloc", "yes", "Option '--require-zero-alloc' must be 'true' or 'false'.")]
     [InlineData("--require-runtime-transport", "yes", "Option '--require-runtime-transport' must be 'true' or 'false'.")]
+    [InlineData("--verify-multiplayer-snapshot", "yes", "Option '--verify-multiplayer-snapshot' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -328,6 +335,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--multiplayer-demo' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenMultiplayerSnapshotPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--multiplayer-snapshot", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--multiplayer-snapshot' cannot be empty.", result.Error);
     }
 
     [Fact]

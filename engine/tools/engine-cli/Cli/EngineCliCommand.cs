@@ -58,7 +58,9 @@ public sealed record DoctorCommand(
     long? MaxPeakCaptureAllocatedBytes,
     bool RequireZeroAllocationCapturePath,
     bool RequireRuntimeTransportSuccess,
-    string? MultiplayerDemoSummaryPath) : EngineCliCommand;
+    string? MultiplayerDemoSummaryPath,
+    bool VerifyMultiplayerSnapshotBinary,
+    string? MultiplayerSnapshotBinaryPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 
