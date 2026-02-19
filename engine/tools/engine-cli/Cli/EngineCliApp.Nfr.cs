@@ -304,6 +304,7 @@ public sealed partial class EngineCliApp
 
                     string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? projectDirectory;
                     var missingArtifactFiles = new List<string>();
+                    var invalidArtifactFiles = new List<string>();
                     foreach (string requiredKind in requiredKinds)
                     {
                         if (!entriesByKind.TryGetValue(requiredKind, out TestingArtifactEntry[]? entriesForKind) || entriesForKind.Length == 0)
@@ -316,6 +317,20 @@ public sealed partial class EngineCliApp
                         if (!File.Exists(resolvedArtifactPath))
                         {
                             missingArtifactFiles.Add($"{requiredKind} ({resolvedArtifactPath})");
+                            continue;
+                        }
+
+                        if (string.Equals(requiredKind, "screenshot-buffer-rgba16f-exr", StringComparison.Ordinal))
+                        {
+                            try
+                            {
+                                byte[] exrPayload = File.ReadAllBytes(resolvedArtifactPath);
+                                _ = ExrHeaderValidation.ValidateRgba16Float(exrPayload, "NFR proof RGBA16F EXR artifact");
+                            }
+                            catch (Exception ex) when (ex is IOException or InvalidDataException)
+                            {
+                                invalidArtifactFiles.Add($"{requiredKind} ({resolvedArtifactPath}): {ex.Message}");
+                            }
                         }
                     }
 
@@ -324,7 +339,12 @@ public sealed partial class EngineCliApp
                         failures.Add($"NFR proof artifacts manifest missing required artifact files: [{string.Join(", ", missingArtifactFiles)}].");
                     }
 
-                    if (missingKinds.Length == 0 && missingArtifactFiles.Count == 0)
+                    if (invalidArtifactFiles.Count > 0)
+                    {
+                        failures.Add($"NFR proof artifacts manifest invalid required artifact files: [{string.Join(", ", invalidArtifactFiles)}].");
+                    }
+
+                    if (missingKinds.Length == 0 && missingArtifactFiles.Count == 0 && invalidArtifactFiles.Count == 0)
                     {
                         artifactsManifestOk = true;
                     }

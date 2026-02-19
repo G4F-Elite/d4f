@@ -1,5 +1,6 @@
 using Engine.Cli;
 using Engine.Net;
+using System.Text;
 
 namespace Engine.Cli.Tests;
 
@@ -1850,10 +1851,67 @@ public sealed class EngineCliDoctorToolChecksTests
     private static void WriteCaptureRgba16FloatExr(string filePath)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
-        var payload = new byte[8];
-        BitConverter.GetBytes(20000630u).CopyTo(payload, 0);
-        BitConverter.GetBytes(2u).CopyTo(payload, 4);
-        File.WriteAllBytes(filePath, payload);
+        using var stream = File.Create(filePath);
+        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: false);
+
+        writer.Write(20000630u);
+        writer.Write(2u);
+        WriteExrAttribute(writer, "channels", "chlist", BuildExrChannelsAttribute());
+        WriteExrAttribute(writer, "compression", "compression", [0]);
+        WriteExrAttribute(writer, "dataWindow", "box2i", BuildExrBox2I(0, 0, 0, 0));
+        WriteExrAttribute(writer, "displayWindow", "box2i", BuildExrBox2I(0, 0, 0, 0));
+        WriteExrAttribute(writer, "lineOrder", "lineOrder", [0]);
+        writer.Write((byte)0);
+    }
+
+    private static byte[] BuildExrChannelsAttribute()
+    {
+        using var stream = new MemoryStream();
+        using var writer = new BinaryWriter(stream, Encoding.ASCII, leaveOpen: true);
+
+        WriteExrChannel(writer, "R");
+        WriteExrChannel(writer, "G");
+        WriteExrChannel(writer, "B");
+        WriteExrChannel(writer, "A");
+        writer.Write((byte)0);
+        writer.Flush();
+        return stream.ToArray();
+    }
+
+    private static void WriteExrChannel(BinaryWriter writer, string name)
+    {
+        WriteExrNullTerminatedAscii(writer, name);
+        writer.Write(1);
+        writer.Write((byte)1);
+        writer.Write((byte)0);
+        writer.Write((byte)0);
+        writer.Write((byte)0);
+        writer.Write(1);
+        writer.Write(1);
+    }
+
+    private static byte[] BuildExrBox2I(int minX, int minY, int maxX, int maxY)
+    {
+        var value = new byte[16];
+        BitConverter.GetBytes(minX).CopyTo(value, 0);
+        BitConverter.GetBytes(minY).CopyTo(value, 4);
+        BitConverter.GetBytes(maxX).CopyTo(value, 8);
+        BitConverter.GetBytes(maxY).CopyTo(value, 12);
+        return value;
+    }
+
+    private static void WriteExrAttribute(BinaryWriter writer, string name, string type, byte[] value)
+    {
+        WriteExrNullTerminatedAscii(writer, name);
+        WriteExrNullTerminatedAscii(writer, type);
+        writer.Write(value.Length);
+        writer.Write(value);
+    }
+
+    private static void WriteExrNullTerminatedAscii(BinaryWriter writer, string value)
+    {
+        writer.Write(Encoding.ASCII.GetBytes(value));
+        writer.Write((byte)0);
     }
 
     private static void WriteRenderStats(

@@ -395,28 +395,9 @@ public sealed partial class EngineCliApp
         try
         {
             byte[] payload = File.ReadAllBytes(resolvedPath);
-            if (payload.Length < 8)
-            {
-                throw new InvalidDataException("Capture RGBA16F EXR payload is too small.");
-            }
-
-            const uint exrMagic = 20000630u;
-            const uint exrBaseVersion = 2u;
-            uint magic = BitConverter.ToUInt32(payload, 0);
-            uint version = BitConverter.ToUInt32(payload, 4);
-            uint baseVersion = version & 0xFFu;
-
-            if (magic != exrMagic)
-            {
-                throw new InvalidDataException($"Capture RGBA16F EXR has invalid magic value {magic}.");
-            }
-
-            if (baseVersion != exrBaseVersion)
-            {
-                throw new InvalidDataException($"Capture RGBA16F EXR has unsupported base version {baseVersion}.");
-            }
-
-            _stdout.WriteLine($"Capture RGBA16F EXR: bytes={payload.Length}, version={baseVersion}.");
+            ExrHeaderInfo exr = ExrHeaderValidation.ValidateRgba16Float(payload, "Capture RGBA16F EXR");
+            _stdout.WriteLine(
+                $"Capture RGBA16F EXR: bytes={payload.Length}, size={exr.Width}x{exr.Height}, compression={exr.Compression}, channels={string.Join(',', exr.Channels)}.");
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
