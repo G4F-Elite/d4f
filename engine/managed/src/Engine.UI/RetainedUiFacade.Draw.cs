@@ -358,13 +358,16 @@ public sealed partial class RetainedUiFacade
         Func<char, float> resolveAdvance = fontAtlas is null
             ? static _ => fallbackGlyphWidth
             : fontAtlas.GetAdvance;
+        Func<char, char, float> resolveKerning = fontAtlas is null
+            ? static (_, _) => 0f
+            : fontAtlas.GetKerning;
 
         if (bounds.Width <= 0f || bounds.Height <= 0f)
         {
             return new TextLayoutResult(0u, RectF.Empty);
         }
 
-        string[] lines = BuildTextLines(text.Content, text.WrapMode, bounds.Width, resolveAdvance);
+        string[] lines = BuildTextLines(text.Content, text.WrapMode, bounds.Width, resolveAdvance, resolveKerning);
         if (lines.Length == 0)
         {
             return new TextLayoutResult(0u, RectF.Empty);
@@ -375,7 +378,7 @@ public sealed partial class RetainedUiFacade
         for (int i = 0; i < lines.Length; i++)
         {
             string line = lines[i];
-            maxLineWidth = Math.Max(maxLineWidth, MeasureLineWidth(line, resolveAdvance));
+            maxLineWidth = Math.Max(maxLineWidth, MeasureLineWidth(line, resolveAdvance, resolveKerning));
             glyphCount += line.Length;
         }
 
@@ -414,10 +417,12 @@ public sealed partial class RetainedUiFacade
         string content,
         UiTextWrapMode wrapMode,
         float availableWidth,
-        Func<char, float> resolveAdvance)
+        Func<char, float> resolveAdvance,
+        Func<char, char, float> resolveKerning)
     {
         ArgumentNullException.ThrowIfNull(content);
         ArgumentNullException.ThrowIfNull(resolveAdvance);
+        ArgumentNullException.ThrowIfNull(resolveKerning);
         if (content.Length == 0)
         {
             return Array.Empty<string>();
@@ -447,7 +452,7 @@ public sealed partial class RetainedUiFacade
             for (int wordIndex = 0; wordIndex < words.Length; wordIndex++)
             {
                 string word = words[wordIndex];
-                float wordWidth = MeasureLineWidth(word, resolveAdvance);
+                float wordWidth = MeasureLineWidth(word, resolveAdvance, resolveKerning);
 
                 if (wordWidth > maxWidth)
                 {
@@ -458,7 +463,7 @@ public sealed partial class RetainedUiFacade
                         currentWidth = 0f;
                     }
 
-                    foreach (string chunk in SplitWordToWidth(word, maxWidth, resolveAdvance))
+                    foreach (string chunk in SplitWordToWidth(word, maxWidth, resolveAdvance, resolveKerning))
                     {
                         lines.Add(chunk);
                     }
@@ -473,7 +478,13 @@ public sealed partial class RetainedUiFacade
                 }
                 else
                 {
-                    float candidateWidth = currentWidth + spaceWidth + wordWidth;
+                    float candidateWidth = currentWidth + resolveKerning(current[^1], ' ') + spaceWidth;
+                    if (word.Length > 0)
+                    {
+                        candidateWidth += resolveKerning(' ', word[0]);
+                    }
+
+                    candidateWidth += wordWidth;
                     if (candidateWidth <= maxWidth)
                     {
                         current = $"{current} {word}";
@@ -497,24 +508,38 @@ public sealed partial class RetainedUiFacade
         return lines.Count == 0 ? Array.Empty<string>() : lines.ToArray();
     }
 
-    private static float MeasureLineWidth(string line, Func<char, float> resolveAdvance)
+    private static float MeasureLineWidth(
+        string line,
+        Func<char, float> resolveAdvance,
+        Func<char, char, float> resolveKerning)
     {
         ArgumentNullException.ThrowIfNull(line);
         ArgumentNullException.ThrowIfNull(resolveAdvance);
+        ArgumentNullException.ThrowIfNull(resolveKerning);
 
         float width = 0f;
         for (int i = 0; i < line.Length; i++)
         {
+            if (i > 0)
+            {
+                width += resolveKerning(line[i - 1], line[i]);
+            }
+
             width += resolveAdvance(line[i]);
         }
 
         return width;
     }
 
-    private static IEnumerable<string> SplitWordToWidth(string word, float maxWidth, Func<char, float> resolveAdvance)
+    private static IEnumerable<string> SplitWordToWidth(
+        string word,
+        float maxWidth,
+        Func<char, float> resolveAdvance,
+        Func<char, char, float> resolveKerning)
     {
         ArgumentNullException.ThrowIfNull(word);
         ArgumentNullException.ThrowIfNull(resolveAdvance);
+        ArgumentNullException.ThrowIfNull(resolveKerning);
         if (word.Length == 0)
         {
             yield return string.Empty;
@@ -529,6 +554,11 @@ public sealed partial class RetainedUiFacade
             while (end < word.Length)
             {
                 float nextWidth = width + resolveAdvance(word[end]);
+                if (end > start)
+                {
+                    nextWidth += resolveKerning(word[end - 1], word[end]);
+                }
+
                 if (nextWidth > maxWidth && end > start)
                 {
                     break;

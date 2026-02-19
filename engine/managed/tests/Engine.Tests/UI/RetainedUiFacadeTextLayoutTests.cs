@@ -108,6 +108,66 @@ public sealed class RetainedUiFacadeTextLayoutTests
         Assert.Equal(new RectF(0, 0, 24, 40), command.Bounds);
     }
 
+    [Fact]
+    public void Update_ShouldApplyKerningForAlignedTextLayout()
+    {
+        var document = new UiDocument();
+        var text = new UiText("text", new TextureHandle(15), "AV")
+        {
+            Width = 40,
+            Height = 20,
+            HorizontalAlignment = UiTextHorizontalAlignment.Right,
+            FontAtlas = new UiFontAtlas(
+                lineHeight: 20f,
+                defaultAdvance: 10f,
+                glyphs: new Dictionary<char, UiGlyphMetrics>
+                {
+                    ['A'] = new UiGlyphMetrics(10f),
+                    ['V'] = new UiGlyphMetrics(10f)
+                },
+                kerningPairs: new Dictionary<UiKerningPair, float>
+                {
+                    [new UiKerningPair('A', 'V')] = -4f
+                })
+        };
+        document.AddRoot(text);
+
+        UiDrawCommand command = RenderSingleTextCommand(document);
+
+        Assert.Equal(new RectF(24, 0, 16, 20), command.Bounds);
+    }
+
+    [Fact]
+    public void Update_ShouldApplyKerningWhenWrappingLongWord()
+    {
+        var document = new UiDocument();
+        var text = new UiText("text", new TextureHandle(16), "AVA")
+        {
+            Width = 18,
+            Height = 80,
+            WrapMode = UiTextWrapMode.WordWrap,
+            FontAtlas = new UiFontAtlas(
+                lineHeight: 20f,
+                defaultAdvance: 10f,
+                glyphs: new Dictionary<char, UiGlyphMetrics>
+                {
+                    ['A'] = new UiGlyphMetrics(10f),
+                    ['V'] = new UiGlyphMetrics(10f)
+                },
+                kerningPairs: new Dictionary<UiKerningPair, float>
+                {
+                    [new UiKerningPair('A', 'V')] = -4f,
+                    [new UiKerningPair('V', 'A')] = -4f
+                })
+        };
+        document.AddRoot(text);
+
+        UiDrawCommand command = RenderSingleTextCommand(document);
+
+        Assert.Equal(new RectF(0, 0, 16, 40), command.Bounds);
+        Assert.Equal((uint)3, command.VertexCount / 4u);
+    }
+
     private static UiDrawCommand RenderSingleTextCommand(UiDocument document)
     {
         var facade = new RetainedUiFacade(document);

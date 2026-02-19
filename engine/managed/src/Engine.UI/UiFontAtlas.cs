@@ -7,11 +7,18 @@ public readonly record struct UiGlyphMetrics(float Advance)
         : Advance;
 }
 
+public readonly record struct UiKerningPair(char Left, char Right);
+
 public sealed class UiFontAtlas
 {
     private readonly IReadOnlyDictionary<char, UiGlyphMetrics> _glyphs;
+    private readonly IReadOnlyDictionary<int, float> _kerningAdjustments;
 
-    public UiFontAtlas(float lineHeight, float defaultAdvance, IReadOnlyDictionary<char, UiGlyphMetrics>? glyphs = null)
+    public UiFontAtlas(
+        float lineHeight,
+        float defaultAdvance,
+        IReadOnlyDictionary<char, UiGlyphMetrics>? glyphs = null,
+        IReadOnlyDictionary<UiKerningPair, float>? kerningPairs = null)
     {
         if (!float.IsFinite(lineHeight) || lineHeight <= 0f)
         {
@@ -38,6 +45,26 @@ public sealed class UiFontAtlas
             _glyphs = normalized;
         }
 
+        if (kerningPairs is null || kerningPairs.Count == 0)
+        {
+            _kerningAdjustments = new Dictionary<int, float>();
+        }
+        else
+        {
+            var normalizedKerning = new Dictionary<int, float>(kerningPairs.Count);
+            foreach ((UiKerningPair pair, float value) in kerningPairs)
+            {
+                if (!float.IsFinite(value))
+                {
+                    throw new ArgumentOutOfRangeException(nameof(kerningPairs), "Kerning values must be finite.");
+                }
+
+                normalizedKerning[ComposeKerningKey(pair.Left, pair.Right)] = value;
+            }
+
+            _kerningAdjustments = normalizedKerning;
+        }
+
         LineHeight = lineHeight;
         DefaultAdvance = defaultAdvance;
     }
@@ -51,5 +78,17 @@ public sealed class UiFontAtlas
         return _glyphs.TryGetValue(glyph, out UiGlyphMetrics metrics)
             ? metrics.Advance
             : DefaultAdvance;
+    }
+
+    public float GetKerning(char previousGlyph, char glyph)
+    {
+        return _kerningAdjustments.TryGetValue(ComposeKerningKey(previousGlyph, glyph), out float adjustment)
+            ? adjustment
+            : 0f;
+    }
+
+    private static int ComposeKerningKey(char left, char right)
+    {
+        return (left << 16) | right;
     }
 }
