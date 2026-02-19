@@ -30,7 +30,12 @@ internal sealed record MultiplayerDemoOwnershipStats(
 
 internal sealed record MultiplayerDemoArtifactOutput(
     string SummaryRelativePath,
-    string ProfileLogRelativePath);
+    string ProfileLogRelativePath,
+    string SnapshotBinaryRelativePath);
+
+internal sealed record MultiplayerDemoBuildResult(
+    MultiplayerDemoSummary Summary,
+    NetSnapshot Snapshot);
 
 internal sealed record RuntimeTransportSummary(
     bool Enabled,
@@ -69,7 +74,8 @@ internal static class MultiplayerDemoArtifactGenerator
             throw new ArgumentOutOfRangeException(nameof(fixedDeltaSeconds), "Fixed delta must be greater than zero.");
         }
 
-        MultiplayerDemoSummary summary = BuildSummary(seed, fixedDeltaSeconds);
+        MultiplayerDemoBuildResult buildResult = BuildSummary(seed, fixedDeltaSeconds);
+        MultiplayerDemoSummary summary = buildResult.Summary;
         string summaryRelativePath = Path.Combine("net", "multiplayer-demo.json");
         string summaryFullPath = Path.Combine(outputDirectory, summaryRelativePath);
 
@@ -86,12 +92,18 @@ internal static class MultiplayerDemoArtifactGenerator
         string profileLogFullPath = Path.Combine(outputDirectory, profileLogRelativePath);
         WriteProfileLog(profileLogFullPath, summary);
 
+        string snapshotBinaryRelativePath = Path.Combine("net", "multiplayer-snapshot.bin");
+        string snapshotBinaryFullPath = Path.Combine(outputDirectory, snapshotBinaryRelativePath);
+        byte[] snapshotBinary = NetSnapshotBinaryCodec.Encode(buildResult.Snapshot);
+        File.WriteAllBytes(snapshotBinaryFullPath, snapshotBinary);
+
         return new MultiplayerDemoArtifactOutput(
             SummaryRelativePath: NormalizePath(summaryRelativePath),
-            ProfileLogRelativePath: NormalizePath(profileLogRelativePath));
+            ProfileLogRelativePath: NormalizePath(profileLogRelativePath),
+            SnapshotBinaryRelativePath: NormalizePath(snapshotBinaryRelativePath));
     }
 
-    private static MultiplayerDemoSummary BuildSummary(ulong seed, double fixedDeltaSeconds)
+    private static MultiplayerDemoBuildResult BuildSummary(ulong seed, double fixedDeltaSeconds)
     {
         uint proceduralSeed = unchecked((uint)seed);
         int tickRate = ResolveTickRate(fixedDeltaSeconds);
@@ -150,7 +162,7 @@ internal static class MultiplayerDemoArtifactGenerator
             .Take(8)
             .ToArray();
 
-        return new MultiplayerDemoSummary(
+        var summary = new MultiplayerDemoSummary(
             Seed: seed,
             ProceduralSeed: proceduralSeed,
             FixedDeltaSeconds: fixedDeltaSeconds,
@@ -169,6 +181,8 @@ internal static class MultiplayerDemoArtifactGenerator
             ],
             OwnershipStats: BuildOwnershipStats(firstSnapshot, [firstClientId, secondClientId]),
             RuntimeTransport: runtimeTransport);
+
+        return new MultiplayerDemoBuildResult(summary, firstSnapshot);
     }
 
     private static RuntimeTransportSummary RunRuntimeTransportDemoIfAvailable()

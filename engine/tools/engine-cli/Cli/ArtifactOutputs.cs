@@ -294,6 +294,11 @@ internal static class TestArtifactGenerator
                 Description: "Network profiling log with RTT/loss/bandwidth counters for server and clients."));
         manifestEntries.Add(
             new TestingArtifactEntry(
+                Kind: "multiplayer-snapshot-bin",
+                RelativePath: multiplayerArtifacts.SnapshotBinaryRelativePath,
+                Description: "Binary snapshot payload for transport/serialization verification."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
                 Kind: "render-stats-log",
                 RelativePath: NormalizePath(renderStatsRelativePath),
                 Description: "Render counters log with draw calls, triangles, upload bytes and GPU memory estimate."));
