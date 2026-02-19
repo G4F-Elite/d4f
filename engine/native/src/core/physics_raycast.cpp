@@ -13,6 +13,7 @@ constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
 constexpr float kEpsilon = 0.00001f;
+constexpr float kDistanceTieEpsilon = 0.00001f;
 
 std::array<float, 3> Add(const std::array<float, 3>& lhs,
                          const std::array<float, 3>& rhs) {
@@ -331,7 +332,16 @@ engine_native_status_t PhysicsState::Raycast(
         continue;
     }
 
-    if (!has_hit || hit_distance > best_distance) {
+    if (!has_hit) {
+      continue;
+    }
+
+    const bool has_better_distance =
+        !found_hit || (hit_distance + kDistanceTieEpsilon) < best_distance;
+    const bool is_distance_tie =
+        found_hit && std::fabs(hit_distance - best_distance) <= kDistanceTieEpsilon;
+    const bool has_smaller_body = is_distance_tie && body_pair.first < best_body;
+    if (!has_better_distance && !has_smaller_body) {
       continue;
     }
 

@@ -375,6 +375,54 @@ void TestEngineAndSubsystemFlow() {
   assert(reads[0].body == 1001u);
   assert(std::fabs(reads[0].position[0] - 2.10f) < 0.001f);
 
+  engine_native_body_write_t deterministic_writes[2]{};
+  deterministic_writes[0] = writes[0];
+  deterministic_writes[0].body = 3002u;
+  deterministic_writes[0].position[0] = 4.0f;
+  deterministic_writes[0].position[1] = 0.0f;
+  deterministic_writes[0].position[2] = 0.0f;
+  deterministic_writes[1] = deterministic_writes[0];
+  deterministic_writes[1].body = 3001u;
+
+  assert(physics_sync_from_world(physics, deterministic_writes, 2u) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_OK);
+
+  engine_native_raycast_query_t deterministic_query = query;
+  deterministic_query.max_distance = 20.0f;
+  assert(physics_raycast(physics, &deterministic_query, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(raycast_hit.has_hit == 1u);
+  assert(raycast_hit.body == 3001u);
+
+  engine_native_sweep_query_t deterministic_sweep = sweep_query;
+  deterministic_sweep.max_distance = 20.0f;
+  assert(physics_sweep(physics, &deterministic_sweep, &sweep_hit) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(sweep_hit.has_hit == 1u);
+  assert(sweep_hit.body == 3001u);
+
+  engine_native_overlap_query_t deterministic_overlap{};
+  deterministic_overlap.center[0] = 4.0f;
+  deterministic_overlap.center[1] = 0.0f;
+  deterministic_overlap.center[2] = 0.0f;
+  deterministic_overlap.include_triggers = 1u;
+  deterministic_overlap.shape_type = 0u;
+  deterministic_overlap.shape_dimensions[0] = 1.0f;
+  deterministic_overlap.shape_dimensions[1] = 1.0f;
+  deterministic_overlap.shape_dimensions[2] = 1.0f;
+  engine_native_overlap_hit_t deterministic_hits[2]{};
+  uint32_t deterministic_count = 0u;
+  assert(physics_overlap(physics, &deterministic_overlap, deterministic_hits, 2u,
+                         &deterministic_count) == ENGINE_NATIVE_STATUS_OK);
+  assert(deterministic_count == 2u);
+  assert(deterministic_hits[0].body == 3001u);
+  assert(deterministic_hits[1].body == 3002u);
+
+  assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(read_count == 2u);
+
   assert(physics_sync_from_world(physics, nullptr, 1u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   engine_native_body_write_t non_finite_write[1]{};

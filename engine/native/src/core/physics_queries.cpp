@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <vector>
 
 namespace dff::native {
 
@@ -12,6 +13,7 @@ constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
 constexpr float kEpsilon = 0.00001f;
+constexpr float kDistanceTieEpsilon = 0.00001f;
 
 float Dot(const std::array<float, 3>& lhs, const std::array<float, 3>& rhs) {
   return lhs[0] * rhs[0] + lhs[1] * rhs[1] + lhs[2] * rhs[2];
@@ -171,9 +173,18 @@ engine_native_status_t PhysicsState::Sweep(const engine_native_sweep_query_t& qu
     const float body_radius =
         BoundingSphereRadius(body.collider_shape, body.collider_dimensions);
     float distance = 0.0f;
-    if (!RayIntersectsSphere(origin, direction, body.position, query_radius + body_radius,
-                             query.max_distance, &distance) ||
-        distance > best_distance) {
+    if (!RayIntersectsSphere(origin, direction, body.position,
+                             query_radius + body_radius,
+                             query.max_distance, &distance)) {
+      continue;
+    }
+
+    const bool has_better_distance =
+        !found || (distance + kDistanceTieEpsilon) < best_distance;
+    const bool is_distance_tie =
+        found && std::fabs(distance - best_distance) <= kDistanceTieEpsilon;
+    const bool has_smaller_body = is_distance_tie && body_pair.first < best_body;
+    if (!has_better_distance && !has_smaller_body) {
       continue;
     }
 
@@ -228,7 +239,12 @@ engine_native_status_t PhysicsState::Overlap(const engine_native_overlap_query_t
   }
 
   const float query_radius = BoundingSphereRadius(query.shape_type, shape_dimensions);
-  uint32_t written = 0u;
+  struct OverlapCandidate {
+    engine_native_resource_handle_t body = 0u;
+    uint8_t is_trigger = 0u;
+  };
+  std::vector<OverlapCandidate> overlaps;
+  overlaps.reserve(bodies_.size());
 
   for (const auto& body_pair : bodies_) {
     const PhysicsBodyState& body = body_pair.second;
@@ -243,19 +259,26 @@ engine_native_status_t PhysicsState::Overlap(const engine_native_overlap_query_t
       continue;
     }
 
-    if (written < hit_capacity) {
-      engine_native_overlap_hit_t& hit = hits[written];
-      hit.body = body_pair.first;
-      hit.is_trigger = body.is_trigger;
-      hit.reserved0 = 0u;
-      hit.reserved1 = 0u;
-      hit.reserved2 = 0u;
-    }
-
-    ++written;
+    overlaps.push_back({body_pair.first, body.is_trigger});
   }
 
-  *out_hit_count = std::min(written, hit_capacity);
+  std::sort(overlaps.begin(), overlaps.end(),
+            [](const OverlapCandidate& lhs, const OverlapCandidate& rhs) {
+              return lhs.body < rhs.body;
+            });
+
+  const uint32_t written =
+      std::min(hit_capacity, static_cast<uint32_t>(overlaps.size()));
+  for (uint32_t i = 0u; i < written; ++i) {
+    engine_native_overlap_hit_t& hit = hits[i];
+    hit.body = overlaps[i].body;
+    hit.is_trigger = overlaps[i].is_trigger;
+    hit.reserved0 = 0u;
+    hit.reserved1 = 0u;
+    hit.reserved2 = 0u;
+  }
+
+  *out_hit_count = written;
   return ENGINE_NATIVE_STATUS_OK;
 }
 
