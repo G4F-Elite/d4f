@@ -329,13 +329,32 @@ public static partial class EngineCliParser
             }
         }
 
+        bool requireRuntimeTransportSuccess = false;
+        if (options.TryGetValue("require-runtime-transport", out string? requireRuntimeTransportValue))
+        {
+            if (!bool.TryParse(requireRuntimeTransportValue, out requireRuntimeTransportSuccess))
+            {
+                return EngineCliParseResult.Failure("Option '--require-runtime-transport' must be 'true' or 'false'.");
+            }
+        }
+
+        string? multiplayerDemoSummaryPath = options.TryGetValue("multiplayer-demo", out string? multiplayerDemoPathValue)
+            ? multiplayerDemoPathValue
+            : null;
+        if (multiplayerDemoSummaryPath is not null && string.IsNullOrWhiteSpace(multiplayerDemoSummaryPath))
+        {
+            return EngineCliParseResult.Failure("Option '--multiplayer-demo' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
                 runtimePerfMetricsPath,
                 maxAverageCaptureCpuMs,
                 maxPeakCaptureAllocatedBytes,
-                requireZeroAllocationCapturePath));
+                requireZeroAllocationCapturePath,
+                requireRuntimeTransportSuccess,
+                multiplayerDemoSummaryPath));
     }
 
     private static string GetOutOrOutputPath(

@@ -270,6 +270,122 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRuntimeTransportRequiredButSummaryMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--require-runtime-transport", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer demo summary artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRuntimeTransportSummaryNotSucceeded()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-demo.json");
+            WriteMultiplayerSummary(
+                summaryPath,
+                enabled: true,
+                succeeded: false,
+                serverMessagesReceived: 0,
+                clientMessagesReceived: 0);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--require-runtime-transport", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("runtime transport did not succeed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenRuntimeTransportSummarySucceeded()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-demo.json");
+            WriteMultiplayerSummary(
+                summaryPath,
+                enabled: true,
+                succeeded: true,
+                serverMessagesReceived: 3,
+                clientMessagesReceived: 4);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--require-runtime-transport", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Multiplayer runtime transport: enabled=True, succeeded=True", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -315,6 +431,29 @@ public sealed class EngineCliDoctorToolChecksTests
               "zeroAllocationCapturePath": {{zeroAllocationCapturePath.ToString().ToLowerInvariant()}},
               "releaseRendererInteropBudgetPerFrame": {{releaseRendererBudget}},
               "releasePhysicsInteropBudgetPerTick": {{releasePhysicsBudget}}
+            }
+            """);
+    }
+
+    private static void WriteMultiplayerSummary(
+        string filePath,
+        bool enabled,
+        bool succeeded,
+        int serverMessagesReceived,
+        int clientMessagesReceived)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(
+            filePath,
+            $$"""
+            {
+              "seed": 1337,
+              "runtimeTransport": {
+                "enabled": {{enabled.ToString().ToLowerInvariant()}},
+                "succeeded": {{succeeded.ToString().ToLowerInvariant()}},
+                "serverMessagesReceived": {{serverMessagesReceived}},
+                "clientMessagesReceived": {{clientMessagesReceived}}
+              }
             }
             """);
     }

@@ -56,7 +56,9 @@ public sealed record DoctorCommand(
     string? RuntimePerfMetricsPath,
     double? MaxAverageCaptureCpuMs,
     long? MaxPeakCaptureAllocatedBytes,
-    bool RequireZeroAllocationCapturePath) : EngineCliCommand;
+    bool RequireZeroAllocationCapturePath,
+    bool RequireRuntimeTransportSuccess,
+    string? MultiplayerDemoSummaryPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

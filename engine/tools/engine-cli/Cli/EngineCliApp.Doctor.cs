@@ -47,6 +47,7 @@ public sealed partial class EngineCliApp
         }
 
         ValidateRuntimePerfMetrics(command, projectDirectory, failures);
+        ValidateMultiplayerRuntimeTransport(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -60,6 +61,70 @@ public sealed partial class EngineCliApp
 
         _stdout.WriteLine("Doctor checks passed.");
         return 0;
+    }
+
+    private void ValidateMultiplayerRuntimeTransport(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.MultiplayerDemoSummaryPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.MultiplayerDemoSummaryPath!
+            : Path.Combine("artifacts", "tests", "net", "multiplayer-demo.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.RequireRuntimeTransportSuccess || explicitPath)
+            {
+                failures.Add($"Multiplayer demo summary artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Multiplayer demo summary artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        MultiplayerRuntimeTransportSummary summary;
+        try
+        {
+            summary = ReadMultiplayerRuntimeTransportSummary(resolvedPath);
+        }
+        catch (InvalidDataException ex)
+        {
+            failures.Add(ex.Message);
+            return;
+        }
+
+        _stdout.WriteLine(
+            $"Multiplayer runtime transport: enabled={summary.Enabled}, succeeded={summary.Succeeded}, serverMessages={summary.ServerMessagesReceived}, clientMessages={summary.ClientMessagesReceived}.");
+
+        if (!command.RequireRuntimeTransportSuccess)
+        {
+            return;
+        }
+
+        if (!summary.Enabled)
+        {
+            failures.Add("Multiplayer runtime transport check failed: runtime transport is disabled in summary artifact.");
+            return;
+        }
+
+        if (!summary.Succeeded)
+        {
+            failures.Add("Multiplayer runtime transport check failed: runtime transport did not succeed.");
+            return;
+        }
+
+        if (summary.ServerMessagesReceived <= 0 || summary.ClientMessagesReceived <= 0)
+        {
+            failures.Add("Multiplayer runtime transport check failed: message counters must be greater than zero.");
+        }
     }
 
     private void ValidateRuntimePerfMetrics(
@@ -180,6 +245,33 @@ public sealed partial class EngineCliApp
             releasePhysicsInteropBudgetPerTick);
     }
 
+    private static MultiplayerRuntimeTransportSummary ReadMultiplayerRuntimeTransportSummary(string summaryPath)
+    {
+        string json = File.ReadAllText(summaryPath);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement root = document.RootElement;
+
+        if (!root.TryGetProperty("runtimeTransport", out JsonElement runtimeTransport) || runtimeTransport.ValueKind != JsonValueKind.Object)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact is missing object property 'runtimeTransport'.");
+        }
+
+        bool enabled = ReadRequiredBool(runtimeTransport, "enabled", "Multiplayer summary artifact runtimeTransport");
+        bool succeeded = ReadRequiredBool(runtimeTransport, "succeeded", "Multiplayer summary artifact runtimeTransport");
+        int serverMessagesReceived = ReadRequiredInt(runtimeTransport, "serverMessagesReceived", "Multiplayer summary artifact runtimeTransport");
+        int clientMessagesReceived = ReadRequiredInt(runtimeTransport, "clientMessagesReceived", "Multiplayer summary artifact runtimeTransport");
+        if (serverMessagesReceived < 0 || clientMessagesReceived < 0)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact runtimeTransport contains negative message counters.");
+        }
+
+        return new MultiplayerRuntimeTransportSummary(
+            enabled,
+            succeeded,
+            serverMessagesReceived,
+            clientMessagesReceived);
+    }
+
     private static string ReadRequiredString(JsonElement root, string propertyName, string context)
     {
         if (!root.TryGetProperty(propertyName, out JsonElement property) || property.ValueKind != JsonValueKind.String)
@@ -292,4 +384,10 @@ public sealed partial class EngineCliApp
         bool ZeroAllocationCapturePath,
         int ReleaseRendererInteropBudgetPerFrame,
         int ReleasePhysicsInteropBudgetPerTick);
+
+    private readonly record struct MultiplayerRuntimeTransportSummary(
+        bool Enabled,
+        bool Succeeded,
+        int ServerMessagesReceived,
+        int ClientMessagesReceived);
 }
