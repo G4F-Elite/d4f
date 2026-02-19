@@ -246,6 +246,21 @@ internal static class TestArtifactGenerator
                     Kind: $"{definition.Kind}-buffer",
                     RelativePath: NormalizePath(relativeBufferPath),
                     Description: "Runtime raw capture buffer for golden comparison."));
+
+            if (captureFacade is IAdvancedCaptureRenderingFacade advancedCaptureFacade &&
+                advancedCaptureFacade.TryCaptureFrameRgba16Float(CaptureWidth, CaptureHeight, out byte[] rgba16Float, includeAlpha: true))
+            {
+                string relativeFloatBufferPath = Path.ChangeExtension(definition.RelativeCapturePath, ".rgba16f.bin")
+                    ?? throw new InvalidDataException($"Unable to compute float capture buffer path for '{definition.RelativeCapturePath}'.");
+                string fullFloatBufferPath = Path.Combine(outputDirectory, relativeFloatBufferPath);
+                WriteBinaryArtifact(fullFloatBufferPath, rgba16Float);
+                manifestEntries.Add(
+                    new TestingArtifactEntry(
+                        Kind: $"{definition.Kind}-buffer-rgba16f",
+                        RelativePath: NormalizePath(relativeFloatBufferPath),
+                        Description: "Runtime RGBA16F capture buffer for HDR/readback verification."));
+            }
+
             captures.Add(new TestCaptureArtifact(NormalizePath(definition.RelativeCapturePath), NormalizePath(relativeBufferPath)));
         }
 
@@ -648,6 +663,20 @@ internal static class TestArtifactGenerator
 
         string json = JsonSerializer.Serialize(metrics, ArtifactOutputWriter.SerializerOptions);
         File.WriteAllText(outputPath, json);
+    }
+
+    private static void WriteBinaryArtifact(string outputPath, byte[] payload)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(outputPath);
+        ArgumentNullException.ThrowIfNull(payload);
+
+        string? directory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
+
+        File.WriteAllBytes(outputPath, payload);
     }
 
     private static void WriteRenderStats(string outputPath, RenderStatsArtifact stats)

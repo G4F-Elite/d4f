@@ -251,4 +251,14 @@ internal sealed class NativeRenderingApiStub : INativeRenderingApi
 
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
         => NoopRenderingFacade.Instance.CaptureFrameRgba8(width, height, includeAlpha);
+
+    public byte[] CaptureFrameRgba16Float(uint width, uint height, bool includeAlpha = true)
+    {
+        if (NoopRenderingFacade.Instance.TryCaptureFrameRgba16Float(width, height, out byte[] rgba16Float, includeAlpha))
+        {
+            return rgba16Float;
+        }
+
+        throw new InvalidOperationException("Noop rendering facade did not provide RGBA16F capture data.");
+    }
 }

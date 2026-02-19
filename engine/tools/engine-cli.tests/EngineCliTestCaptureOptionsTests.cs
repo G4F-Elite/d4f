@@ -33,6 +33,7 @@ public sealed class EngineCliTestCaptureOptionsTests
             string artifactsRoot = Path.Combine(tempRoot, "artifacts", "tests");
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.rgba8.bin")));
+            Assert.True(File.Exists(Path.Combine(artifactsRoot, "screenshots", "frame-0012.rgba16f.bin")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "albedo-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "normals-0012.png")));
             Assert.True(File.Exists(Path.Combine(artifactsRoot, "dumps", "depth-0012.png")));
@@ -199,6 +200,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "runtime-perf-metrics",
                     StringComparison.Ordinal));
             Assert.True(hasRuntimePerfMetrics);
+            bool hasScreenshotRgba16f = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "screenshot-buffer-rgba16f",
+                    StringComparison.Ordinal));
+            Assert.True(hasScreenshotRgba16f);
         }
         finally
         {

@@ -10,6 +10,17 @@ internal sealed partial class NativeRuntime
     private const int MaxCapturePollAttempts = 32;
 
     public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
+        => CaptureFrameRaw(width, height, includeAlpha, EngineNativeCaptureFormat.Rgba8Unorm, bytesPerPixel: 4);
+
+    public byte[] CaptureFrameRgba16Float(uint width, uint height, bool includeAlpha = true)
+        => CaptureFrameRaw(width, height, includeAlpha, EngineNativeCaptureFormat.Rgba16Float, bytesPerPixel: 8);
+
+    private byte[] CaptureFrameRaw(
+        uint width,
+        uint height,
+        bool includeAlpha,
+        EngineNativeCaptureFormat requestedFormat,
+        int bytesPerPixel)
     {
         if (width == 0u)
         {
@@ -29,7 +40,7 @@ internal sealed partial class NativeRuntime
             Height = height,
             IncludeAlpha = includeAlpha ? (byte)1 : (byte)0,
             Reserved0 = MapCaptureSemantic(_lastSubmittedDebugViewMode),
-            Reserved1 = 0,
+            Reserved1 = (byte)requestedFormat,
             Reserved2 = 0
         };
 
@@ -66,12 +77,12 @@ internal sealed partial class NativeRuntime
                     $"Capture request '{requestId}' is not ready after {MaxCapturePollAttempts} poll attempts.");
             }
 
-            ValidateCaptureResult(result);
+            ValidateCaptureResult(result, bytesPerPixel);
 
-            if (result.Format != (uint)EngineNativeCaptureFormat.Rgba8Unorm)
+            if (result.Format != (uint)requestedFormat)
             {
                 throw new InvalidOperationException(
-                    $"Unsupported capture format '{result.Format}'.");
+                    $"Unsupported capture format '{result.Format}' (requested '{requestedFormat}').");
             }
 
             int rawByteCount = checked((int)result.PixelBytes);
@@ -81,7 +92,7 @@ internal sealed partial class NativeRuntime
                 Marshal.Copy(result.Pixels, rawBytes, 0, rawByteCount);
             }
 
-            return EnsureTightRgbaRows(rawBytes, result);
+            return EnsureTightRows(rawBytes, result, bytesPerPixel);
         }
         finally
         {
@@ -94,15 +105,20 @@ internal sealed partial class NativeRuntime
         }
     }
 
-    private static void ValidateCaptureResult(EngineNativeCaptureResult result)
+    private static void ValidateCaptureResult(EngineNativeCaptureResult result, int bytesPerPixel)
     {
+        if (bytesPerPixel <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(bytesPerPixel), "Bytes per pixel must be positive.");
+        }
+
         if (result.Width == 0u || result.Height == 0u)
         {
             throw new InvalidOperationException(
                 $"Native capture returned invalid dimensions {result.Width}x{result.Height}.");
         }
 
-        var minStride = checked(result.Width * 4u);
+        var minStride = checked(result.Width * (uint)bytesPerPixel);
         if (result.Stride < minStride)
         {
             throw new InvalidOperationException(
@@ -125,9 +141,9 @@ internal sealed partial class NativeRuntime
         }
     }
 
-    private static byte[] EnsureTightRgbaRows(byte[] rawBytes, EngineNativeCaptureResult result)
+    private static byte[] EnsureTightRows(byte[] rawBytes, EngineNativeCaptureResult result, int bytesPerPixel)
     {
-        int tightStride = checked((int)result.Width * 4);
+        int tightStride = checked((int)result.Width * bytesPerPixel);
         int sourceStride = checked((int)result.Stride);
         if (sourceStride == tightStride)
         {

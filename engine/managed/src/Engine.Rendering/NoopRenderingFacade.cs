@@ -4,7 +4,7 @@ using Engine.Core.Handles;
 
 namespace Engine.Rendering;
 
-public sealed class NoopRenderingFacade : IRenderingFacade
+public sealed class NoopRenderingFacade : IRenderingFacade, IAdvancedCaptureRenderingFacade
 {
     public static NoopRenderingFacade Instance { get; } = new();
     private readonly object _resourceSync = new();
@@ -172,6 +172,72 @@ public sealed class NoopRenderingFacade : IRenderingFacade
         }
 
         return rgba;
+    }
+
+    public bool TryCaptureFrameRgba16Float(uint width, uint height, out byte[] rgba16Float, bool includeAlpha = true)
+    {
+        byte[] rgba8 = CaptureFrameRgba8(width, height, includeAlpha);
+        var rgba16 = new byte[checked(rgba8.Length * 2)];
+        for (int pixelIndex = 0, outputIndex = 0; pixelIndex < rgba8.Length; pixelIndex++, outputIndex += 2)
+        {
+            ushort half = FloatToHalfBits(rgba8[pixelIndex] / 255f);
+            rgba16[outputIndex] = (byte)(half & 0xFF);
+            rgba16[outputIndex + 1] = (byte)((half >> 8) & 0xFF);
+        }
+
+        rgba16Float = rgba16;
+        return true;
+    }
+
+    private static ushort FloatToHalfBits(float value)
+    {
+        uint bits = BitConverter.SingleToUInt32Bits(value);
+        uint sign = (bits >> 16) & 0x8000u;
+        int exponent = (int)((bits >> 23) & 0xFFu) - 127 + 15;
+        uint mantissa = bits & 0x007FFFFFu;
+
+        if (exponent <= 0)
+        {
+            if (exponent < -10)
+            {
+                return (ushort)sign;
+            }
+
+            mantissa = (mantissa | 0x00800000u) >> (1 - exponent);
+            if ((mantissa & 0x00001000u) != 0u)
+            {
+                mantissa += 0x00002000u;
+            }
+
+            return (ushort)(sign | (mantissa >> 13));
+        }
+
+        if (exponent >= 31)
+        {
+            if (mantissa == 0u)
+            {
+                return (ushort)(sign | 0x7C00u);
+            }
+
+            mantissa >>= 13;
+            return (ushort)(sign | 0x7C00u | mantissa | (mantissa == 0u ? 1u : 0u));
+        }
+
+        if ((mantissa & 0x00001000u) != 0u)
+        {
+            mantissa += 0x00002000u;
+            if ((mantissa & 0x00800000u) != 0u)
+            {
+                mantissa = 0u;
+                exponent++;
+                if (exponent >= 31)
+                {
+                    return (ushort)(sign | 0x7C00u);
+                }
+            }
+        }
+
+        return (ushort)(sign | ((uint)exponent << 10) | (mantissa >> 13));
     }
 
     private static void FillColorCapture(

@@ -94,4 +94,6 @@ internal interface INativeRenderingApi
     void DestroyResource(ulong handle);
 
     byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true);
+
+    byte[] CaptureFrameRgba16Float(uint width, uint height, bool includeAlpha = true);
 }

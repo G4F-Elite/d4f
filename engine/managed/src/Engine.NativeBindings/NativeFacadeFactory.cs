@@ -342,7 +342,7 @@ public static class NativeFacadeFactory
         }
     }
 
-    private sealed class NativeRenderingFacade : IRenderingFacade
+    private sealed class NativeRenderingFacade : IRenderingFacade, IAdvancedCaptureRenderingFacade
     {
         private readonly INativeRenderingApi _nativeApi;
 
@@ -383,5 +383,11 @@ public static class NativeFacadeFactory
 
         public byte[] CaptureFrameRgba8(uint width, uint height, bool includeAlpha = true)
             => _nativeApi.CaptureFrameRgba8(width, height, includeAlpha);
+
+        public bool TryCaptureFrameRgba16Float(uint width, uint height, out byte[] rgba16Float, bool includeAlpha = true)
+        {
+            rgba16Float = _nativeApi.CaptureFrameRgba16Float(width, height, includeAlpha);
+            return true;
+        }
     }
 }
