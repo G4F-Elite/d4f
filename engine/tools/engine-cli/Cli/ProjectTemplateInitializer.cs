@@ -31,8 +31,9 @@ internal static class ProjectTemplateInitializer
                 "Engine managed source directory was not found under 'engine/managed/src'.");
         }
 
+        string runtimeProjectDirectory = ResolveRuntimeProjectDirectory(projectDirectory, gameName);
         string relativeManagedSourcePath = NormalizeRelativePath(
-            Path.GetRelativePath(projectDirectory, engineManagedSourceDirectory));
+            Path.GetRelativePath(runtimeProjectDirectory, engineManagedSourceDirectory));
 
         ReplaceTokensInTextFiles(projectDirectory, GameNameToken, gameName);
         ReplaceTokensInTextFiles(projectDirectory, EngineManagedSourceRelativeToken, relativeManagedSourcePath);
@@ -156,6 +157,36 @@ internal static class ProjectTemplateInitializer
         }
 
         return path.Replace('\\', '/');
+    }
+
+    private static string ResolveRuntimeProjectDirectory(string projectDirectory, string gameName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(projectDirectory);
+        ArgumentException.ThrowIfNullOrWhiteSpace(gameName);
+
+        string expectedRuntimeDirectory = Path.Combine(projectDirectory, "src", $"{gameName}.Runtime");
+        if (Directory.Exists(expectedRuntimeDirectory))
+        {
+            return expectedRuntimeDirectory;
+        }
+
+        string sourceDirectory = Path.Combine(projectDirectory, "src");
+        if (Directory.Exists(sourceDirectory))
+        {
+            string? fallbackProjectPath = Directory.GetFiles(sourceDirectory, "*.csproj", SearchOption.AllDirectories)
+                .OrderBy(static path => path, StringComparer.Ordinal)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(fallbackProjectPath))
+            {
+                string? runtimeDirectory = Path.GetDirectoryName(fallbackProjectPath);
+                if (!string.IsNullOrWhiteSpace(runtimeDirectory))
+                {
+                    return runtimeDirectory;
+                }
+            }
+        }
+
+        return projectDirectory;
     }
 
     private static void CopyDirectory(string sourceDirectory, string destinationDirectory)

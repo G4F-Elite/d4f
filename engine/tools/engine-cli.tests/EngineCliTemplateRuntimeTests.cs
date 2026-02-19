@@ -1,4 +1,5 @@
 using Engine.Cli;
+using System.Xml.Linq;
 
 namespace Engine.Cli.Tests;
 
@@ -30,6 +31,22 @@ public sealed class EngineCliTemplateRuntimeTests
             Assert.Contains("Engine.NativeBindings/Engine.NativeBindings.csproj", projectText, StringComparison.Ordinal);
             Assert.Contains("Engine.Procedural/Engine.Procedural.csproj", projectText, StringComparison.Ordinal);
             Assert.Contains("Engine.Net/Engine.Net.csproj", projectText, StringComparison.Ordinal);
+
+            XDocument runtimeProject = XDocument.Load(runtimeProjectPath);
+            List<string> includes = runtimeProject
+                .Descendants("ProjectReference")
+                .Select(static element => element.Attribute("Include")?.Value)
+                .Where(static include => !string.IsNullOrWhiteSpace(include))
+                .Select(static include => include!)
+                .ToList();
+
+            Assert.NotEmpty(includes);
+            foreach (string include in includes)
+            {
+                string normalizedInclude = include.Replace('/', Path.DirectorySeparatorChar);
+                string absoluteReferencePath = Path.GetFullPath(Path.Combine(runtimeDirectory, normalizedInclude));
+                Assert.True(File.Exists(absoluteReferencePath), $"Resolved ProjectReference path does not exist: {absoluteReferencePath}");
+            }
 
             string programText = File.ReadAllText(runtimeProgramPath);
             Assert.DoesNotContain("__GAME_NAME__", programText, StringComparison.Ordinal);
