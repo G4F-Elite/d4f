@@ -363,6 +363,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--multiplayer-snapshot' cannot be empty.");
         }
 
+        bool verifyMultiplayerRpcBinary = false;
+        if (options.TryGetValue("verify-multiplayer-rpc", out string? verifyRpcValue))
+        {
+            if (!bool.TryParse(verifyRpcValue, out verifyMultiplayerRpcBinary))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-multiplayer-rpc' must be 'true' or 'false'.");
+            }
+        }
+
+        string? multiplayerRpcBinaryPath = options.TryGetValue("multiplayer-rpc", out string? multiplayerRpcPathValue)
+            ? multiplayerRpcPathValue
+            : null;
+        if (multiplayerRpcBinaryPath is not null && string.IsNullOrWhiteSpace(multiplayerRpcBinaryPath))
+        {
+            return EngineCliParseResult.Failure("Option '--multiplayer-rpc' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -373,7 +390,9 @@ public static partial class EngineCliParser
                 requireRuntimeTransportSuccess,
                 multiplayerDemoSummaryPath,
                 verifyMultiplayerSnapshotBinary,
-                multiplayerSnapshotBinaryPath));
+                multiplayerSnapshotBinaryPath,
+                verifyMultiplayerRpcBinary,
+                multiplayerRpcBinaryPath));
     }
 
     private static string GetOutOrOutputPath(

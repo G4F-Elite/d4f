@@ -50,6 +50,7 @@ public sealed partial class EngineCliApp
         ValidateRuntimePerfMetrics(command, projectDirectory, failures);
         ValidateMultiplayerRuntimeTransport(command, projectDirectory, failures);
         ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
+        ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -170,6 +171,50 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or InvalidDataException)
         {
             failures.Add($"Multiplayer snapshot binary check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateMultiplayerRpcBinary(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.MultiplayerRpcBinaryPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.MultiplayerRpcBinaryPath!
+            : Path.Combine("artifacts", "tests", "net", "multiplayer-rpc.bin");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyMultiplayerRpcBinary || explicitPath)
+            {
+                failures.Add($"Multiplayer RPC binary artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Multiplayer RPC binary artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            byte[] payload = File.ReadAllBytes(resolvedPath);
+            NetRpcMessage message = NetRpcBinaryCodec.Decode(payload);
+            _stdout.WriteLine(
+                $"Multiplayer RPC binary: rpc={message.RpcName}, entity={message.EntityId}, channel={message.Channel}, payloadBytes={message.Payload.Length}.");
+            if (command.VerifyMultiplayerRpcBinary && message.Payload.Length == 0)
+            {
+                failures.Add("Multiplayer RPC binary check failed: decoded RPC payload is empty.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException)
+        {
+            failures.Add($"Multiplayer RPC binary check failed: {ex.Message}");
         }
     }
 

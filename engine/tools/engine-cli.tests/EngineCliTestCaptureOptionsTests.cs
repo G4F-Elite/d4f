@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Engine.Cli;
+using Engine.Net;
 
 namespace Engine.Cli.Tests;
 
@@ -41,12 +42,14 @@ public sealed class EngineCliTestCaptureOptionsTests
             string multiplayerPath = Path.Combine(artifactsRoot, "net", "multiplayer-demo.json");
             string profileLogPath = Path.Combine(artifactsRoot, "net", "multiplayer-profile.log");
             string snapshotBinaryPath = Path.Combine(artifactsRoot, "net", "multiplayer-snapshot.bin");
+            string rpcBinaryPath = Path.Combine(artifactsRoot, "net", "multiplayer-rpc.bin");
             string renderStatsPath = Path.Combine(artifactsRoot, "render", "frame-stats.json");
             string hostConfigPath = Path.Combine(artifactsRoot, "runtime", "test-host.json");
             string runtimePerfPath = Path.Combine(artifactsRoot, "runtime", "perf-metrics.json");
             Assert.True(File.Exists(multiplayerPath));
             Assert.True(File.Exists(profileLogPath));
             Assert.True(File.Exists(snapshotBinaryPath));
+            Assert.True(File.Exists(rpcBinaryPath));
             Assert.True(File.Exists(renderStatsPath));
             Assert.True(File.Exists(hostConfigPath));
             Assert.True(File.Exists(runtimePerfPath));
@@ -137,6 +140,12 @@ public sealed class EngineCliTestCaptureOptionsTests
             Assert.Contains("client-", profileLog, StringComparison.Ordinal);
             byte[] snapshotBinary = File.ReadAllBytes(snapshotBinaryPath);
             Assert.True(snapshotBinary.Length > 0);
+            byte[] rpcBinary = File.ReadAllBytes(rpcBinaryPath);
+            NetRpcMessage rpcMessage = NetRpcBinaryCodec.Decode(rpcBinary);
+            Assert.Equal("proc.sync.chunk", rpcMessage.RpcName);
+            Assert.Equal(NetworkChannel.ReliableOrdered, rpcMessage.Channel);
+            Assert.True(rpcMessage.TargetClientId.HasValue);
+            Assert.True(rpcMessage.Payload.Length > 0);
             using JsonDocument renderStatsJson = JsonDocument.Parse(File.ReadAllText(renderStatsPath));
             JsonElement renderStatsRoot = renderStatsJson.RootElement;
             Assert.True(renderStatsRoot.GetProperty("drawItemCount").GetInt32() > 0);
@@ -182,6 +191,12 @@ public sealed class EngineCliTestCaptureOptionsTests
                     "multiplayer-snapshot-bin",
                     StringComparison.Ordinal));
             Assert.True(hasSnapshotBinary);
+            bool hasRpcBinary = artifacts.EnumerateArray()
+                .Any(static artifact => string.Equals(
+                    artifact.GetProperty("kind").GetString(),
+                    "multiplayer-rpc-bin",
+                    StringComparison.Ordinal));
+            Assert.True(hasRpcBinary);
             bool hasRenderStatsLog = artifacts.EnumerateArray()
                 .Any(static artifact => string.Equals(
                     artifact.GetProperty("kind").GetString(),

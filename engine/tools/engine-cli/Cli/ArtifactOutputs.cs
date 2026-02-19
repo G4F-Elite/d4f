@@ -314,6 +314,11 @@ internal static class TestArtifactGenerator
                 Description: "Binary snapshot payload for transport/serialization verification."));
         manifestEntries.Add(
             new TestingArtifactEntry(
+                Kind: "multiplayer-rpc-bin",
+                RelativePath: multiplayerArtifacts.RpcBinaryRelativePath,
+                Description: "Binary RPC payload for transport/serialization verification."));
+        manifestEntries.Add(
+            new TestingArtifactEntry(
                 Kind: "render-stats-log",
                 RelativePath: NormalizePath(renderStatsRelativePath),
                 Description: "Render counters log with draw calls, triangles, upload bytes and GPU memory estimate."));

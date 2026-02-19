@@ -494,6 +494,113 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerRpcRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-rpc", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer RPC binary artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenMultiplayerRpcBinaryInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string rpcPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-rpc.bin");
+            Directory.CreateDirectory(Path.GetDirectoryName(rpcPath)!);
+            File.WriteAllBytes(rpcPath, [10, 20, 30]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-rpc", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Multiplayer RPC binary check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenMultiplayerRpcBinaryValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string rpcPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-rpc.bin");
+            WriteMultiplayerRpcBinary(rpcPath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-rpc", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Multiplayer RPC binary: rpc=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -583,6 +690,21 @@ public sealed class EngineCliDoctorToolChecksTests
             ]);
 
         byte[] payload = NetSnapshotBinaryCodec.Encode(snapshot);
+        File.WriteAllBytes(filePath, payload);
+    }
+
+    private static void WriteMultiplayerRpcBinary(string filePath)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+
+        var message = new NetRpcMessage(
+            entityId: 1u,
+            rpcName: "proc.sync.chunk",
+            payload: [1, 2, 3, 4],
+            channel: NetworkChannel.ReliableOrdered,
+            targetClientId: 10u);
+
+        byte[] payload = NetRpcBinaryCodec.Encode(message);
         File.WriteAllBytes(filePath, payload);
     }
 

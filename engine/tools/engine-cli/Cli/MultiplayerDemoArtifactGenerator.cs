@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 using Engine.NativeBindings;
 using Engine.Net;
@@ -31,11 +32,13 @@ internal sealed record MultiplayerDemoOwnershipStats(
 internal sealed record MultiplayerDemoArtifactOutput(
     string SummaryRelativePath,
     string ProfileLogRelativePath,
-    string SnapshotBinaryRelativePath);
+    string SnapshotBinaryRelativePath,
+    string RpcBinaryRelativePath);
 
 internal sealed record MultiplayerDemoBuildResult(
     MultiplayerDemoSummary Summary,
-    NetSnapshot Snapshot);
+    NetSnapshot Snapshot,
+    NetRpcMessage RpcMessage);
 
 internal sealed record RuntimeTransportSummary(
     bool Enabled,
@@ -97,10 +100,16 @@ internal static class MultiplayerDemoArtifactGenerator
         byte[] snapshotBinary = NetSnapshotBinaryCodec.Encode(buildResult.Snapshot);
         File.WriteAllBytes(snapshotBinaryFullPath, snapshotBinary);
 
+        string rpcBinaryRelativePath = Path.Combine("net", "multiplayer-rpc.bin");
+        string rpcBinaryFullPath = Path.Combine(outputDirectory, rpcBinaryRelativePath);
+        byte[] rpcBinary = NetRpcBinaryCodec.Encode(buildResult.RpcMessage);
+        File.WriteAllBytes(rpcBinaryFullPath, rpcBinary);
+
         return new MultiplayerDemoArtifactOutput(
             SummaryRelativePath: NormalizePath(summaryRelativePath),
             ProfileLogRelativePath: NormalizePath(profileLogRelativePath),
-            SnapshotBinaryRelativePath: NormalizePath(snapshotBinaryRelativePath));
+            SnapshotBinaryRelativePath: NormalizePath(snapshotBinaryRelativePath),
+            RpcBinaryRelativePath: NormalizePath(rpcBinaryRelativePath));
     }
 
     private static MultiplayerDemoBuildResult BuildSummary(ulong seed, double fixedDeltaSeconds)
@@ -155,6 +164,7 @@ internal static class MultiplayerDemoArtifactGenerator
         }
 
         RuntimeTransportSummary runtimeTransport = RunRuntimeTransportDemoIfAvailable();
+        NetRpcMessage rpcMessage = BuildDemoRpcMessage(firstSnapshot, secondClientId);
 
         string[] sampleAssetKeys = firstResult.ActiveEntities
             .Select(static x => x.AssetKey)
@@ -182,7 +192,30 @@ internal static class MultiplayerDemoArtifactGenerator
             OwnershipStats: BuildOwnershipStats(firstSnapshot, [firstClientId, secondClientId]),
             RuntimeTransport: runtimeTransport);
 
-        return new MultiplayerDemoBuildResult(summary, firstSnapshot);
+        return new MultiplayerDemoBuildResult(summary, firstSnapshot, rpcMessage);
+    }
+
+    private static NetRpcMessage BuildDemoRpcMessage(NetSnapshot snapshot, uint targetClientId)
+    {
+        ArgumentNullException.ThrowIfNull(snapshot);
+        if (targetClientId == 0u)
+        {
+            throw new ArgumentOutOfRangeException(nameof(targetClientId), "Target client id must be greater than zero.");
+        }
+
+        NetEntityState? firstEntity = snapshot.Entities.Count > 0 ? snapshot.Entities[0] : null;
+        uint entityId = firstEntity?.EntityId ?? 1u;
+        string payloadText = firstEntity is null
+            ? "proc/chunk/none"
+            : string.Create(CultureInfo.InvariantCulture, $"{firstEntity.AssetKey}|seed={firstEntity.ProceduralSeed}");
+        byte[] payload = Encoding.UTF8.GetBytes(payloadText);
+
+        return new NetRpcMessage(
+            entityId: entityId,
+            rpcName: "proc.sync.chunk",
+            payload: payload,
+            channel: NetworkChannel.ReliableOrdered,
+            targetClientId: targetClientId);
     }
 
     private static RuntimeTransportSummary RunRuntimeTransportDemoIfAvailable()

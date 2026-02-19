@@ -60,7 +60,9 @@ public sealed record DoctorCommand(
     bool RequireRuntimeTransportSuccess,
     string? MultiplayerDemoSummaryPath,
     bool VerifyMultiplayerSnapshotBinary,
-    string? MultiplayerSnapshotBinaryPath) : EngineCliCommand;
+    string? MultiplayerSnapshotBinaryPath,
+    bool VerifyMultiplayerRpcBinary,
+    string? MultiplayerRpcBinaryPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 
