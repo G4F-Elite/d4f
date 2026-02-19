@@ -5,7 +5,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, nfr proof, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -88,6 +88,19 @@ public static partial class EngineCliParser
             }
 
             return ParseMultiplayerDemo(multiplayerOptions);
+        }
+
+        if (string.Equals(commandName, "multiplayer", StringComparison.Ordinal) &&
+            args.Length > 1 &&
+            string.Equals(args[1], "orchestrate", StringComparison.OrdinalIgnoreCase))
+        {
+            Dictionary<string, string> orchestrateOptions = ParseOptions(args[2..], out string? orchestrateError);
+            if (orchestrateError is not null)
+            {
+                return EngineCliParseResult.Failure(orchestrateError);
+            }
+
+            return ParseMultiplayerOrchestration(orchestrateOptions);
         }
 
         if (string.Equals(commandName, "nfr", StringComparison.Ordinal) &&
@@ -357,6 +370,75 @@ public static partial class EngineCliParser
             Seed: seed,
             FixedDeltaSeconds: fixedDeltaSeconds,
             RequireNativeTransportSuccess: requireNativeTransportSuccess));
+    }
+
+    private static EngineCliParseResult ParseMultiplayerOrchestration(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'multiplayer orchestrate'.");
+        }
+
+        string outputDirectory = GetOutOrOutputPath(
+            options,
+            defaultValue: Path.Combine(project, "artifacts", "runtime-multiplayer-orchestration"),
+            out string? outError);
+        if (outError is not null)
+        {
+            return EngineCliParseResult.Failure(outError);
+        }
+
+        string configuration = options.TryGetValue("configuration", out string? cfg) ? cfg : "Release";
+        if (!ValidConfigurations.Contains(configuration))
+        {
+            return EngineCliParseResult.Failure("Option '--configuration' must be 'Debug' or 'Release'.");
+        }
+
+        ulong seed = 1337UL;
+        if (options.TryGetValue("seed", out string? seedValue))
+        {
+            if (!ulong.TryParse(seedValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out seed))
+            {
+                return EngineCliParseResult.Failure("Option '--seed' must be an unsigned integer.");
+            }
+        }
+
+        double fixedDeltaSeconds = 1.0 / 60.0;
+        if (options.TryGetValue("fixed-dt", out string? fixedDtValue))
+        {
+            if (!double.TryParse(fixedDtValue, NumberStyles.Float, CultureInfo.InvariantCulture, out fixedDeltaSeconds) ||
+                !double.IsFinite(fixedDeltaSeconds) ||
+                fixedDeltaSeconds <= 0.0)
+            {
+                return EngineCliParseResult.Failure("Option '--fixed-dt' must be a positive number.");
+            }
+        }
+
+        bool requireNativeTransportSuccess = true;
+        if (options.TryGetValue("require-native-transport", out string? requireNativeTransportValue))
+        {
+            if (!bool.TryParse(requireNativeTransportValue, out requireNativeTransportSuccess))
+            {
+                return EngineCliParseResult.Failure("Option '--require-native-transport' must be 'true' or 'false'.");
+            }
+        }
+
+        string cliProjectPath = options.TryGetValue("cli-project", out string? cliProjectPathValue)
+            ? cliProjectPathValue
+            : Path.Combine("engine", "tools", "engine-cli", "Engine.Cli.csproj");
+        if (string.IsNullOrWhiteSpace(cliProjectPath))
+        {
+            return EngineCliParseResult.Failure("Option '--cli-project' cannot be empty.");
+        }
+
+        return EngineCliParseResult.Success(new MultiplayerOrchestrationCommand(
+            ProjectDirectory: project,
+            OutputDirectory: outputDirectory,
+            Configuration: configuration,
+            Seed: seed,
+            FixedDeltaSeconds: fixedDeltaSeconds,
+            RequireNativeTransportSuccess: requireNativeTransportSuccess,
+            CliProjectPath: cliProjectPath));
     }
 
     private static EngineCliParseResult ParseNfrProof(IReadOnlyDictionary<string, string> options)

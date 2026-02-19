@@ -198,6 +198,114 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailMultiplayerOrchestration_WhenCliProjectMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error);
+
+            int code = app.Run(
+            [
+                "multiplayer",
+                "orchestrate",
+                "--project", tempRoot,
+                "--cli-project", Path.Combine(tempRoot, "missing", "Engine.Cli.csproj")
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("CLI project file does not exist", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldCreateMultiplayerOrchestrationSummary_WhenNodeProcessesSucceed()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            string cliProjectPath = Path.Combine(tempRoot, "tools", "engine-cli", "Engine.Cli.csproj");
+            Directory.CreateDirectory(Path.GetDirectoryName(cliProjectPath)!);
+            File.WriteAllText(cliProjectPath, "<Project Sdk=\"Microsoft.NET.Sdk\"></Project>");
+
+            var runner = new RecordingCommandRunner
+            {
+                OnRun = (executablePath, arguments, _, _, _) =>
+                {
+                    if (!string.Equals(executablePath, "dotnet", StringComparison.OrdinalIgnoreCase) ||
+                        !arguments.Contains("multiplayer") ||
+                        !arguments.Contains("demo"))
+                    {
+                        return;
+                    }
+
+                    int outIndex = Array.FindIndex(arguments.ToArray(), static arg => string.Equals(arg, "--out", StringComparison.Ordinal));
+                    Assert.True(outIndex >= 0);
+                    Assert.True(outIndex + 1 < arguments.Count);
+                    string roleOutputDirectory = arguments[outIndex + 1];
+                    string summaryPath = Path.Combine(roleOutputDirectory, "net", "multiplayer-demo.json");
+                    Directory.CreateDirectory(Path.GetDirectoryName(summaryPath)!);
+                    File.WriteAllText(
+                        summaryPath,
+                        """
+                        {
+                          "runtimeTransport": {
+                            "enabled": true,
+                            "succeeded": true,
+                            "serverMessagesReceived": 3,
+                            "clientMessagesReceived": 4
+                          }
+                        }
+                        """);
+                }
+            };
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int code = app.Run(
+            [
+                "multiplayer",
+                "orchestrate",
+                "--project", tempRoot,
+                "--out", "artifacts/runtime-multiplayer-orchestration",
+                "--configuration", "Release",
+                "--seed", "9001",
+                "--fixed-dt", "0.0166667",
+                "--require-native-transport", "true",
+                "--cli-project", cliProjectPath
+            ]);
+
+            Assert.Equal(0, code);
+            Assert.Equal(3, runner.Invocations.Count);
+
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "runtime-multiplayer-orchestration", "net", "multiplayer-orchestration.json");
+            Assert.True(File.Exists(summaryPath));
+
+            using JsonDocument summary = JsonDocument.Parse(File.ReadAllText(summaryPath));
+            JsonElement root = summary.RootElement;
+            Assert.True(root.GetProperty("allSucceeded").GetBoolean());
+            JsonElement nodes = root.GetProperty("nodes");
+            Assert.Equal(3, nodes.GetArrayLength());
+
+            string stdout = output.ToString();
+            Assert.Contains("Multiplayer orchestration summary written", stdout, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailNfrProof_WhenRuntimeProjectMissing()
     {
         string tempRoot = CreateTempDirectory();
@@ -590,6 +698,8 @@ public sealed class EngineCliAppValidationTests
 
         public int ExitCode { get; init; }
 
+        public Action<string, IReadOnlyList<string>, string, TextWriter, TextWriter>? OnRun { get; init; }
+
         public int Run(
             string executablePath,
             IReadOnlyList<string> arguments,
@@ -598,6 +708,7 @@ public sealed class EngineCliAppValidationTests
             TextWriter stderr)
         {
             Invocations.Add(new CommandInvocation(executablePath, arguments.ToArray(), workingDirectory));
+            OnRun?.Invoke(executablePath, arguments, workingDirectory, stdout, stderr);
             return ExitCode;
         }
     }

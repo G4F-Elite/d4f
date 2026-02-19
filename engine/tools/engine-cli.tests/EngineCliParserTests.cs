@@ -12,7 +12,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, nfr proof, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.",
             result.Error);
     }
 
@@ -186,6 +186,77 @@ public sealed class EngineCliParserTests
         [
             "multiplayer",
             "demo",
+            "--project", "game",
+            optionName,
+            optionValue
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(expectedError, result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateMultiplayerOrchestrationCommand_WithDefaults()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["multiplayer", "orchestrate", "--project", "game"]);
+
+        MultiplayerOrchestrationCommand command = Assert.IsType<MultiplayerOrchestrationCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal(Path.Combine("game", "artifacts", "runtime-multiplayer-orchestration"), command.OutputDirectory);
+        Assert.Equal("Release", command.Configuration);
+        Assert.Equal(1337UL, command.Seed);
+        Assert.Equal(1.0 / 60.0, command.FixedDeltaSeconds, 6);
+        Assert.True(command.RequireNativeTransportSuccess);
+        Assert.Equal(Path.Combine("engine", "tools", "engine-cli", "Engine.Cli.csproj"), command.CliProjectPath);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateMultiplayerOrchestrationCommand_WithExplicitOptions()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "multiplayer",
+            "orchestrate",
+            "--project", "game",
+            "--out", "artifacts/runtime-multiplayer-orchestration",
+            "--configuration", "Debug",
+            "--seed", "9001",
+            "--fixed-dt", "0.02",
+            "--require-native-transport", "false",
+            "--cli-project", "tools/engine-cli/Engine.Cli.csproj"
+        ]);
+
+        MultiplayerOrchestrationCommand command = Assert.IsType<MultiplayerOrchestrationCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("artifacts/runtime-multiplayer-orchestration", command.OutputDirectory);
+        Assert.Equal("Debug", command.Configuration);
+        Assert.Equal(9001UL, command.Seed);
+        Assert.Equal(0.02, command.FixedDeltaSeconds, 6);
+        Assert.False(command.RequireNativeTransportSuccess);
+        Assert.Equal("tools/engine-cli/Engine.Cli.csproj", command.CliProjectPath);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailMultiplayerOrchestration_WhenProjectMissing()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["multiplayer", "orchestrate"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--project' is required for 'multiplayer orchestrate'.", result.Error);
+    }
+
+    [Theory]
+    [InlineData("--configuration", "Prod", "Option '--configuration' must be 'Debug' or 'Release'.")]
+    [InlineData("--seed", "bad", "Option '--seed' must be an unsigned integer.")]
+    [InlineData("--fixed-dt", "0", "Option '--fixed-dt' must be a positive number.")]
+    [InlineData("--require-native-transport", "yes", "Option '--require-native-transport' must be 'true' or 'false'.")]
+    [InlineData("--cli-project", " ", "Option '--cli-project' cannot be empty.")]
+    public void Parse_ShouldFailMultiplayerOrchestration_WhenOptionInvalid(string optionName, string optionValue, string expectedError)
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "multiplayer",
+            "orchestrate",
             "--project", "game",
             optionName,
             optionValue

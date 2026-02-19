@@ -58,6 +58,15 @@ public sealed record MultiplayerDemoCommand(
     double FixedDeltaSeconds,
     bool RequireNativeTransportSuccess) : EngineCliCommand;
 
+public sealed record MultiplayerOrchestrationCommand(
+    string ProjectDirectory,
+    string OutputDirectory,
+    string Configuration,
+    ulong Seed,
+    double FixedDeltaSeconds,
+    bool RequireNativeTransportSuccess,
+    string CliProjectPath) : EngineCliCommand;
+
 public sealed record NfrProofCommand(
     string ProjectDirectory,
     string OutputPath,
