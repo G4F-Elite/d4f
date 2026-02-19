@@ -28,7 +28,9 @@ public sealed class GameHostOptionsTests
             interopBudgets: new InteropBudgetOptions(
                 enforce: true,
                 maxRendererCallsPerFrame: 3,
-                maxPhysicsCallsPerTick: 2));
+                maxPhysicsCallsPerTick: 2),
+            maxManagedAllocatedBytesPerFrame: 4096,
+            maxTotalCpuTimePerFrame: TimeSpan.FromMilliseconds(33));
 
         Assert.Equal(TimeSpan.FromMilliseconds(8), options.FixedDt);
         Assert.Equal(6, options.MaxSubsteps);
@@ -45,6 +47,8 @@ public sealed class GameHostOptionsTests
         Assert.True(options.InteropBudgets.Enforce);
         Assert.Equal(3, options.InteropBudgets.MaxRendererCallsPerFrame);
         Assert.Equal(2, options.InteropBudgets.MaxPhysicsCallsPerTick);
+        Assert.Equal(4096, options.MaxManagedAllocatedBytesPerFrame);
+        Assert.Equal(TimeSpan.FromMilliseconds(33), options.MaxTotalCpuTimePerFrame);
     }
 
     [Fact]
@@ -64,6 +68,8 @@ public sealed class GameHostOptionsTests
         Assert.True(options.InteropBudgets.Enforce);
         Assert.Equal(3, options.InteropBudgets.MaxRendererCallsPerFrame);
         Assert.Equal(3, options.InteropBudgets.MaxPhysicsCallsPerTick);
+        Assert.Null(options.MaxManagedAllocatedBytesPerFrame);
+        Assert.Null(options.MaxTotalCpuTimePerFrame);
     }
 
     [Fact]
@@ -115,6 +121,28 @@ public sealed class GameHostOptionsTests
             frameArenaBytes: 2048,
             frameArenaAlignment: 64,
             maxAccumulatedTime: TimeSpan.FromMilliseconds(8)));
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonPositiveManagedAllocationBudget()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 2048,
+            frameArenaAlignment: 64,
+            maxManagedAllocatedBytesPerFrame: 0));
+    }
+
+    [Fact]
+    public void Constructor_RejectsNonPositiveCpuBudget()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => new GameHostOptions(
+            fixedDt: TimeSpan.FromMilliseconds(16),
+            maxSubsteps: 4,
+            frameArenaBytes: 2048,
+            frameArenaAlignment: 64,
+            maxTotalCpuTimePerFrame: TimeSpan.Zero));
     }
 
     [Fact]

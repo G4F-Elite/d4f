@@ -92,6 +92,7 @@ public sealed class GameHost
 
         timing = ResolveFrameTiming(timing);
         TimeSpan physicsFixedDt = ResolvePhysicsFixedDt();
+        long allocationBefore = GC.GetAllocatedBytesForCurrentThread();
 
         long frameStart = Stopwatch.GetTimestamp();
 
@@ -151,6 +152,9 @@ public sealed class GameHost
         ValidateInteropBudgets(timing.FrameNumber, substeps, physicsInteropCalls);
 
         TimeSpan totalCpuTime = Stopwatch.GetElapsedTime(frameStart);
+        long allocationAfter = GC.GetAllocatedBytesForCurrentThread();
+        long managedAllocatedBytes = Math.Max(0L, allocationAfter - allocationBefore);
+        ValidateFrameBudgets(timing.FrameNumber, totalCpuTime, managedAllocatedBytes);
         LastFrameObservability = new FrameObservabilitySnapshot(
             timing.FrameNumber,
             prePhysicsCpuTime,
@@ -160,6 +164,7 @@ public sealed class GameHost
             preRenderCpuTime,
             renderCpuTime,
             totalCpuTime,
+            managedAllocatedBytes,
             substeps,
             physicsInteropCalls,
             RendererInteropCallsPerFrame,
@@ -196,6 +201,23 @@ public sealed class GameHost
         {
             throw new InvalidOperationException(
                 $"Interop budget exceeded on frame {frameNumber}: physics calls {physicsInteropCalls} > {maxAllowedPhysicsCalls} ({budgets.MaxPhysicsCallsPerTick} per tick, {physicsSubsteps} tick(s)).");
+        }
+    }
+
+    private void ValidateFrameBudgets(long frameNumber, TimeSpan totalCpuTime, long managedAllocatedBytes)
+    {
+        if (_options.MaxTotalCpuTimePerFrame.HasValue &&
+            totalCpuTime > _options.MaxTotalCpuTimePerFrame.Value)
+        {
+            throw new InvalidOperationException(
+                $"Frame budget exceeded on frame {frameNumber}: total CPU {totalCpuTime.TotalMilliseconds:F4}ms > {_options.MaxTotalCpuTimePerFrame.Value.TotalMilliseconds:F4}ms.");
+        }
+
+        if (_options.MaxManagedAllocatedBytesPerFrame.HasValue &&
+            managedAllocatedBytes > _options.MaxManagedAllocatedBytesPerFrame.Value)
+        {
+            throw new InvalidOperationException(
+                $"Frame budget exceeded on frame {frameNumber}: managed allocation {managedAllocatedBytes} bytes > {_options.MaxManagedAllocatedBytesPerFrame.Value} bytes.");
         }
     }
 

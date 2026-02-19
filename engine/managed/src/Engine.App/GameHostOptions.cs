@@ -19,7 +19,9 @@ public sealed class GameHostOptions
         DefaultMaxAccumulatedTime,
         DeterministicModeOptions.Disabled,
         RenderSettingsValue.Default,
-        InteropBudgetOptions.ReleaseStrict);
+        InteropBudgetOptions.ReleaseStrict,
+        maxManagedAllocatedBytesPerFrame: null,
+        maxTotalCpuTimePerFrame: null);
 
     public GameHostOptions(
         TimeSpan fixedDt,
@@ -29,7 +31,9 @@ public sealed class GameHostOptions
         TimeSpan? maxAccumulatedTime = null,
         DeterministicModeOptions? deterministicMode = null,
         RenderSettingsValue? renderSettings = null,
-        InteropBudgetOptions? interopBudgets = null)
+        InteropBudgetOptions? interopBudgets = null,
+        long? maxManagedAllocatedBytesPerFrame = null,
+        TimeSpan? maxTotalCpuTimePerFrame = null)
     {
         if (fixedDt <= TimeSpan.Zero)
         {
@@ -61,6 +65,20 @@ public sealed class GameHostOptions
                 "Max accumulated time must be greater than or equal to fixed delta time.");
         }
 
+        if (maxManagedAllocatedBytesPerFrame.HasValue && maxManagedAllocatedBytesPerFrame.Value <= 0L)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxManagedAllocatedBytesPerFrame),
+                "Managed allocation budget per frame must be greater than zero when specified.");
+        }
+
+        if (maxTotalCpuTimePerFrame.HasValue && maxTotalCpuTimePerFrame.Value <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(maxTotalCpuTimePerFrame),
+                "Total CPU budget per frame must be greater than zero when specified.");
+        }
+
         FixedDt = fixedDt;
         MaxSubsteps = maxSubsteps;
         FrameArenaBytes = frameArenaBytes;
@@ -69,6 +87,8 @@ public sealed class GameHostOptions
         DeterministicMode = deterministicMode ?? DeterministicModeOptions.Disabled;
         RenderSettings = renderSettings ?? RenderSettingsValue.Default;
         InteropBudgets = interopBudgets ?? InteropBudgetOptions.ReleaseStrict;
+        MaxManagedAllocatedBytesPerFrame = maxManagedAllocatedBytesPerFrame;
+        MaxTotalCpuTimePerFrame = maxTotalCpuTimePerFrame;
     }
 
     public TimeSpan FixedDt { get; }
@@ -86,6 +106,10 @@ public sealed class GameHostOptions
     public RenderSettingsValue RenderSettings { get; }
 
     public InteropBudgetOptions InteropBudgets { get; }
+
+    public long? MaxManagedAllocatedBytesPerFrame { get; }
+
+    public TimeSpan? MaxTotalCpuTimePerFrame { get; }
 
     private static bool IsPowerOfTwo(int value)
     {
