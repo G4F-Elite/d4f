@@ -1033,6 +1033,139 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenReplayRecordingRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-replay-recording", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Replay recording artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenReplayRecordingInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string replayPath = Path.Combine(tempRoot, "artifacts", "tests", "replay", "recording.json");
+            WriteReplayRecording(
+                replayPath,
+                """
+                {
+                  "seed": 1,
+                  "fixedDeltaSeconds": 0,
+                  "frames": [],
+                  "networkEvents": ["capture.frame=1"],
+                  "timedNetworkEvents": []
+                }
+                """);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-replay-recording", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Replay recording check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenReplayRecordingValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string replayPath = Path.Combine(tempRoot, "artifacts", "tests", "replay", "recording.json");
+            WriteReplayRecording(
+                replayPath,
+                """
+                {
+                  "seed": 9001,
+                  "fixedDeltaSeconds": 0.0166667,
+                  "frames": [
+                    { "tick": 0, "buttons": 0, "mouseX": 0.0, "mouseY": 0.0 }
+                  ],
+                  "networkEvents": [
+                    "capture.frame=1",
+                    "net.profile=net/multiplayer-profile.log"
+                  ],
+                  "timedNetworkEvents": [
+                    { "tick": 0, "event": "capture.frame=1" }
+                  ]
+                }
+                """);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-replay-recording", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Replay recording: frames=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -1186,6 +1319,12 @@ public sealed class EngineCliDoctorToolChecksTests
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
         File.WriteAllLines(filePath, lines);
+    }
+
+    private static void WriteReplayRecording(string filePath, string json)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllText(filePath, json);
     }
 
     private static string CreateTempDirectory()

@@ -70,7 +70,9 @@ public sealed record DoctorCommand(
     bool VerifyTestHostConfig,
     string? TestHostConfigPath,
     bool VerifyNetProfileLog,
-    string? NetProfileLogPath) : EngineCliCommand;
+    string? NetProfileLogPath,
+    bool VerifyReplayRecording,
+    string? ReplayRecordingPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 

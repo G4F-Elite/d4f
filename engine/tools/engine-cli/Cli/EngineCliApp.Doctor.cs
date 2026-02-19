@@ -55,6 +55,7 @@ public sealed partial class EngineCliApp
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
         ValidateTestHostConfigArtifact(command, projectDirectory, failures);
         ValidateNetProfileLogArtifact(command, projectDirectory, failures);
+        ValidateReplayRecordingArtifact(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -433,6 +434,119 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             failures.Add($"Net profile log check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateReplayRecordingArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.ReplayRecordingPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.ReplayRecordingPath!
+            : Path.Combine("artifacts", "tests", "replay", "recording.json");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyReplayRecording || explicitPath)
+            {
+                failures.Add($"Replay recording artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Replay recording artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string json = File.ReadAllText(resolvedPath);
+            using JsonDocument document = JsonDocument.Parse(json);
+            JsonElement root = document.RootElement;
+
+            double fixedDeltaSeconds = ReadRequiredDouble(root, "fixedDeltaSeconds", "Replay recording artifact");
+            if (!double.IsFinite(fixedDeltaSeconds) || fixedDeltaSeconds <= 0.0)
+            {
+                throw new InvalidDataException("Replay recording artifact has invalid positive number 'fixedDeltaSeconds'.");
+            }
+
+            if (!root.TryGetProperty("frames", out JsonElement frames) || frames.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException("Replay recording artifact is missing array property 'frames'.");
+            }
+
+            int frameCount = frames.GetArrayLength();
+            for (int i = 0; i < frameCount; i++)
+            {
+                JsonElement frame = frames[i];
+                if (!frame.TryGetProperty("tick", out JsonElement tickElement) || !tickElement.TryGetInt64(out long tick) || tick < 0L)
+                {
+                    throw new InvalidDataException("Replay recording artifact contains invalid non-negative frame tick value.");
+                }
+            }
+
+            if (!root.TryGetProperty("networkEvents", out JsonElement networkEvents) || networkEvents.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException("Replay recording artifact is missing array property 'networkEvents'.");
+            }
+
+            int networkEventCount = networkEvents.GetArrayLength();
+            bool hasCaptureEvent = false;
+            bool hasProfileEvent = false;
+            for (int i = 0; i < networkEventCount; i++)
+            {
+                if (networkEvents[i].ValueKind != JsonValueKind.String)
+                {
+                    throw new InvalidDataException("Replay recording artifact contains non-string network event value.");
+                }
+
+                string value = networkEvents[i].GetString() ?? string.Empty;
+                hasCaptureEvent |= value.StartsWith("capture.frame=", StringComparison.Ordinal);
+                hasProfileEvent |= value.StartsWith("net.profile=", StringComparison.Ordinal);
+            }
+
+            if (!root.TryGetProperty("timedNetworkEvents", out JsonElement timedNetworkEvents) || timedNetworkEvents.ValueKind != JsonValueKind.Array)
+            {
+                throw new InvalidDataException("Replay recording artifact is missing array property 'timedNetworkEvents'.");
+            }
+
+            int timedNetworkEventCount = timedNetworkEvents.GetArrayLength();
+            for (int i = 0; i < timedNetworkEventCount; i++)
+            {
+                JsonElement timed = timedNetworkEvents[i];
+                if (!timed.TryGetProperty("tick", out JsonElement tickElement) || !tickElement.TryGetInt64(out long tick) || tick < 0L)
+                {
+                    throw new InvalidDataException("Replay recording artifact contains invalid non-negative timed network event tick.");
+                }
+
+                if (!timed.TryGetProperty("event", out JsonElement eventElement) || eventElement.ValueKind != JsonValueKind.String)
+                {
+                    throw new InvalidDataException("Replay recording artifact contains invalid timed network event value.");
+                }
+            }
+
+            _stdout.WriteLine(
+                $"Replay recording: frames={frameCount}, networkEvents={networkEventCount}, timedNetworkEvents={timedNetworkEventCount}, fixedDeltaSeconds={fixedDeltaSeconds:F6}.");
+
+            if (!command.VerifyReplayRecording)
+            {
+                return;
+            }
+
+            if (frameCount == 0 || networkEventCount == 0 || timedNetworkEventCount == 0 || !hasCaptureEvent || !hasProfileEvent)
+            {
+                failures.Add("Replay recording check failed: frames/events arrays must be non-empty and include capture/profile markers.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
+        {
+            failures.Add($"Replay recording check failed: {ex.Message}");
         }
     }
 

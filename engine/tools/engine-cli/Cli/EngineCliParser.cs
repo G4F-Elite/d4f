@@ -448,6 +448,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--net-profile-log' cannot be empty.");
         }
 
+        bool verifyReplayRecording = false;
+        if (options.TryGetValue("verify-replay-recording", out string? verifyReplayRecordingValue))
+        {
+            if (!bool.TryParse(verifyReplayRecordingValue, out verifyReplayRecording))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-replay-recording' must be 'true' or 'false'.");
+            }
+        }
+
+        string? replayRecordingPath = options.TryGetValue("replay-recording", out string? replayRecordingPathValue)
+            ? replayRecordingPathValue
+            : null;
+        if (replayRecordingPath is not null && string.IsNullOrWhiteSpace(replayRecordingPath))
+        {
+            return EngineCliParseResult.Failure("Option '--replay-recording' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -468,7 +485,9 @@ public static partial class EngineCliParser
                 verifyTestHostConfig,
                 testHostConfigPath,
                 verifyNetProfileLog,
-                netProfileLogPath));
+                netProfileLogPath,
+                verifyReplayRecording,
+                replayRecordingPath));
     }
 
     private static string GetOutOrOutputPath(
