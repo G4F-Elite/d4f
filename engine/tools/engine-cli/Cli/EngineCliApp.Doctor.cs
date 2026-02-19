@@ -377,6 +377,13 @@ public sealed partial class EngineCliApp
         }
 
         string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredExrPath);
+        bool explicitBinaryPath = !string.IsNullOrWhiteSpace(command.CaptureRgba16FloatBinaryPath);
+        string relativeOrConfiguredBinaryPath = explicitBinaryPath
+            ? command.CaptureRgba16FloatBinaryPath!
+            : Path.ChangeExtension(relativeOrConfiguredExrPath, ".bin") ?? string.Empty;
+        string resolvedBinaryPath = string.IsNullOrWhiteSpace(relativeOrConfiguredBinaryPath)
+            ? string.Empty
+            : AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredBinaryPath);
 
         if (!File.Exists(resolvedPath))
         {
@@ -396,6 +403,24 @@ public sealed partial class EngineCliApp
         {
             byte[] payload = File.ReadAllBytes(resolvedPath);
             ExrHeaderInfo exr = ExrHeaderValidation.ValidateRgba16Float(payload, "Capture RGBA16F EXR");
+
+            bool enforcePairCheck = command.VerifyCaptureRgba16FloatBinary || explicitPath || explicitBinaryPath;
+            if (enforcePairCheck)
+            {
+                if (string.IsNullOrWhiteSpace(resolvedBinaryPath) || !File.Exists(resolvedBinaryPath))
+                {
+                    throw new InvalidDataException($"Capture RGBA16F EXR pair check failed: binary artifact was not found: {resolvedBinaryPath}");
+                }
+
+                long expectedBinaryBytes = checked((long)exr.Width * exr.Height * 8L);
+                long actualBinaryBytes = new FileInfo(resolvedBinaryPath).Length;
+                if (actualBinaryBytes != expectedBinaryBytes)
+                {
+                    throw new InvalidDataException(
+                        $"Capture RGBA16F EXR pair check failed: binary size mismatch, expected {expectedBinaryBytes} bytes for {exr.Width}x{exr.Height}, got {actualBinaryBytes}.");
+                }
+            }
+
             _stdout.WriteLine(
                 $"Capture RGBA16F EXR: bytes={payload.Length}, size={exr.Width}x{exr.Height}, compression={exr.Compression}, channels={string.Join(',', exr.Channels)}.");
         }

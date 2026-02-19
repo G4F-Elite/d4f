@@ -305,6 +305,8 @@ public sealed partial class EngineCliApp
                     string manifestDirectory = Path.GetDirectoryName(manifestPath) ?? projectDirectory;
                     var missingArtifactFiles = new List<string>();
                     var invalidArtifactFiles = new List<string>();
+                    var resolvedRequiredArtifactPaths = new Dictionary<string, string>(StringComparer.Ordinal);
+                    var exrHeadersByPath = new Dictionary<string, ExrHeaderInfo>(StringComparer.Ordinal);
                     foreach (string requiredKind in requiredKinds)
                     {
                         if (!entriesByKind.TryGetValue(requiredKind, out TestingArtifactEntry[]? entriesForKind) || entriesForKind.Length == 0)
@@ -320,17 +322,45 @@ public sealed partial class EngineCliApp
                             continue;
                         }
 
+                        resolvedRequiredArtifactPaths[requiredKind] = resolvedArtifactPath;
+
                         if (string.Equals(requiredKind, "screenshot-buffer-rgba16f-exr", StringComparison.Ordinal))
                         {
                             try
                             {
                                 byte[] exrPayload = File.ReadAllBytes(resolvedArtifactPath);
-                                _ = ExrHeaderValidation.ValidateRgba16Float(exrPayload, "NFR proof RGBA16F EXR artifact");
+                                ExrHeaderInfo header = ExrHeaderValidation.ValidateRgba16Float(exrPayload, "NFR proof RGBA16F EXR artifact");
+                                exrHeadersByPath[resolvedArtifactPath] = header;
                             }
                             catch (Exception ex) when (ex is IOException or InvalidDataException)
                             {
                                 invalidArtifactFiles.Add($"{requiredKind} ({resolvedArtifactPath}): {ex.Message}");
                             }
+                        }
+                    }
+
+                    if (resolvedRequiredArtifactPaths.TryGetValue("screenshot-buffer-rgba16f", out string? rgba16fBinPath) &&
+                        resolvedRequiredArtifactPaths.TryGetValue("screenshot-buffer-rgba16f-exr", out string? rgba16fExrPath))
+                    {
+                        try
+                        {
+                            if (!exrHeadersByPath.TryGetValue(rgba16fExrPath, out ExrHeaderInfo exrHeader))
+                            {
+                                byte[] exrPayload = File.ReadAllBytes(rgba16fExrPath);
+                                exrHeader = ExrHeaderValidation.ValidateRgba16Float(exrPayload, "NFR proof RGBA16F EXR artifact");
+                            }
+
+                            long expectedBinaryBytes = checked((long)exrHeader.Width * exrHeader.Height * 8L);
+                            long actualBinaryBytes = new FileInfo(rgba16fBinPath).Length;
+                            if (actualBinaryBytes != expectedBinaryBytes)
+                            {
+                                invalidArtifactFiles.Add(
+                                    $"screenshot-buffer-rgba16f pair size mismatch ({rgba16fBinPath} vs {rgba16fExrPath}): expected {expectedBinaryBytes} bytes, got {actualBinaryBytes}.");
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidDataException)
+                        {
+                            invalidArtifactFiles.Add($"screenshot-buffer-rgba16f pair validation failed: {ex.Message}");
                         }
                     }
 

@@ -929,6 +929,44 @@ public sealed class EngineCliDoctorToolChecksTests
     }
 
     [Fact]
+    public void Run_ShouldFailDoctor_WhenCaptureRgba16FBinarySizeMismatchesExr()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string capturePath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.bin");
+            Directory.CreateDirectory(Path.GetDirectoryName(capturePath)!);
+            File.WriteAllBytes(capturePath, [1, 0, 2, 0, 3, 0, 4, 0, 5, 0, 6, 0, 7, 0, 8, 0]);
+            string exrPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba16f.exr");
+            WriteCaptureRgba16FloatExr(exrPath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-capture-rgba16f", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Capture RGBA16F EXR pair check failed: binary size mismatch", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailDoctor_WhenRenderStatsRequiredButMissing()
     {
         string tempRoot = CreateTempDirectory();
