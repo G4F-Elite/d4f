@@ -9,6 +9,7 @@ public sealed class CharacterControllerSystem : IWorldSystem
 {
     private const float Epsilon = 0.00001f;
     private const float GroundedNormalThreshold = 0.65f;
+    private const float MinGroundProbeDistance = 0.2f;
     private readonly IPhysicsFacade _physics;
 
     public CharacterControllerSystem(IPhysicsFacade physics)
@@ -38,10 +39,11 @@ public sealed class CharacterControllerSystem : IWorldSystem
 
             if (desiredDistance <= Epsilon)
             {
-                if (controller.IsGrounded)
+                bool idleGrounded = ProbeGround(body, controller);
+                if (controller.IsGrounded != idleGrounded)
                 {
                     var updatedIdleController = controller;
-                    updatedIdleController.IsGrounded = false;
+                    updatedIdleController.IsGrounded = idleGrounded;
                     world.SetComponent(entity, updatedIdleController);
                 }
 
@@ -75,5 +77,24 @@ public sealed class CharacterControllerSystem : IWorldSystem
             updatedController.IsGrounded = isGrounded;
             world.SetComponent(entity, updatedController);
         }
+    }
+
+    private bool ProbeGround(in PhysicsBody body, in CharacterController controller)
+    {
+        float probeDistance = MathF.Max(MinGroundProbeDistance, controller.SkinWidth * 2.0f);
+        var probeQuery = new PhysicsSweepQuery(
+            body.Position,
+            -Vector3.UnitY,
+            probeDistance,
+            ColliderShapeType.Capsule,
+            new Vector3(controller.Radius, controller.Height, controller.Radius),
+            includeTriggers: false);
+
+        if (!_physics.Sweep(probeQuery, out PhysicsSweepHit hit))
+        {
+            return false;
+        }
+
+        return hit.Normal.Y >= GroundedNormalThreshold;
     }
 }

@@ -81,6 +81,51 @@ public sealed class CharacterControllerSystemTests
         Assert.Empty(physics.SweepQueries);
     }
 
+    [Fact]
+    public void Update_IdleControllerPerformsGroundProbeAndStaysGrounded()
+    {
+        var physics = new TestPhysicsFacade();
+        physics.SweepResults.Enqueue((
+            true,
+            new PhysicsSweepHit(
+                new BodyHandle(10),
+                distance: 0.05f,
+                point: new Vector3(0.0f, -0.05f, 0.0f),
+                normal: Vector3.UnitY,
+                isTrigger: false)));
+        var system = new CharacterControllerSystem(physics);
+        var world = new World();
+        EntityId entity = world.CreateEntity();
+        world.AddComponent(entity, CreateBody(PhysicsBodyType.Dynamic, position: Vector3.Zero));
+        world.AddComponent(entity, new CharacterController(0.5f, 1.8f, 0.05f, Vector3.Zero, isGrounded: true));
+
+        system.Update(world, new FrameTiming(0, TimeSpan.FromSeconds(0.016), TimeSpan.FromSeconds(0.016)));
+
+        Assert.True(world.TryGetComponent(entity, out CharacterController controller));
+        Assert.True(controller.IsGrounded);
+        Assert.Single(physics.SweepQueries);
+        PhysicsSweepQuery probeQuery = physics.SweepQueries[0];
+        Assert.Equal(-Vector3.UnitY, probeQuery.Direction);
+        Assert.Equal(ColliderShapeType.Capsule, probeQuery.ShapeType);
+    }
+
+    [Fact]
+    public void Update_IdleControllerClearsGroundedStateWhenProbeMisses()
+    {
+        var physics = new TestPhysicsFacade();
+        var system = new CharacterControllerSystem(physics);
+        var world = new World();
+        EntityId entity = world.CreateEntity();
+        world.AddComponent(entity, CreateBody(PhysicsBodyType.Dynamic, position: Vector3.Zero));
+        world.AddComponent(entity, new CharacterController(0.5f, 1.8f, 0.05f, Vector3.Zero, isGrounded: true));
+
+        system.Update(world, new FrameTiming(0, TimeSpan.FromSeconds(0.016), TimeSpan.FromSeconds(0.016)));
+
+        Assert.True(world.TryGetComponent(entity, out CharacterController controller));
+        Assert.False(controller.IsGrounded);
+        Assert.Single(physics.SweepQueries);
+    }
+
     private static PhysicsBody CreateBody(PhysicsBodyType type, Vector3 position)
     {
         return new PhysicsBody(
