@@ -32,10 +32,15 @@ public sealed class ClientInterpolationBuffer
         return true;
     }
 
-    public static float ComputeAlpha(long renderTick, NetSnapshot from, NetSnapshot to)
+    public static float ComputeAlpha(double renderTick, NetSnapshot from, NetSnapshot to)
     {
         ArgumentNullException.ThrowIfNull(from);
         ArgumentNullException.ThrowIfNull(to);
+
+        if (!double.IsFinite(renderTick))
+        {
+            throw new ArgumentOutOfRangeException(nameof(renderTick), "Render tick must be finite.");
+        }
 
         if (to.Tick <= from.Tick)
         {
@@ -52,6 +57,6 @@ public sealed class ClientInterpolationBuffer
             return 1f;
         }
 
-        return (float)(renderTick - from.Tick) / (to.Tick - from.Tick);
+        return (float)((renderTick - from.Tick) / (to.Tick - from.Tick));
     }
 }

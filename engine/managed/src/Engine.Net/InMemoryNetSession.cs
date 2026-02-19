@@ -237,6 +237,25 @@ public sealed partial class InMemoryNetSession
         return client.Interpolation.TryGetWindow(out from, out to);
     }
 
+    public bool TrySampleClientInterpolation(uint clientId, double renderTick, out NetInterpolationSample? sample)
+    {
+        if (!double.IsFinite(renderTick))
+        {
+            throw new ArgumentOutOfRangeException(nameof(renderTick), "Render tick must be finite.");
+        }
+
+        ClientState client = GetClientState(clientId);
+        if (!client.Interpolation.TryGetWindow(out NetSnapshot from, out NetSnapshot to))
+        {
+            sample = null;
+            return false;
+        }
+
+        float alpha = ClientInterpolationBuffer.ComputeAlpha(renderTick, from, to);
+        sample = new NetInterpolationSample(from, to, alpha);
+        return true;
+    }
+
     public IReadOnlyList<NetRpcEnvelope> DrainServerInbox()
     {
         return DrainQueue(_serverInbox);

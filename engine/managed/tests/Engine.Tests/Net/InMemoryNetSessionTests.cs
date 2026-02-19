@@ -260,10 +260,59 @@ public sealed class InMemoryNetSessionTests
         Assert.True(hasWindow);
         Assert.Equal(1L, from.Tick);
         Assert.Equal(2L, to.Tick);
-        Assert.Equal(0f, ClientInterpolationBuffer.ComputeAlpha(0L, from, to));
-        Assert.Equal(0f, ClientInterpolationBuffer.ComputeAlpha(1L, from, to));
-        Assert.Equal(1f, ClientInterpolationBuffer.ComputeAlpha(2L, from, to));
-        Assert.Equal(1f, ClientInterpolationBuffer.ComputeAlpha(3L, from, to));
+        Assert.Equal(0f, ClientInterpolationBuffer.ComputeAlpha(0d, from, to));
+        Assert.Equal(0f, ClientInterpolationBuffer.ComputeAlpha(1d, from, to));
+        Assert.Equal(0.5f, ClientInterpolationBuffer.ComputeAlpha(1.5d, from, to));
+        Assert.Equal(1f, ClientInterpolationBuffer.ComputeAlpha(2d, from, to));
+        Assert.Equal(1f, ClientInterpolationBuffer.ComputeAlpha(3d, from, to));
+    }
+
+    [Fact]
+    public void TrySampleClientInterpolation_ShouldReturnAlphaForRenderTick()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+        uint clientId = session.ConnectClient();
+
+        session.UpsertServerEntity(CreateEntity(1u, null, "transform", [1]));
+        session.Pump();
+        session.UpsertServerEntity(CreateEntity(1u, null, "transform", [2]));
+        session.Pump();
+
+        bool ok = session.TrySampleClientInterpolation(clientId, 1.25d, out NetInterpolationSample? sample);
+
+        Assert.True(ok);
+        NetInterpolationSample typed = Assert.IsType<NetInterpolationSample>(sample);
+        Assert.Equal(1L, typed.From.Tick);
+        Assert.Equal(2L, typed.To.Tick);
+        Assert.Equal(0.25f, typed.Alpha);
+    }
+
+    [Fact]
+    public void TrySampleClientInterpolation_ShouldReturnFalseWithoutWindow()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+        uint clientId = session.ConnectClient();
+
+        session.UpsertServerEntity(CreateEntity(1u, null, "transform", [1]));
+        session.Pump();
+
+        bool ok = session.TrySampleClientInterpolation(clientId, 1.0d, out NetInterpolationSample? sample);
+
+        Assert.False(ok);
+        Assert.Null(sample);
+    }
+
+    [Fact]
+    public void TrySampleClientInterpolation_ShouldRejectNonFiniteRenderTick()
+    {
+        InMemoryNetSession session = CreateSession();
+        session.RegisterReplicatedComponent("transform");
+        uint clientId = session.ConnectClient();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            session.TrySampleClientInterpolation(clientId, double.NaN, out _));
     }
 
     [Fact]
