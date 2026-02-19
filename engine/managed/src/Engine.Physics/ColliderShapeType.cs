@@ -4,5 +4,6 @@ public enum ColliderShapeType : byte
 {
     Box = 0,
     Sphere = 1,
-    Capsule = 2
+    Capsule = 2,
+    StaticMesh = 3
 }

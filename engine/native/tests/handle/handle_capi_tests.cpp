@@ -52,6 +52,35 @@ void TestHandleLifecycleAndSubsystemAccess() {
          ENGINE_NATIVE_STATUS_OK);
   assert(frame_memory != nullptr);
 
+  engine_native_ui_draw_item_t ui_items[2]{};
+  ui_items[0].texture = 10u;
+  ui_items[0].vertex_count = 6u;
+  ui_items[0].index_count = 6u;
+  ui_items[0].scissor_width = 32.0f;
+  ui_items[0].scissor_height = 32.0f;
+  ui_items[1].texture = 11u;
+  ui_items[1].vertex_count = 6u;
+  ui_items[1].index_count = 6u;
+  ui_items[1].scissor_width = 16.0f;
+  ui_items[1].scissor_height = 16.0f;
+
+  assert(renderer_ui_append_handle(renderer, ui_items, 2u) == ENGINE_NATIVE_STATUS_OK);
+  uint32_t ui_count = 0u;
+  assert(renderer_ui_get_count_handle(renderer, &ui_count) == ENGINE_NATIVE_STATUS_OK);
+  assert(ui_count == 2u);
+
+  engine_native_ui_draw_item_t copied_ui[2]{};
+  uint32_t copied_count = 0u;
+  assert(renderer_ui_copy_items_handle(renderer, copied_ui, 2u, &copied_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(copied_count == 2u);
+  assert(copied_ui[0].texture == 10u);
+  assert(copied_ui[1].texture == 11u);
+
+  assert(renderer_ui_reset_handle(renderer) == ENGINE_NATIVE_STATUS_OK);
+  assert(renderer_ui_get_count_handle(renderer, &ui_count) == ENGINE_NATIVE_STATUS_OK);
+  assert(ui_count == 0u);
+
   engine_native_render_packet_t empty_packet{
       .draw_items = nullptr,
       .draw_item_count = 0u,

@@ -18,7 +18,7 @@
 #define ENGINE_NATIVE_API __attribute__((visibility("default")))
 #endif
 
-#define ENGINE_NATIVE_API_VERSION 14u
+#define ENGINE_NATIVE_API_VERSION 15u
 
 typedef struct engine_native_engine engine_native_engine_t;
 typedef struct engine_native_renderer engine_native_renderer_t;
@@ -113,6 +113,8 @@ typedef enum engine_native_debug_view_mode {
 
 #define ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE 0x01u
 #define ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS 0x02u
+#define ENGINE_NATIVE_RENDER_FLAG_REQUIRE_FORWARD_PLUS 0x04u
+#define ENGINE_NATIVE_RENDER_FLAG_REQUIRE_CSM 0x08u
 
 #define ENGINE_NATIVE_RENDER_BACKEND_UNKNOWN 0u
 #define ENGINE_NATIVE_RENDER_BACKEND_VULKAN 1u
@@ -270,6 +272,7 @@ typedef struct engine_native_body_write {
   float collider_dimensions[3];
   float friction;
   float restitution;
+  engine_native_resource_handle_t collider_mesh;
 } engine_native_body_write_t;
 
 typedef struct engine_native_body_read {
@@ -457,6 +460,24 @@ ENGINE_NATIVE_API engine_native_status_t renderer_destroy_resource(
 ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats(
     engine_native_renderer_t* renderer,
     engine_native_renderer_frame_stats_t* out_stats);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_reset(
+    engine_native_renderer_t* renderer);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_append(
+    engine_native_renderer_t* renderer,
+    const engine_native_ui_draw_item_t* items,
+    uint32_t item_count);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_get_count(
+    engine_native_renderer_t* renderer,
+    uint32_t* out_item_count);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_copy_items(
+    engine_native_renderer_t* renderer,
+    engine_native_ui_draw_item_t* out_items,
+    uint32_t item_capacity,
+    uint32_t* out_item_count);
 
 ENGINE_NATIVE_API engine_native_status_t capture_request(
     engine_native_renderer_t* renderer,
@@ -653,6 +674,24 @@ ENGINE_NATIVE_API engine_native_status_t renderer_destroy_resource_handle(
 ENGINE_NATIVE_API engine_native_status_t renderer_get_last_frame_stats_handle(
     engine_native_renderer_handle_t renderer,
     engine_native_renderer_frame_stats_t* out_stats);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_reset_handle(
+    engine_native_renderer_handle_t renderer);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_append_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_ui_draw_item_t* items,
+    uint32_t item_count);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_get_count_handle(
+    engine_native_renderer_handle_t renderer,
+    uint32_t* out_item_count);
+
+ENGINE_NATIVE_API engine_native_status_t renderer_ui_copy_items_handle(
+    engine_native_renderer_handle_t renderer,
+    engine_native_ui_draw_item_t* out_items,
+    uint32_t item_capacity,
+    uint32_t* out_item_count);
 
 ENGINE_NATIVE_API engine_native_status_t capture_request_handle(
     engine_native_renderer_handle_t renderer,

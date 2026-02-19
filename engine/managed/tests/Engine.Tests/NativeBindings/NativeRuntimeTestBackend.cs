@@ -95,6 +95,18 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus RendererGetLastFrameStatsStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus RendererUiResetStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererUiAppendStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererUiGetCountStatus { get; set; } = EngineNativeStatus.Ok;
+
+    public EngineNativeStatus RendererUiCopyItemsStatus { get; set; } = EngineNativeStatus.Ok;
+
+    private readonly List<EngineNativeUiDrawItem> _rendererUiItems = [];
+
+    public IReadOnlyList<EngineNativeUiDrawItem> RendererUiItems => _rendererUiItems;
+
     public EngineNativeRendererFrameStats RendererFrameStatsToReturn { get; set; }
 
     public EngineNativeStatus CaptureRequestStatus { get; set; } = EngineNativeStatus.Ok;
@@ -414,6 +426,77 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         Calls.Add("renderer_get_last_frame_stats");
         stats = RendererFrameStatsToReturn;
         return RendererGetLastFrameStatsStatus;
+    }
+
+    public EngineNativeStatus RendererUiReset(IntPtr renderer)
+    {
+        Calls.Add("renderer_ui_reset");
+        if (RendererUiResetStatus != EngineNativeStatus.Ok)
+        {
+            return RendererUiResetStatus;
+        }
+
+        _rendererUiItems.Clear();
+        return RendererUiResetStatus;
+    }
+
+    public EngineNativeStatus RendererUiAppend(IntPtr renderer, IntPtr uiItems, uint uiItemCount)
+    {
+        Calls.Add("renderer_ui_append");
+        if (RendererUiAppendStatus != EngineNativeStatus.Ok)
+        {
+            return RendererUiAppendStatus;
+        }
+
+        if (uiItemCount > 0 && uiItems == IntPtr.Zero)
+        {
+            return EngineNativeStatus.InvalidArgument;
+        }
+
+        for (var i = 0u; i < uiItemCount; i++)
+        {
+            IntPtr source = uiItems + checked((int)(i * (uint)Marshal.SizeOf<EngineNativeUiDrawItem>()));
+            _rendererUiItems.Add(Marshal.PtrToStructure<EngineNativeUiDrawItem>(source));
+        }
+
+        return EngineNativeStatus.Ok;
+    }
+
+    public EngineNativeStatus RendererUiGetCount(IntPtr renderer, out uint uiItemCount)
+    {
+        Calls.Add("renderer_ui_get_count");
+        uiItemCount = checked((uint)_rendererUiItems.Count);
+        return RendererUiGetCountStatus;
+    }
+
+    public EngineNativeStatus RendererUiCopyItems(
+        IntPtr renderer,
+        IntPtr uiItems,
+        uint uiItemCapacity,
+        out uint uiItemCount)
+    {
+        Calls.Add("renderer_ui_copy_items");
+        uiItemCount = 0u;
+
+        if (RendererUiCopyItemsStatus != EngineNativeStatus.Ok)
+        {
+            return RendererUiCopyItemsStatus;
+        }
+
+        if (uiItemCapacity > 0 && uiItems == IntPtr.Zero)
+        {
+            return EngineNativeStatus.InvalidArgument;
+        }
+
+        uint copied = Math.Min(uiItemCapacity, checked((uint)_rendererUiItems.Count));
+        for (var i = 0u; i < copied; i++)
+        {
+            IntPtr destination = uiItems + checked((int)(i * (uint)Marshal.SizeOf<EngineNativeUiDrawItem>()));
+            Marshal.StructureToPtr(_rendererUiItems[checked((int)i)], destination, false);
+        }
+
+        uiItemCount = copied;
+        return EngineNativeStatus.Ok;
     }
 
     public EngineNativeStatus PhysicsStep(IntPtr physics, double deltaSeconds)

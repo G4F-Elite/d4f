@@ -161,4 +161,46 @@ engine_native_status_t renderer_get_last_frame_stats(
   return renderer->state->GetLastFrameStats(out_stats);
 }
 
+engine_native_status_t renderer_ui_reset(engine_native_renderer_t* renderer) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return renderer->state->UiReset();
+}
+
+engine_native_status_t renderer_ui_append(engine_native_renderer_t* renderer,
+                                          const engine_native_ui_draw_item_t* items,
+                                          uint32_t item_count) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return renderer->state->UiAppend(items, item_count);
+}
+
+engine_native_status_t renderer_ui_get_count(engine_native_renderer_t* renderer,
+                                             uint32_t* out_item_count) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return renderer->state->UiGetCount(out_item_count);
+}
+
+engine_native_status_t renderer_ui_copy_items(engine_native_renderer_t* renderer,
+                                              engine_native_ui_draw_item_t* out_items,
+                                              uint32_t item_capacity,
+                                              uint32_t* out_item_count) {
+  const engine_native_status_t status = ValidateRenderer(renderer);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+
+  return renderer->state->UiCopyItems(out_items, item_capacity, out_item_count);
+}
+
 }  // extern "C"

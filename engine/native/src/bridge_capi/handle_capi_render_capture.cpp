@@ -163,6 +163,61 @@ engine_native_status_t renderer_get_last_frame_stats_handle(
   return renderer_get_last_frame_stats(raw_renderer, out_stats);
 }
 
+engine_native_status_t renderer_ui_reset_handle(
+    engine_native_renderer_handle_t renderer) {
+  engine_native_renderer_t* raw_renderer = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveRenderer(renderer, &raw_renderer);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return renderer_ui_reset(raw_renderer);
+}
+
+engine_native_status_t renderer_ui_append_handle(
+    engine_native_renderer_handle_t renderer,
+    const engine_native_ui_draw_item_t* items,
+    uint32_t item_count) {
+  engine_native_renderer_t* raw_renderer = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveRenderer(renderer, &raw_renderer);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return renderer_ui_append(raw_renderer, items, item_count);
+}
+
+engine_native_status_t renderer_ui_get_count_handle(
+    engine_native_renderer_handle_t renderer,
+    uint32_t* out_item_count) {
+  engine_native_renderer_t* raw_renderer = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveRenderer(renderer, &raw_renderer);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return renderer_ui_get_count(raw_renderer, out_item_count);
+}
+
+engine_native_status_t renderer_ui_copy_items_handle(
+    engine_native_renderer_handle_t renderer,
+    engine_native_ui_draw_item_t* out_items,
+    uint32_t item_capacity,
+    uint32_t* out_item_count) {
+  engine_native_renderer_t* raw_renderer = nullptr;
+  const engine_native_status_t resolve_status =
+      ResolveRenderer(renderer, &raw_renderer);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return renderer_ui_copy_items(raw_renderer, out_items, item_capacity,
+                                out_item_count);
+}
+
 engine_native_status_t capture_request_handle(
     engine_native_renderer_handle_t renderer,
     const engine_native_capture_request_t* request,

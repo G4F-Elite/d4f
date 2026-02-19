@@ -12,6 +12,7 @@ namespace {
 constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
+constexpr uint8_t kColliderShapeStaticMesh = 3u;
 constexpr float kEpsilon = 0.00001f;
 constexpr float kDistanceTieEpsilon = 0.00001f;
 
@@ -285,6 +286,20 @@ engine_native_status_t PhysicsState::Raycast(
 
     switch (state.collider_shape) {
       case kColliderShapeBox: {
+        const std::array<float, 3> extents = Scale(state.collider_dimensions, 0.5f);
+        const std::array<float, 3> min_bounds = Subtract(state.position, extents);
+        const std::array<float, 3> max_bounds = Add(state.position, extents);
+        has_hit = RayIntersectsAabb(origin, direction, min_bounds, max_bounds,
+                                    query.max_distance, &hit_distance);
+        if (has_hit) {
+          const std::array<float, 3> point =
+              Add(origin, Scale(direction, hit_distance));
+          hit_normal = ComputeAabbNormal(point, state.position, extents);
+        }
+        break;
+      }
+
+      case kColliderShapeStaticMesh: {
         const std::array<float, 3> extents = Scale(state.collider_dimensions, 0.5f);
         const std::array<float, 3> min_bounds = Subtract(state.position, extents);
         const std::array<float, 3> max_bounds = Add(state.position, extents);

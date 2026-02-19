@@ -16,6 +16,7 @@ internal sealed partial class NativeRuntime
     : INativePlatformApi,
       INativeTimingApi,
       INativePhysicsApi,
+      INativeUiApi,
       INativeAudioApi,
       INativeContentApi,
       INativeNetApi,
@@ -411,7 +412,8 @@ internal sealed partial class NativeRuntime
                 ColliderDimensions1 = body.Collider.Dimensions.Y,
                 ColliderDimensions2 = body.Collider.Dimensions.Z,
                 Friction = body.Collider.Material.Friction,
-                Restitution = body.Collider.Material.Restitution
+                Restitution = body.Collider.Material.Restitution,
+                ColliderMesh = body.Collider.StaticMeshHandle.Value
             });
         }
 

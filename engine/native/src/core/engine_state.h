@@ -43,6 +43,13 @@ class RendererState {
                                     size_t alignment,
                                     void** out_frame_memory);
   engine_native_status_t Submit(const engine_native_render_packet_t& packet);
+  engine_native_status_t UiReset();
+  engine_native_status_t UiAppend(const engine_native_ui_draw_item_t* items,
+                                  uint32_t item_count);
+  engine_native_status_t UiGetCount(uint32_t* out_item_count) const;
+  engine_native_status_t UiCopyItems(engine_native_ui_draw_item_t* out_items,
+                                     uint32_t item_capacity,
+                                     uint32_t* out_item_count) const;
   engine_native_status_t Present();
   engine_native_status_t CreateMeshFromBlob(
       const void* data,
@@ -136,6 +143,7 @@ struct PhysicsBodyState {
   std::array<float, 3> collider_dimensions{1.0f, 1.0f, 1.0f};
   float friction = 0.5f;
   float restitution = 0.1f;
+  engine_native_resource_handle_t collider_mesh = kInvalidResourceHandle;
 };
 
 class PhysicsState {

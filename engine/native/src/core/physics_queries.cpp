@@ -12,6 +12,7 @@ namespace {
 constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
+constexpr uint8_t kColliderShapeStaticMesh = 3u;
 constexpr float kEpsilon = 0.00001f;
 constexpr float kDistanceTieEpsilon = 0.00001f;
 
@@ -54,7 +55,8 @@ bool IsFiniteVector3(const std::array<float, 3>& value) {
 
 bool IsSupportedShape(uint8_t shape) {
   return shape == kColliderShapeBox || shape == kColliderShapeSphere ||
-         shape == kColliderShapeCapsule;
+         shape == kColliderShapeCapsule ||
+         shape == kColliderShapeStaticMesh;
 }
 
 bool IsValidShapeDimensions(uint8_t shape, const std::array<float, 3>& dimensions) {
@@ -80,6 +82,10 @@ bool IsValidShapeDimensions(uint8_t shape, const std::array<float, 3>& dimension
 float BoundingSphereRadius(uint8_t shape, const std::array<float, 3>& dimensions) {
   switch (shape) {
     case kColliderShapeBox: {
+      const std::array<float, 3> half = Scale(dimensions, 0.5f);
+      return Length(half);
+    }
+    case kColliderShapeStaticMesh: {
       const std::array<float, 3> half = Scale(dimensions, 0.5f);
       return Length(half);
     }

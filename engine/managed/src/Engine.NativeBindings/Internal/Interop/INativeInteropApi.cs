@@ -82,6 +82,23 @@ internal interface INativeInteropApi
         IntPtr renderer,
         out EngineNativeRendererFrameStats stats);
 
+    EngineNativeStatus RendererUiReset(IntPtr renderer);
+
+    EngineNativeStatus RendererUiAppend(
+        IntPtr renderer,
+        IntPtr uiItems,
+        uint uiItemCount);
+
+    EngineNativeStatus RendererUiGetCount(
+        IntPtr renderer,
+        out uint uiItemCount);
+
+    EngineNativeStatus RendererUiCopyItems(
+        IntPtr renderer,
+        IntPtr uiItems,
+        uint uiItemCapacity,
+        out uint uiItemCount);
+
     EngineNativeStatus CaptureRequest(
         IntPtr renderer,
         in EngineNativeCaptureRequest request,

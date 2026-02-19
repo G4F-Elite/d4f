@@ -32,6 +32,7 @@ constexpr uint8_t kPhysicsBodyTypeKinematic = 2u;
 constexpr uint8_t kColliderShapeBox = 0u;
 constexpr uint8_t kColliderShapeSphere = 1u;
 constexpr uint8_t kColliderShapeCapsule = 2u;
+constexpr uint8_t kColliderShapeStaticMesh = 3u;
 constexpr uint32_t kBlobVersion = 1u;
 constexpr uint32_t kMeshBlobMagic = 0x424D4644u;      // DFMB
 constexpr uint32_t kTextureBlobMagic = 0x42544644u;   // DFTB
@@ -92,7 +93,8 @@ bool IsSupportedBodyType(uint8_t body_type) {
 bool IsSupportedColliderShape(uint8_t collider_shape) {
   return collider_shape == kColliderShapeBox ||
          collider_shape == kColliderShapeSphere ||
-         collider_shape == kColliderShapeCapsule;
+         collider_shape == kColliderShapeCapsule ||
+         collider_shape == kColliderShapeStaticMesh;
 }
 
 bool IsUnitRange(float value) {
@@ -203,7 +205,9 @@ bool IsSupportedDebugViewMode(uint8_t mode) {
 bool IsSupportedRenderFeatureFlags(uint8_t flags) {
   constexpr uint8_t kSupportedFlags =
       ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE |
-      ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS;
+      ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS |
+      ENGINE_NATIVE_RENDER_FLAG_REQUIRE_FORWARD_PLUS |
+      ENGINE_NATIVE_RENDER_FLAG_REQUIRE_CSM;
   return (flags & static_cast<uint8_t>(~kSupportedFlags)) == 0u;
 }
 
@@ -498,7 +502,6 @@ engine_native_status_t RendererState::Submit(
   }
 
   submitted_draw_count_ = total_draw_count;
-  submitted_ui_count_ = total_ui_count;
   if (packet.debug_view_mode != ENGINE_NATIVE_DEBUG_VIEW_NONE) {
     if (submitted_debug_view_mode_ == ENGINE_NATIVE_DEBUG_VIEW_NONE) {
       submitted_debug_view_mode_ =
@@ -552,19 +555,96 @@ engine_native_status_t RendererState::Submit(
   }
 
   if (packet.ui_item_count > 0u) {
-    for (uint32_t i = 0u; i < packet.ui_item_count; ++i) {
-      if (!HasValidUiScissor(packet.ui_items[i])) {
-        return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
-      }
+    const engine_native_status_t ui_status =
+        UiAppend(packet.ui_items, packet.ui_item_count);
+    if (ui_status != ENGINE_NATIVE_STATUS_OK) {
+      return ui_status;
     }
-
-    const size_t old_size = submitted_ui_items_.size();
-    const size_t added = static_cast<size_t>(packet.ui_item_count);
-    submitted_ui_items_.resize(old_size + added);
-    std::copy_n(packet.ui_items, packet.ui_item_count,
-                submitted_ui_items_.data() + old_size);
   }
 
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::UiReset() {
+  if (!frame_open_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  submitted_ui_count_ = 0u;
+  submitted_ui_items_.clear();
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::UiAppend(
+    const engine_native_ui_draw_item_t* items,
+    uint32_t item_count) {
+  if (!frame_open_) {
+    return ENGINE_NATIVE_STATUS_INVALID_STATE;
+  }
+
+  if (item_count > 0u && items == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  if (item_count > std::numeric_limits<uint32_t>::max() - submitted_ui_count_) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const uint32_t total_ui_count = submitted_ui_count_ + item_count;
+  const size_t draw_bytes =
+      static_cast<size_t>(submitted_draw_count_) *
+      static_cast<size_t>(sizeof(engine_native_draw_item_t));
+  const size_t ui_bytes = static_cast<size_t>(total_ui_count) *
+                          static_cast<size_t>(sizeof(engine_native_ui_draw_item_t));
+  if (draw_bytes > frame_capacity_ || ui_bytes > frame_capacity_ ||
+      draw_bytes > std::numeric_limits<size_t>::max() - ui_bytes ||
+      draw_bytes + ui_bytes > frame_capacity_) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  for (uint32_t i = 0u; i < item_count; ++i) {
+    if (!HasValidUiScissor(items[i])) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+  }
+
+  const size_t old_size = submitted_ui_items_.size();
+  const size_t added = static_cast<size_t>(item_count);
+  submitted_ui_items_.resize(old_size + added);
+  std::copy_n(items, item_count, submitted_ui_items_.data() + old_size);
+  submitted_ui_count_ = total_ui_count;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::UiGetCount(uint32_t* out_item_count) const {
+  if (out_item_count == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_item_count = submitted_ui_count_;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t RendererState::UiCopyItems(
+    engine_native_ui_draw_item_t* out_items,
+    uint32_t item_capacity,
+    uint32_t* out_item_count) const {
+  if (out_item_count == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  *out_item_count = 0u;
+  if (item_capacity > 0u && out_items == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  const uint32_t copied_count =
+      std::min(item_capacity, static_cast<uint32_t>(submitted_ui_items_.size()));
+  if (copied_count > 0u) {
+    std::copy_n(submitted_ui_items_.data(), copied_count, out_items);
+  }
+
+  *out_item_count = copied_count;
   return ENGINE_NATIVE_STATUS_OK;
 }
 
@@ -1001,6 +1081,14 @@ engine_native_status_t PhysicsState::SyncFromWorld(
         write.collider_dimensions[1] <= write.collider_dimensions[0] * 2.0f) {
       return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
     }
+    if (write.collider_shape == kColliderShapeStaticMesh &&
+        write.collider_mesh == kInvalidResourceHandle) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
+    if (write.collider_shape != kColliderShapeStaticMesh &&
+        write.collider_mesh != kInvalidResourceHandle) {
+      return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+    }
 
     PhysicsBodyState state;
     state.body_type = write.body_type;
@@ -1013,6 +1101,7 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     std::copy_n(write.collider_dimensions, 3, state.collider_dimensions.data());
     state.friction = write.friction;
     state.restitution = write.restitution;
+    state.collider_mesh = write.collider_mesh;
     if (next_bodies.find(write.body) != next_bodies.end()) {
       return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
     }

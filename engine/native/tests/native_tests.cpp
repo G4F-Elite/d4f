@@ -440,6 +440,36 @@ void TestEngineAndSubsystemFlow() {
   duplicate_writes[1].position[0] = duplicate_writes[1].position[0] + 1.0f;
   assert(physics_sync_from_world(physics, duplicate_writes, 2u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+
+  engine_native_body_write_t static_mesh_write[1]{};
+  static_mesh_write[0] = writes[0];
+  static_mesh_write[0].body = 4001u;
+  static_mesh_write[0].body_type = 0u;
+  static_mesh_write[0].collider_shape = 3u;
+  static_mesh_write[0].position[0] = 6.0f;
+  static_mesh_write[0].position[1] = 0.0f;
+  static_mesh_write[0].position[2] = 0.0f;
+  static_mesh_write[0].collider_dimensions[0] = 2.0f;
+  static_mesh_write[0].collider_dimensions[1] = 2.0f;
+  static_mesh_write[0].collider_dimensions[2] = 2.0f;
+  static_mesh_write[0].collider_mesh = 7001u;
+  engine_native_body_write_t static_mesh_missing_ref[1]{};
+  static_mesh_missing_ref[0] = static_mesh_write[0];
+  static_mesh_missing_ref[0].collider_mesh = 0u;
+  assert(physics_sync_from_world(physics, static_mesh_missing_ref, 1u) ==
+         ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
+  assert(physics_sync_from_world(physics, static_mesh_write, 1u) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_OK);
+  engine_native_raycast_query_t static_mesh_query = query;
+  static_mesh_query.max_distance = 20.0f;
+  assert(physics_raycast(physics, &static_mesh_query, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(raycast_hit.has_hit == 1u);
+  assert(raycast_hit.body == 4001u);
+  assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+
   assert(physics_step(physics, std::numeric_limits<double>::quiet_NaN()) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   engine_native_body_write_t invalid_write[1]{};
@@ -534,6 +564,41 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
   assert(renderer != nullptr);
 
   void* frame_memory = nullptr;
+  assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(frame_memory != nullptr);
+
+  engine_native_ui_draw_item_t native_ui_batch[2]{};
+  native_ui_batch[0].texture = 101u;
+  native_ui_batch[0].vertex_count = 6u;
+  native_ui_batch[0].index_count = 6u;
+  native_ui_batch[0].scissor_x = 1.0f;
+  native_ui_batch[0].scissor_y = 2.0f;
+  native_ui_batch[0].scissor_width = 16.0f;
+  native_ui_batch[0].scissor_height = 20.0f;
+  native_ui_batch[1].texture = 102u;
+  native_ui_batch[1].vertex_count = 6u;
+  native_ui_batch[1].index_count = 6u;
+  native_ui_batch[1].scissor_x = 3.0f;
+  native_ui_batch[1].scissor_y = 4.0f;
+  native_ui_batch[1].scissor_width = 24.0f;
+  native_ui_batch[1].scissor_height = 28.0f;
+  assert(renderer_ui_append(renderer, native_ui_batch, 2u) == ENGINE_NATIVE_STATUS_OK);
+  uint32_t native_ui_count = 0u;
+  assert(renderer_ui_get_count(renderer, &native_ui_count) == ENGINE_NATIVE_STATUS_OK);
+  assert(native_ui_count == 2u);
+  engine_native_ui_draw_item_t copied_native_ui[2]{};
+  uint32_t copied_native_ui_count = 0u;
+  assert(renderer_ui_copy_items(renderer, copied_native_ui, 2u, &copied_native_ui_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(copied_native_ui_count == 2u);
+  assert(copied_native_ui[0].texture == 101u);
+  assert(copied_native_ui[1].texture == 102u);
+  assert(renderer_present(renderer) == ENGINE_NATIVE_STATUS_OK);
+  AssertPassOrder(internal_engine->state.renderer.last_executed_rhi_passes(),
+                  {"ui", "present"});
+
+  frame_memory = nullptr;
   assert(renderer_begin_frame(renderer, 1024u, 64u, &frame_memory) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(frame_memory != nullptr);
@@ -718,7 +783,9 @@ void TestRendererPassOrderForDrawAndUiScenarios() {
       .debug_view_mode = ENGINE_NATIVE_DEBUG_VIEW_NONE,
       .reserved0 = static_cast<uint8_t>(
           ENGINE_NATIVE_RENDER_FLAG_DISABLE_AUTO_EXPOSURE |
-          ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS)};
+          ENGINE_NATIVE_RENDER_FLAG_DISABLE_JITTER_EFFECTS |
+          ENGINE_NATIVE_RENDER_FLAG_REQUIRE_FORWARD_PLUS |
+          ENGINE_NATIVE_RENDER_FLAG_REQUIRE_CSM)};
 
   assert(renderer_submit(renderer, &deterministic_flags_packet) ==
          ENGINE_NATIVE_STATUS_OK);

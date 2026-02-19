@@ -301,6 +301,7 @@ internal struct EngineNativeBodyWrite
     public float ColliderDimensions2;
     public float Friction;
     public float Restitution;
+    public ulong ColliderMesh;
 }
 
 [StructLayout(LayoutKind.Sequential)]

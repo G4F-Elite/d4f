@@ -1,5 +1,6 @@
 using System;
 using System.Numerics;
+using Engine.Core.Handles;
 using Engine.Physics;
 using Xunit;
 
@@ -21,6 +22,22 @@ public sealed class PhysicsColliderTests
         Assert.Equal(new Vector3(1.0f, 2.0f, 3.0f), collider.Dimensions);
         Assert.True(collider.IsTrigger);
         Assert.Equal(material, collider.Material);
+        Assert.Equal(MeshHandle.Invalid, collider.StaticMeshHandle);
+    }
+
+    [Fact]
+    public void Constructor_AssignsStaticMeshHandle_ForStaticMeshCollider()
+    {
+        var mesh = new MeshHandle(42u);
+        var collider = new PhysicsCollider(
+            ColliderShapeType.StaticMesh,
+            new Vector3(4.0f, 2.0f, 3.0f),
+            isTrigger: false,
+            PhysicsMaterial.Default,
+            mesh);
+
+        Assert.Equal(ColliderShapeType.StaticMesh, collider.ShapeType);
+        Assert.Equal(mesh, collider.StaticMeshHandle);
     }
 
     [Fact]
@@ -49,6 +66,20 @@ public sealed class PhysicsColliderTests
             new Vector3(1.0f, 1.9f, 1.0f),
             false,
             PhysicsMaterial.Default));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsCollider(
+            ColliderShapeType.StaticMesh,
+            new Vector3(1.0f, 1.0f, 1.0f),
+            false,
+            PhysicsMaterial.Default,
+            MeshHandle.Invalid));
+
+        Assert.Throws<ArgumentException>(() => new PhysicsCollider(
+            ColliderShapeType.Box,
+            new Vector3(1.0f, 1.0f, 1.0f),
+            false,
+            PhysicsMaterial.Default,
+            new MeshHandle(1u)));
     }
 
     [Fact]

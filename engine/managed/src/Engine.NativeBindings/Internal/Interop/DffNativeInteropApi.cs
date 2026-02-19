@@ -275,6 +275,31 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         out EngineNativeRendererFrameStats stats)
         => NativeMethods.RendererGetLastFrameStatsHandle(HandleFromToken(renderer), out stats);
 
+    public EngineNativeStatus RendererUiReset(IntPtr renderer)
+        => NativeMethods.RendererUiResetHandle(HandleFromToken(renderer));
+
+    public EngineNativeStatus RendererUiAppend(
+        IntPtr renderer,
+        IntPtr uiItems,
+        uint uiItemCount)
+        => NativeMethods.RendererUiAppendHandle(HandleFromToken(renderer), uiItems, uiItemCount);
+
+    public EngineNativeStatus RendererUiGetCount(
+        IntPtr renderer,
+        out uint uiItemCount)
+        => NativeMethods.RendererUiGetCountHandle(HandleFromToken(renderer), out uiItemCount);
+
+    public EngineNativeStatus RendererUiCopyItems(
+        IntPtr renderer,
+        IntPtr uiItems,
+        uint uiItemCapacity,
+        out uint uiItemCount)
+        => NativeMethods.RendererUiCopyItemsHandle(
+            HandleFromToken(renderer),
+            uiItems,
+            uiItemCapacity,
+            out uiItemCount);
+
     public EngineNativeStatus CaptureRequest(
         IntPtr renderer,
         in EngineNativeCaptureRequest request,
@@ -572,6 +597,31 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
         internal static partial EngineNativeStatus RendererGetLastFrameStatsHandle(
             ulong renderer,
             out EngineNativeRendererFrameStats outStats);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_ui_reset_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererUiResetHandle(ulong renderer);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_ui_append_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererUiAppendHandle(
+            ulong renderer,
+            IntPtr uiItems,
+            uint uiItemCount);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_ui_get_count_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererUiGetCountHandle(
+            ulong renderer,
+            out uint uiItemCount);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "renderer_ui_copy_items_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus RendererUiCopyItemsHandle(
+            ulong renderer,
+            IntPtr uiItems,
+            uint uiItemCapacity,
+            out uint uiItemCount);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "capture_request_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

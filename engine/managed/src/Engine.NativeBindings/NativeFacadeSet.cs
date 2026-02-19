@@ -22,7 +22,7 @@ public sealed class NativeFacadeSet : IDisposable
         Audio = NativeFacadeFactory.CreateAudioFacade(runtime);
         Content = NativeFacadeFactory.CreateContentRuntimeFacade(runtime);
         Net = NativeFacadeFactory.CreateNetFacade(runtime);
-        Ui = NativeFacadeFactory.CreateUiFacade(new NativeUiApiStub());
+        Ui = NativeFacadeFactory.CreateUiFacade(runtime);
         Rendering = NativeFacadeFactory.CreateRenderingFacade(runtime);
     }
 

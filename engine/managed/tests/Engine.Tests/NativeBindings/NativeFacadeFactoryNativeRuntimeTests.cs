@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using Engine.Core.Timing;
 using Engine.Core.Geometry;
 using Engine.Core.Handles;
 using Engine.ECS;
@@ -62,6 +63,8 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal((ulong)16384, stats.GpuMemoryBytes);
         Assert.Equal(RenderingBackendKind.Vulkan, stats.BackendKind);
 
+        nativeSet.Ui.Update(world, frame1);
+
         nativeSet.Physics.SyncToPhysics(world);
         nativeSet.Physics.Step(TimeSpan.FromSeconds(1.0 / 60.0));
         nativeSet.Physics.SyncFromPhysics(world);
@@ -80,6 +83,7 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
                 "renderer_begin_frame",
                 "renderer_submit",
                 "renderer_present_with_stats",
+                "renderer_ui_reset",
                 "physics_sync_from_world",
                 "physics_step",
                 "physics_sync_to_world",
@@ -140,6 +144,18 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
 
         Assert.Contains("engine_get_net", exception.Message, StringComparison.Ordinal);
         Assert.Equal(1, backend.CountCall("engine_destroy"));
+    }
+
+    [Fact]
+    public void NativeRuntimeUiUpdate_ForwardsToRendererUiReset()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        nativeSet.Ui.Update(world, new FrameTiming(0, TimeSpan.FromSeconds(1.0 / 60.0), TimeSpan.FromSeconds(1.0 / 60.0)));
+
+        Assert.Equal(1, backend.CountCall("renderer_ui_reset"));
     }
 
     [Fact]
@@ -207,12 +223,46 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
         Assert.Equal(0.4f, backend.LastPhysicsWrite.Value.ColliderDimensions2);
         Assert.Equal(0.25f, backend.LastPhysicsWrite.Value.Friction);
         Assert.Equal(0.75f, backend.LastPhysicsWrite.Value.Restitution);
+        Assert.Equal((ulong)0, backend.LastPhysicsWrite.Value.ColliderMesh);
 
         Assert.True(world.TryGetComponent(syncedEntity, out PhysicsBody updated));
         Assert.Equal(new Vector3(10.0f, 20.0f, 30.0f), updated.Position);
         Assert.Equal(new Vector3(40.0f, 50.0f, 60.0f), updated.LinearVelocity);
         Assert.Equal(new Vector3(70.0f, 80.0f, 90.0f), updated.AngularVelocity);
         Assert.True(updated.IsActive);
+    }
+
+    [Fact]
+    public void NativeRuntimePhysicsSync_SerializesStaticMeshColliderHandle()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        var entity = world.CreateEntity();
+
+        world.AddComponent(
+            entity,
+            new PhysicsBody(
+                new BodyHandle(111),
+                PhysicsBodyType.Static,
+                new PhysicsCollider(
+                    ColliderShapeType.StaticMesh,
+                    new Vector3(8.0f, 4.0f, 6.0f),
+                    isTrigger: false,
+                    PhysicsMaterial.Default,
+                    new MeshHandle(7001)),
+                new Vector3(0.0f, 0.0f, 0.0f),
+                Quaternion.Identity,
+                Vector3.Zero,
+                Vector3.Zero,
+                isActive: true));
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        nativeSet.Physics.SyncToPhysics(world);
+
+        Assert.True(backend.LastPhysicsWrite.HasValue);
+        Assert.Equal((byte)ColliderShapeType.StaticMesh, backend.LastPhysicsWrite.Value.ColliderShape);
+        Assert.Equal((ulong)7001, backend.LastPhysicsWrite.Value.ColliderMesh);
     }
 
     [Fact]
