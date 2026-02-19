@@ -1468,6 +1468,8 @@ public sealed class EngineCliDoctorToolChecksTests
                     "screenshot-buffer",
                     "screenshot-buffer-rgba16f",
                     "screenshot-buffer-rgba16f-exr",
+                    "roughness",
+                    "roughness-buffer",
                     "multiplayer-demo",
                     "net-profile-log",
                     "multiplayer-snapshot-bin",
