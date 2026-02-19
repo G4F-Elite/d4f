@@ -404,6 +404,22 @@ public sealed partial class EngineCliApp
             byte[] payload = File.ReadAllBytes(resolvedPath);
             ExrHeaderInfo exr = ExrHeaderValidation.ValidateRgba16Float(payload, "Capture RGBA16F EXR");
 
+            string? pngRelativePath = TryDeriveCapturePngPath(relativeOrConfiguredExrPath);
+            if (!string.IsNullOrWhiteSpace(pngRelativePath))
+            {
+                string resolvedPngPath = AssetPipelineService.ResolveRelativePath(projectDirectory, pngRelativePath);
+                if (File.Exists(resolvedPngPath))
+                {
+                    byte[] pngPayload = File.ReadAllBytes(resolvedPngPath);
+                    PngHeaderInfo png = PngHeaderValidation.ValidateRgba8(pngPayload, "Capture screenshot PNG");
+                    if (png.Width != exr.Width || png.Height != exr.Height)
+                    {
+                        throw new InvalidDataException(
+                            $"Capture RGBA16F EXR pair check failed: EXR size {exr.Width}x{exr.Height} does not match PNG size {png.Width}x{png.Height}.");
+                    }
+                }
+            }
+
             bool enforcePairCheck = command.VerifyCaptureRgba16FloatBinary || explicitPath || explicitBinaryPath;
             if (enforcePairCheck)
             {
@@ -428,6 +444,22 @@ public sealed partial class EngineCliApp
         {
             failures.Add($"Capture RGBA16F EXR check failed: {ex.Message}");
         }
+    }
+
+    private static string? TryDeriveCapturePngPath(string exrRelativePath)
+    {
+        if (string.IsNullOrWhiteSpace(exrRelativePath))
+        {
+            return null;
+        }
+
+        const string exrSuffix = ".rgba16f.exr";
+        if (exrRelativePath.EndsWith(exrSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            return exrRelativePath[..^exrSuffix.Length] + ".png";
+        }
+
+        return Path.ChangeExtension(exrRelativePath, ".png");
     }
 
     private void ValidateRenderStatsArtifact(

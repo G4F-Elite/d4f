@@ -364,6 +364,71 @@ public sealed partial class EngineCliApp
                         }
                     }
 
+                    PngHeaderInfo? screenshotPngHeader = null;
+                    if (resolvedRequiredArtifactPaths.TryGetValue("screenshot", out string? screenshotPngPath))
+                    {
+                        try
+                        {
+                            byte[] pngPayload = File.ReadAllBytes(screenshotPngPath);
+                            screenshotPngHeader = PngHeaderValidation.ValidateRgba8(pngPayload, "NFR proof screenshot artifact");
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidDataException)
+                        {
+                            invalidArtifactFiles.Add($"screenshot ({screenshotPngPath}): {ex.Message}");
+                        }
+                    }
+
+                    if (screenshotPngHeader.HasValue &&
+                        resolvedRequiredArtifactPaths.TryGetValue("screenshot-buffer", out string? rgba8BufferPath))
+                    {
+                        try
+                        {
+                            GoldenImageBuffer buffer = GoldenImageBufferFileCodec.Read(rgba8BufferPath);
+                            if (buffer.Width != screenshotPngHeader.Value.Width || buffer.Height != screenshotPngHeader.Value.Height)
+                            {
+                                invalidArtifactFiles.Add(
+                                    $"screenshot-buffer size mismatch ({rgba8BufferPath}): expected {screenshotPngHeader.Value.Width}x{screenshotPngHeader.Value.Height}, got {buffer.Width}x{buffer.Height}.");
+                            }
+                            else
+                            {
+                                int expectedRgba8Bytes = checked(buffer.Width * buffer.Height * 4);
+                                if (buffer.RgbaBytes.Length != expectedRgba8Bytes)
+                                {
+                                    invalidArtifactFiles.Add(
+                                        $"screenshot-buffer payload mismatch ({rgba8BufferPath}): expected {expectedRgba8Bytes} bytes, got {buffer.RgbaBytes.Length}.");
+                                }
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidDataException)
+                        {
+                            invalidArtifactFiles.Add($"screenshot-buffer ({rgba8BufferPath}): {ex.Message}");
+                        }
+                    }
+
+                    if (screenshotPngHeader.HasValue &&
+                        resolvedRequiredArtifactPaths.TryGetValue("screenshot-buffer-rgba16f-exr", out string? screenshotExrPath))
+                    {
+                        try
+                        {
+                            ExrHeaderInfo exrHeader;
+                            if (!exrHeadersByPath.TryGetValue(screenshotExrPath, out exrHeader))
+                            {
+                                byte[] exrPayload = File.ReadAllBytes(screenshotExrPath);
+                                exrHeader = ExrHeaderValidation.ValidateRgba16Float(exrPayload, "NFR proof RGBA16F EXR artifact");
+                            }
+
+                            if (exrHeader.Width != screenshotPngHeader.Value.Width || exrHeader.Height != screenshotPngHeader.Value.Height)
+                            {
+                                invalidArtifactFiles.Add(
+                                    $"screenshot-buffer-rgba16f-exr size mismatch ({screenshotExrPath}): expected {screenshotPngHeader.Value.Width}x{screenshotPngHeader.Value.Height}, got {exrHeader.Width}x{exrHeader.Height}.");
+                            }
+                        }
+                        catch (Exception ex) when (ex is IOException or InvalidDataException)
+                        {
+                            invalidArtifactFiles.Add($"screenshot-buffer-rgba16f-exr ({screenshotExrPath}): {ex.Message}");
+                        }
+                    }
+
                     if (missingArtifactFiles.Count > 0)
                     {
                         failures.Add($"NFR proof artifacts manifest missing required artifact files: [{string.Join(", ", missingArtifactFiles)}].");

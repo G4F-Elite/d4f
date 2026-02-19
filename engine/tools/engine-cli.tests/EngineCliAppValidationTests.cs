@@ -571,6 +571,86 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailNfrProof_WhenScreenshotPngIsInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            string screenshotPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.png");
+            Assert.True(File.Exists(screenshotPath));
+            File.WriteAllBytes(screenshotPath, [0, 1, 2, 3]);
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(1, code);
+            string stderr = error.ToString();
+            Assert.Contains("NFR proof artifacts manifest invalid required artifact files", stderr, StringComparison.Ordinal);
+            Assert.Contains("screenshot", stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailNfrProof_WhenScreenshotBufferSizeMismatchesPng()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            string screenshotBufferPath = Path.Combine(tempRoot, "artifacts", "tests", "screenshots", "frame-0001.rgba8.bin");
+            Assert.True(File.Exists(screenshotBufferPath));
+            File.WriteAllBytes(screenshotBufferPath, [1, 2, 3, 4]);
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(1, code);
+            string stderr = error.ToString();
+            Assert.Contains("NFR proof artifacts manifest invalid required artifact files", stderr, StringComparison.Ordinal);
+            Assert.Contains("screenshot-buffer", stderr, StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();
