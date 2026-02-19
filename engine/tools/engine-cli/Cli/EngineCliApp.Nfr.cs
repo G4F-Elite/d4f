@@ -157,6 +157,7 @@ public sealed partial class EngineCliApp
             }
         }
 
+        MultiplayerSummaryDetails? multiplayerSummary = null;
         MultiplayerRuntimeTransportSummary? runtimeTransportSummary = null;
         bool multiplayerSummaryOk = false;
         if (!File.Exists(multiplayerSummaryPath))
@@ -167,8 +168,9 @@ public sealed partial class EngineCliApp
         {
             try
             {
-                MultiplayerRuntimeTransportSummary summary = ReadMultiplayerRuntimeTransportSummary(multiplayerSummaryPath);
-                runtimeTransportSummary = summary;
+                MultiplayerSummaryDetails summary = ReadMultiplayerSummaryDetails(multiplayerSummaryPath, requireStrictSuccessFields: true);
+                multiplayerSummary = summary;
+                runtimeTransportSummary = summary.RuntimeTransport;
                 multiplayerSummaryOk = true;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException or JsonException)
@@ -197,6 +199,7 @@ public sealed partial class EngineCliApp
             }
         }
 
+        NetSnapshot? decodedSnapshot = null;
         bool snapshotBinaryOk = false;
         if (!File.Exists(snapshotBinaryPath))
         {
@@ -206,7 +209,7 @@ public sealed partial class EngineCliApp
         {
             try
             {
-                _ = NetSnapshotBinaryCodec.Decode(File.ReadAllBytes(snapshotBinaryPath));
+                decodedSnapshot = NetSnapshotBinaryCodec.Decode(File.ReadAllBytes(snapshotBinaryPath));
                 snapshotBinaryOk = true;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
@@ -215,6 +218,7 @@ public sealed partial class EngineCliApp
             }
         }
 
+        NetRpcMessage? decodedRpc = null;
         bool rpcBinaryOk = false;
         if (!File.Exists(rpcBinaryPath))
         {
@@ -224,12 +228,55 @@ public sealed partial class EngineCliApp
         {
             try
             {
-                _ = NetRpcBinaryCodec.Decode(File.ReadAllBytes(rpcBinaryPath));
+                decodedRpc = NetRpcBinaryCodec.Decode(File.ReadAllBytes(rpcBinaryPath));
                 rpcBinaryOk = true;
             }
             catch (Exception ex) when (ex is InvalidDataException or IOException)
             {
                 failures.Add($"NFR proof multiplayer RPC invalid: {ex.Message}");
+            }
+        }
+
+        if (multiplayerSummaryOk && multiplayerSummary.HasValue)
+        {
+            MultiplayerSummaryDetails summary = multiplayerSummary.Value;
+            if (!summary.Synchronized)
+            {
+                failures.Add("NFR proof multiplayer summary invalid: synchronized=false.");
+                multiplayerSummaryOk = false;
+            }
+
+            if (summary.RuntimeTransport.Enabled && !summary.RuntimeTransport.Succeeded)
+            {
+                failures.Add("NFR proof multiplayer summary invalid: runtime transport is enabled but did not succeed.");
+                multiplayerSummaryOk = false;
+            }
+
+            if (summary.RuntimeTransport.Enabled &&
+                (summary.RuntimeTransport.ServerMessagesReceived <= 0 || summary.RuntimeTransport.ClientMessagesReceived <= 0))
+            {
+                failures.Add("NFR proof multiplayer summary invalid: runtime transport message counters must be greater than zero.");
+                multiplayerSummaryOk = false;
+            }
+
+            if (snapshotBinaryOk && decodedSnapshot is not null && decodedSnapshot.Entities.Count != summary.ServerEntityCount)
+            {
+                failures.Add($"NFR proof multiplayer snapshot invalid: entity count ({decodedSnapshot.Entities.Count}) does not match summary serverEntityCount ({summary.ServerEntityCount}).");
+                snapshotBinaryOk = false;
+            }
+
+            if (rpcBinaryOk && decodedRpc is not null)
+            {
+                if (!decodedRpc.TargetClientId.HasValue)
+                {
+                    failures.Add("NFR proof multiplayer RPC invalid: targetClientId must be present.");
+                    rpcBinaryOk = false;
+                }
+                else if (!summary.ClientIds.Contains(decodedRpc.TargetClientId.Value))
+                {
+                    failures.Add($"NFR proof multiplayer RPC invalid: targetClientId ({decodedRpc.TargetClientId.Value}) is not listed in summary clientStats.");
+                    rpcBinaryOk = false;
+                }
             }
         }
 

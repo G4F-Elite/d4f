@@ -52,6 +52,7 @@ public sealed partial class EngineCliApp
         ValidateMultiplayerSnapshotBinary(command, projectDirectory, failures);
         ValidateMultiplayerRpcBinary(command, projectDirectory, failures);
         ValidateMultiplayerOrchestrationArtifact(command, projectDirectory, failures);
+        ValidateMultiplayerCrossArtifactConsistency(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
         ValidateCaptureRgba16FloatExr(command, projectDirectory, failures);
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
@@ -304,6 +305,109 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
             failures.Add($"Multiplayer orchestration check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateMultiplayerCrossArtifactConsistency(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool requireStrictMultiplayerChecks =
+            command.RequireRuntimeTransportSuccess ||
+            command.VerifyMultiplayerSnapshotBinary ||
+            command.VerifyMultiplayerRpcBinary;
+        if (!requireStrictMultiplayerChecks)
+        {
+            return;
+        }
+
+        bool explicitSummaryPath = !string.IsNullOrWhiteSpace(command.MultiplayerDemoSummaryPath);
+        string summaryRelativePath = explicitSummaryPath
+            ? command.MultiplayerDemoSummaryPath!
+            : Path.Combine("artifacts", "tests", "net", "multiplayer-demo.json");
+        string summaryPath = AssetPipelineService.ResolveRelativePath(projectDirectory, summaryRelativePath);
+        if (!File.Exists(summaryPath))
+        {
+            return;
+        }
+
+        MultiplayerSummaryDetails summary;
+        try
+        {
+            summary = ReadMultiplayerSummaryDetails(summaryPath, requireStrictSuccessFields: true);
+        }
+        catch (InvalidDataException ex)
+        {
+            failures.Add($"Multiplayer strict consistency check failed: {ex.Message}");
+            return;
+        }
+
+        if (command.RequireRuntimeTransportSuccess)
+        {
+            if (!summary.Synchronized)
+            {
+                failures.Add("Multiplayer strict consistency check failed: summary reports synchronized=false.");
+            }
+
+            if (summary.GeneratedChunkCount <= 0 || summary.SimulatedTicks <= 0 || summary.ServerEntityCount <= 0)
+            {
+                failures.Add("Multiplayer strict consistency check failed: generatedChunkCount, simulatedTicks and serverEntityCount must be positive.");
+            }
+        }
+
+        if (command.VerifyMultiplayerSnapshotBinary)
+        {
+            bool explicitSnapshotPath = !string.IsNullOrWhiteSpace(command.MultiplayerSnapshotBinaryPath);
+            string snapshotRelativePath = explicitSnapshotPath
+                ? command.MultiplayerSnapshotBinaryPath!
+                : Path.Combine("artifacts", "tests", "net", "multiplayer-snapshot.bin");
+            string snapshotPath = AssetPipelineService.ResolveRelativePath(projectDirectory, snapshotRelativePath);
+            if (File.Exists(snapshotPath))
+            {
+                try
+                {
+                    NetSnapshot snapshot = NetSnapshotBinaryCodec.Decode(File.ReadAllBytes(snapshotPath));
+                    if (snapshot.Entities.Count != summary.ServerEntityCount)
+                    {
+                        failures.Add($"Multiplayer strict consistency check failed: snapshot entity count ({snapshot.Entities.Count}) does not match summary serverEntityCount ({summary.ServerEntityCount}).");
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException)
+                {
+                    failures.Add($"Multiplayer strict consistency check failed while reading snapshot binary: {ex.Message}");
+                }
+            }
+        }
+
+        if (command.VerifyMultiplayerRpcBinary)
+        {
+            bool explicitRpcPath = !string.IsNullOrWhiteSpace(command.MultiplayerRpcBinaryPath);
+            string rpcRelativePath = explicitRpcPath
+                ? command.MultiplayerRpcBinaryPath!
+                : Path.Combine("artifacts", "tests", "net", "multiplayer-rpc.bin");
+            string rpcPath = AssetPipelineService.ResolveRelativePath(projectDirectory, rpcRelativePath);
+            if (File.Exists(rpcPath))
+            {
+                try
+                {
+                    NetRpcMessage rpc = NetRpcBinaryCodec.Decode(File.ReadAllBytes(rpcPath));
+                    if (!rpc.TargetClientId.HasValue)
+                    {
+                        failures.Add("Multiplayer strict consistency check failed: RPC targetClientId must be present.");
+                    }
+                    else if (!summary.ClientIds.Contains(rpc.TargetClientId.Value))
+                    {
+                        failures.Add($"Multiplayer strict consistency check failed: RPC targetClientId ({rpc.TargetClientId.Value}) is not present in summary clientStats.");
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or InvalidDataException)
+                {
+                    failures.Add($"Multiplayer strict consistency check failed while reading RPC binary: {ex.Message}");
+                }
+            }
         }
     }
 
@@ -1062,29 +1166,135 @@ public sealed partial class EngineCliApp
 
     private static MultiplayerRuntimeTransportSummary ReadMultiplayerRuntimeTransportSummary(string summaryPath)
     {
+        MultiplayerSummaryDetails summary = ReadMultiplayerSummaryDetails(summaryPath, requireStrictSuccessFields: false);
+        return summary.RuntimeTransport;
+    }
+
+    private static MultiplayerSummaryDetails ReadMultiplayerSummaryDetails(string summaryPath, bool requireStrictSuccessFields)
+    {
         string json = File.ReadAllText(summaryPath);
         using JsonDocument document = JsonDocument.Parse(json);
         JsonElement root = document.RootElement;
 
-        if (!root.TryGetProperty("runtimeTransport", out JsonElement runtimeTransport) || runtimeTransport.ValueKind != JsonValueKind.Object)
+        if (!root.TryGetProperty("runtimeTransport", out JsonElement runtimeTransportElement) || runtimeTransportElement.ValueKind != JsonValueKind.Object)
         {
             throw new InvalidDataException("Multiplayer summary artifact is missing object property 'runtimeTransport'.");
         }
 
-        bool enabled = ReadRequiredBool(runtimeTransport, "enabled", "Multiplayer summary artifact runtimeTransport");
-        bool succeeded = ReadRequiredBool(runtimeTransport, "succeeded", "Multiplayer summary artifact runtimeTransport");
-        int serverMessagesReceived = ReadRequiredInt(runtimeTransport, "serverMessagesReceived", "Multiplayer summary artifact runtimeTransport");
-        int clientMessagesReceived = ReadRequiredInt(runtimeTransport, "clientMessagesReceived", "Multiplayer summary artifact runtimeTransport");
+        bool enabled = ReadRequiredBool(runtimeTransportElement, "enabled", "Multiplayer summary artifact runtimeTransport");
+        bool succeeded = ReadRequiredBool(runtimeTransportElement, "succeeded", "Multiplayer summary artifact runtimeTransport");
+        int serverMessagesReceived = ReadRequiredInt(runtimeTransportElement, "serverMessagesReceived", "Multiplayer summary artifact runtimeTransport");
+        int clientMessagesReceived = ReadRequiredInt(runtimeTransportElement, "clientMessagesReceived", "Multiplayer summary artifact runtimeTransport");
         if (serverMessagesReceived < 0 || clientMessagesReceived < 0)
         {
             throw new InvalidDataException("Multiplayer summary artifact runtimeTransport contains negative message counters.");
         }
 
-        return new MultiplayerRuntimeTransportSummary(
+        MultiplayerRuntimeTransportSummary runtimeTransport = new(
             enabled,
             succeeded,
             serverMessagesReceived,
             clientMessagesReceived);
+
+        if (!requireStrictSuccessFields)
+        {
+            return new MultiplayerSummaryDetails(
+                Synchronized: false,
+                ConnectedClients: 0,
+                SimulatedTicks: 0,
+                GeneratedChunkCount: 0,
+                ServerEntityCount: 0,
+                ClientIds: new HashSet<uint>(),
+                OwnershipEntityTotal: 0,
+                RuntimeTransport: runtimeTransport);
+        }
+
+        bool synchronized = ReadRequiredBool(root, "synchronized", "Multiplayer summary artifact");
+        int connectedClients = ReadRequiredInt(root, "connectedClients", "Multiplayer summary artifact");
+        int simulatedTicks = ReadRequiredInt(root, "simulatedTicks", "Multiplayer summary artifact");
+        int generatedChunkCount = ReadRequiredInt(root, "generatedChunkCount", "Multiplayer summary artifact");
+        int serverEntityCount = ReadRequiredInt(root, "serverEntityCount", "Multiplayer summary artifact");
+        if (connectedClients <= 0 || simulatedTicks <= 0 || generatedChunkCount <= 0 || serverEntityCount <= 0)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact strict fields must be positive integers.");
+        }
+
+        if (!root.TryGetProperty("clientStats", out JsonElement clientStatsElement) || clientStatsElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact is missing array property 'clientStats'.");
+        }
+
+        var clientIds = new HashSet<uint>();
+        for (int i = 0; i < clientStatsElement.GetArrayLength(); i++)
+        {
+            JsonElement clientStat = clientStatsElement[i];
+            ulong clientIdRaw = ReadRequiredUInt64(clientStat, "clientId", "Multiplayer summary artifact clientStats item");
+            if (clientIdRaw == 0 || clientIdRaw > uint.MaxValue)
+            {
+                throw new InvalidDataException("Multiplayer summary artifact clientStats contains invalid clientId.");
+            }
+
+            if (!clientIds.Add((uint)clientIdRaw))
+            {
+                throw new InvalidDataException("Multiplayer summary artifact clientStats contains duplicate clientId.");
+            }
+        }
+
+        if (clientIds.Count != connectedClients)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact clientStats count does not match connectedClients.");
+        }
+
+        if (!root.TryGetProperty("ownershipStats", out JsonElement ownershipStatsElement) || ownershipStatsElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact is missing array property 'ownershipStats'.");
+        }
+
+        var ownershipIds = new HashSet<uint>();
+        int ownershipEntityTotal = 0;
+        for (int i = 0; i < ownershipStatsElement.GetArrayLength(); i++)
+        {
+            JsonElement ownership = ownershipStatsElement[i];
+            ulong ownerIdRaw = ReadRequiredUInt64(ownership, "clientId", "Multiplayer summary artifact ownershipStats item");
+            int ownedEntityCount = ReadRequiredInt(ownership, "ownedEntityCount", "Multiplayer summary artifact ownershipStats item");
+            if (ownerIdRaw == 0 || ownerIdRaw > uint.MaxValue || ownedEntityCount < 0)
+            {
+                throw new InvalidDataException("Multiplayer summary artifact ownershipStats contains invalid values.");
+            }
+
+            uint ownerId = (uint)ownerIdRaw;
+            if (!ownershipIds.Add(ownerId))
+            {
+                throw new InvalidDataException("Multiplayer summary artifact ownershipStats contains duplicate clientId.");
+            }
+
+            ownershipEntityTotal = checked(ownershipEntityTotal + ownedEntityCount);
+        }
+
+        if (ownershipIds.Count != connectedClients)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact ownershipStats count does not match connectedClients.");
+        }
+
+        if (!ownershipIds.SetEquals(clientIds))
+        {
+            throw new InvalidDataException("Multiplayer summary artifact ownershipStats client IDs do not match clientStats.");
+        }
+
+        if (ownershipEntityTotal != serverEntityCount)
+        {
+            throw new InvalidDataException("Multiplayer summary artifact ownershipStats total does not match serverEntityCount.");
+        }
+
+        return new MultiplayerSummaryDetails(
+            Synchronized: synchronized,
+            ConnectedClients: connectedClients,
+            SimulatedTicks: simulatedTicks,
+            GeneratedChunkCount: generatedChunkCount,
+            ServerEntityCount: serverEntityCount,
+            ClientIds: clientIds,
+            OwnershipEntityTotal: ownershipEntityTotal,
+            RuntimeTransport: runtimeTransport);
     }
 
     private static string ReadRequiredString(JsonElement root, string propertyName, string context)
@@ -1215,4 +1425,14 @@ public sealed partial class EngineCliApp
         bool Succeeded,
         int ServerMessagesReceived,
         int ClientMessagesReceived);
+
+    private readonly record struct MultiplayerSummaryDetails(
+        bool Synchronized,
+        int ConnectedClients,
+        int SimulatedTicks,
+        int GeneratedChunkCount,
+        int ServerEntityCount,
+        IReadOnlySet<uint> ClientIds,
+        int OwnershipEntityTotal,
+        MultiplayerRuntimeTransportSummary RuntimeTransport);
 }

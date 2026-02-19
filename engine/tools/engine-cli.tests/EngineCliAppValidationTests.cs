@@ -651,6 +651,60 @@ public sealed class EngineCliAppValidationTests
     }
 
     [Fact]
+    public void Run_ShouldFailNfrProof_WhenMultiplayerSnapshotCountMismatchesSummary()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            _ = PrepareRuntimeProject(tempRoot, "NfrRuntime");
+            var runner = new RecordingCommandRunner();
+
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            EngineCliApp app = new(output, error, runner);
+
+            int testCode = app.Run(["test", "--project", tempRoot, "--out", "artifacts/tests", "--configuration", "Release"]);
+            Assert.Equal(0, testCode);
+
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-demo.json");
+            string summaryJson = File.ReadAllText(summaryPath);
+            summaryJson = System.Text.RegularExpressions.Regex.Replace(
+                summaryJson,
+                "\"serverEntityCount\"\\s*:\\s*\\d+",
+                "\"serverEntityCount\": 1000");
+            summaryJson = System.Text.RegularExpressions.Regex.Replace(
+                summaryJson,
+                "\"ownedEntityCount\"\\s*:\\s*\\d+",
+                "\"ownedEntityCount\": 500");
+            File.WriteAllText(summaryPath, summaryJson);
+
+            int code = app.Run(
+            [
+                "nfr",
+                "proof",
+                "--project", tempRoot,
+                "--out", "artifacts/nfr/release-proof.json",
+                "--configuration", "Release"
+            ]);
+
+            Assert.Equal(1, code);
+            string stderr = error.ToString();
+            Assert.Contains("entity count", stderr, StringComparison.Ordinal);
+
+            string proofPath = Path.Combine(tempRoot, "artifacts", "nfr", "release-proof.json");
+            Assert.True(File.Exists(proofPath));
+            using JsonDocument proof = JsonDocument.Parse(File.ReadAllText(proofPath));
+            JsonElement checks = proof.RootElement.GetProperty("checks");
+            Assert.False(checks.GetProperty("multiplayerSnapshotBinary").GetBoolean());
+            Assert.False(checks.GetProperty("allArtifactsPresent").GetBoolean());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldCreateProjectStructure_WhenNewValid()
     {
         string tempRoot = CreateTempDirectory();

@@ -431,6 +431,91 @@ public sealed class EngineCliDoctorToolChecksTests
     }
 
     [Fact]
+    public void Run_ShouldFailDoctor_WhenSnapshotEntityCountDoesNotMatchSummary()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-demo.json");
+            WriteMultiplayerSummary(
+                summaryPath,
+                enabled: true,
+                succeeded: true,
+                serverMessagesReceived: 3,
+                clientMessagesReceived: 4);
+            string snapshotPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-snapshot.bin");
+            WriteMultiplayerSnapshotBinary(snapshotPath);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--require-runtime-transport", "true",
+                "--verify-multiplayer-snapshot", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("snapshot entity count", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenRpcTargetClientIsNotInSummary()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string summaryPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-demo.json");
+            WriteMultiplayerSummary(
+                summaryPath,
+                enabled: true,
+                succeeded: true,
+                serverMessagesReceived: 3,
+                clientMessagesReceived: 4);
+            string rpcPath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-rpc.bin");
+            WriteMultiplayerRpcBinary(rpcPath, targetClientId: 999u);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-multiplayer-rpc", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("targetClientId", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailDoctor_WhenMultiplayerSnapshotRequiredButMissing()
     {
         string tempRoot = CreateTempDirectory();
@@ -1827,6 +1912,72 @@ public sealed class EngineCliDoctorToolChecksTests
             $$"""
             {
               "seed": 1337,
+              "proceduralSeed": 1337,
+              "fixedDeltaSeconds": 0.016667,
+              "tickRateHz": 60,
+              "simulatedTicks": 3,
+              "connectedClients": 2,
+              "generatedChunkCount": 4,
+              "serverEntityCount": 4,
+              "synchronized": true,
+              "sampleAssetKeys": ["proc/chunk/1/AAAA0001"],
+              "serverStats": {
+                "bytesSent": 100,
+                "bytesReceived": 120,
+                "messagesSent": 4,
+                "messagesReceived": 4,
+                "messagesDropped": 0,
+                "roundTripTimeMs": 10.5,
+                "lossPercent": 0.0,
+                "averageSendBandwidthKbps": 1.0,
+                "averageReceiveBandwidthKbps": 1.0,
+                "peakSendBandwidthKbps": 1.0,
+                "peakReceiveBandwidthKbps": 1.0
+              },
+              "clientStats": [
+                {
+                  "clientId": 10,
+                  "stats": {
+                    "bytesSent": 80,
+                    "bytesReceived": 90,
+                    "messagesSent": 3,
+                    "messagesReceived": 3,
+                    "messagesDropped": 0,
+                    "roundTripTimeMs": 10.5,
+                    "lossPercent": 0.0,
+                    "averageSendBandwidthKbps": 1.0,
+                    "averageReceiveBandwidthKbps": 1.0,
+                    "peakSendBandwidthKbps": 1.0,
+                    "peakReceiveBandwidthKbps": 1.0
+                  }
+                },
+                {
+                  "clientId": 20,
+                  "stats": {
+                    "bytesSent": 85,
+                    "bytesReceived": 95,
+                    "messagesSent": 3,
+                    "messagesReceived": 3,
+                    "messagesDropped": 0,
+                    "roundTripTimeMs": 10.5,
+                    "lossPercent": 0.0,
+                    "averageSendBandwidthKbps": 1.0,
+                    "averageReceiveBandwidthKbps": 1.0,
+                    "peakSendBandwidthKbps": 1.0,
+                    "peakReceiveBandwidthKbps": 1.0
+                  }
+                }
+              ],
+              "ownershipStats": [
+                {
+                  "clientId": 10,
+                  "ownedEntityCount": 2
+                },
+                {
+                  "clientId": 20,
+                  "ownedEntityCount": 2
+                }
+              ],
               "runtimeTransport": {
                 "enabled": {{enabled.ToString().ToLowerInvariant()}},
                 "succeeded": {{succeeded.ToString().ToLowerInvariant()}},
@@ -1857,7 +2008,7 @@ public sealed class EngineCliDoctorToolChecksTests
         File.WriteAllBytes(filePath, payload);
     }
 
-    private static void WriteMultiplayerRpcBinary(string filePath)
+    private static void WriteMultiplayerRpcBinary(string filePath, uint targetClientId = 10u)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
 
@@ -1866,7 +2017,7 @@ public sealed class EngineCliDoctorToolChecksTests
             rpcName: "proc.sync.chunk",
             payload: [1, 2, 3, 4],
             channel: NetworkChannel.ReliableOrdered,
-            targetClientId: 10u);
+            targetClientId: targetClientId);
 
         byte[] payload = NetRpcBinaryCodec.Encode(message);
         File.WriteAllBytes(filePath, payload);
