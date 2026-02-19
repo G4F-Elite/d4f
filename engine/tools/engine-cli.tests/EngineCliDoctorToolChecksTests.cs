@@ -920,6 +920,119 @@ public sealed class EngineCliDoctorToolChecksTests
         }
     }
 
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenNetProfileLogRequiredButMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-net-profile-log", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Net profile log artifact was not found", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldFailDoctor_WhenNetProfileLogInvalid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string profilePath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-profile.log");
+            WriteNetProfileLog(profilePath, ["seed=1", "runtime-transport serverMessages=0 clientMessages=0"]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-net-profile-log", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Net profile log check failed", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Run_ShouldPassDoctor_WhenNetProfileLogValid()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string profilePath = Path.Combine(tempRoot, "artifacts", "tests", "net", "multiplayer-profile.log");
+            WriteNetProfileLog(
+                profilePath,
+                [
+                    "seed=1 proceduralSeed=1 fixedDt=0.016667 tickRateHz=60 simulatedTicks=3 synchronized=True runtimeTransportEnabled=True runtimeTransportSucceeded=True",
+                    "runtime-transport serverMessages=2 clientMessages=2",
+                    "server bytesSent=128 bytesReceived=64 messagesSent=2 messagesReceived=2 dropped=0 rttMs=1.000 lossPercent=0.000 sendKbps=1.000 receiveKbps=1.000 peakSendKbps=1.000 peakReceiveKbps=1.000",
+                    "client-1 bytesSent=64 bytesReceived=128 messagesSent=2 messagesReceived=2 dropped=0 rttMs=1.000 lossPercent=0.000 sendKbps=1.000 receiveKbps=1.000 peakSendKbps=1.000 peakReceiveKbps=1.000"
+                ]);
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-net-profile-log", "true"
+            ]);
+
+            Assert.Equal(0, code);
+            string outputText = output.ToString();
+            Assert.Contains("Net profile log: lines=", outputText, StringComparison.Ordinal);
+            Assert.Contains("Doctor checks passed.", outputText, StringComparison.Ordinal);
+            Assert.Equal(string.Empty, error.ToString());
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
     private static void PrepareDoctorProject(string rootPath)
     {
         Directory.CreateDirectory(Path.Combine(rootPath, "assets"));
@@ -1067,6 +1180,12 @@ public sealed class EngineCliDoctorToolChecksTests
               "fixedDeltaSeconds": {{fixedDeltaSeconds.ToString(System.Globalization.CultureInfo.InvariantCulture)}}
             }
             """);
+    }
+
+    private static void WriteNetProfileLog(string filePath, IReadOnlyList<string> lines)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        File.WriteAllLines(filePath, lines);
     }
 
     private static string CreateTempDirectory()

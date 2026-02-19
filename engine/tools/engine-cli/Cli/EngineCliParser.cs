@@ -431,6 +431,23 @@ public static partial class EngineCliParser
             return EngineCliParseResult.Failure("Option '--test-host-config' cannot be empty.");
         }
 
+        bool verifyNetProfileLog = false;
+        if (options.TryGetValue("verify-net-profile-log", out string? verifyNetProfileLogValue))
+        {
+            if (!bool.TryParse(verifyNetProfileLogValue, out verifyNetProfileLog))
+            {
+                return EngineCliParseResult.Failure("Option '--verify-net-profile-log' must be 'true' or 'false'.");
+            }
+        }
+
+        string? netProfileLogPath = options.TryGetValue("net-profile-log", out string? netProfileLogPathValue)
+            ? netProfileLogPathValue
+            : null;
+        if (netProfileLogPath is not null && string.IsNullOrWhiteSpace(netProfileLogPath))
+        {
+            return EngineCliParseResult.Failure("Option '--net-profile-log' cannot be empty.");
+        }
+
         return EngineCliParseResult.Success(
             new DoctorCommand(
                 project,
@@ -449,7 +466,9 @@ public static partial class EngineCliParser
                 verifyRenderStatsArtifact,
                 renderStatsArtifactPath,
                 verifyTestHostConfig,
-                testHostConfigPath));
+                testHostConfigPath,
+                verifyNetProfileLog,
+                netProfileLogPath));
     }
 
     private static string GetOutOrOutputPath(

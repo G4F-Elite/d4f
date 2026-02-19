@@ -279,6 +279,8 @@ public sealed class EngineCliParserTests
         Assert.Null(command.RenderStatsArtifactPath);
         Assert.False(command.VerifyTestHostConfig);
         Assert.Null(command.TestHostConfigPath);
+        Assert.False(command.VerifyNetProfileLog);
+        Assert.Null(command.NetProfileLogPath);
     }
 
     [Fact]
@@ -303,7 +305,9 @@ public sealed class EngineCliParserTests
             "--verify-render-stats", "true",
             "--render-stats", "artifacts/tests/render/frame-stats.json",
             "--verify-test-host-config", "true",
-            "--test-host-config", "artifacts/tests/runtime/test-host.json"
+            "--test-host-config", "artifacts/tests/runtime/test-host.json",
+            "--verify-net-profile-log", "true",
+            "--net-profile-log", "artifacts/tests/net/multiplayer-profile.log"
         ]);
 
         DoctorCommand command = Assert.IsType<DoctorCommand>(result.Command);
@@ -324,6 +328,8 @@ public sealed class EngineCliParserTests
         Assert.Equal("artifacts/tests/render/frame-stats.json", command.RenderStatsArtifactPath);
         Assert.True(command.VerifyTestHostConfig);
         Assert.Equal("artifacts/tests/runtime/test-host.json", command.TestHostConfigPath);
+        Assert.True(command.VerifyNetProfileLog);
+        Assert.Equal("artifacts/tests/net/multiplayer-profile.log", command.NetProfileLogPath);
     }
 
     [Theory]
@@ -338,6 +344,7 @@ public sealed class EngineCliParserTests
     [InlineData("--verify-capture-rgba16f", "yes", "Option '--verify-capture-rgba16f' must be 'true' or 'false'.")]
     [InlineData("--verify-render-stats", "yes", "Option '--verify-render-stats' must be 'true' or 'false'.")]
     [InlineData("--verify-test-host-config", "yes", "Option '--verify-test-host-config' must be 'true' or 'false'.")]
+    [InlineData("--verify-net-profile-log", "yes", "Option '--verify-net-profile-log' must be 'true' or 'false'.")]
     public void Parse_ShouldFailDoctor_WhenPerfOptionValueInvalid(string optionName, string optionValue, string expectedError)
     {
         EngineCliParseResult result = EngineCliParser.Parse(
@@ -433,6 +440,20 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--test-host-config' cannot be empty.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailDoctor_WhenNetProfileLogPathEmpty()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(
+        [
+            "doctor",
+            "--project", "game",
+            "--net-profile-log", " "
+        ]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--net-profile-log' cannot be empty.", result.Error);
     }
 
     [Fact]

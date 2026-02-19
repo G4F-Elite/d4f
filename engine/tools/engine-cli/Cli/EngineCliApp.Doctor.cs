@@ -54,6 +54,7 @@ public sealed partial class EngineCliApp
         ValidateCaptureRgba16FloatBinary(command, projectDirectory, failures);
         ValidateRenderStatsArtifact(command, projectDirectory, failures);
         ValidateTestHostConfigArtifact(command, projectDirectory, failures);
+        ValidateNetProfileLogArtifact(command, projectDirectory, failures);
 
         if (failures.Count > 0)
         {
@@ -379,6 +380,59 @@ public sealed partial class EngineCliApp
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
         {
             failures.Add($"Test host config check failed: {ex.Message}");
+        }
+    }
+
+    private void ValidateNetProfileLogArtifact(
+        DoctorCommand command,
+        string projectDirectory,
+        List<string> failures)
+    {
+        ArgumentNullException.ThrowIfNull(failures);
+
+        bool explicitPath = !string.IsNullOrWhiteSpace(command.NetProfileLogPath);
+        string relativeOrConfiguredPath = explicitPath
+            ? command.NetProfileLogPath!
+            : Path.Combine("artifacts", "tests", "net", "multiplayer-profile.log");
+        string resolvedPath = AssetPipelineService.ResolveRelativePath(projectDirectory, relativeOrConfiguredPath);
+
+        if (!File.Exists(resolvedPath))
+        {
+            if (command.VerifyNetProfileLog || explicitPath)
+            {
+                failures.Add($"Net profile log artifact was not found: {resolvedPath}");
+            }
+            else
+            {
+                _stdout.WriteLine($"Net profile log artifact not found, skipping check: {resolvedPath}");
+            }
+
+            return;
+        }
+
+        try
+        {
+            string[] lines = File.ReadAllLines(resolvedPath)
+                .Where(static line => !string.IsNullOrWhiteSpace(line))
+                .ToArray();
+            _stdout.WriteLine($"Net profile log: lines={lines.Length}.");
+
+            if (!command.VerifyNetProfileLog)
+            {
+                return;
+            }
+
+            bool hasServerLine = lines.Any(static line => line.Contains("server bytesSent=", StringComparison.Ordinal));
+            bool hasClientLine = lines.Any(static line => line.StartsWith("client-", StringComparison.Ordinal));
+            bool hasRuntimeTransportLine = lines.Any(static line => line.StartsWith("runtime-transport ", StringComparison.Ordinal));
+            if (!hasServerLine || !hasClientLine || !hasRuntimeTransportLine)
+            {
+                failures.Add("Net profile log check failed: expected runtime-transport, server and client lines.");
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            failures.Add($"Net profile log check failed: {ex.Message}");
         }
     }
 

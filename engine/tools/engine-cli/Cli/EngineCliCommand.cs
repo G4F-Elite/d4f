@@ -68,7 +68,9 @@ public sealed record DoctorCommand(
     bool VerifyRenderStatsArtifact,
     string? RenderStatsArtifactPath,
     bool VerifyTestHostConfig,
-    string? TestHostConfigPath) : EngineCliCommand;
+    string? TestHostConfigPath,
+    bool VerifyNetProfileLog,
+    string? NetProfileLogPath) : EngineCliCommand;
 
 public sealed record ApiDumpCommand(string HeaderPath, string OutputPath) : EngineCliCommand;
 
