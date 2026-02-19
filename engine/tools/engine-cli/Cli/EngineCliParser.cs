@@ -23,9 +23,10 @@ public static partial class EngineCliParser
         ["normals"] = RenderDebugViewMode.Normals,
         ["albedo"] = RenderDebugViewMode.Albedo,
         ["roughness"] = RenderDebugViewMode.Roughness,
+        ["shadow"] = RenderDebugViewMode.AmbientOcclusion,
         ["ao"] = RenderDebugViewMode.AmbientOcclusion
     };
-    private const string DebugViewOptionError = "Option '--debug-view' must be one of: none, depth, normals, albedo, roughness, ao.";
+    private const string DebugViewOptionError = "Option '--debug-view' must be one of: none, depth, normals, albedo, roughness, shadow, ao.";
 
     public static EngineCliParseResult Parse(string[] args)
     {

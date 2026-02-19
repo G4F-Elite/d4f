@@ -884,6 +884,7 @@ public sealed class EngineCliParserTests
     [InlineData("normals", RenderDebugViewMode.Normals)]
     [InlineData("albedo", RenderDebugViewMode.Albedo)]
     [InlineData("roughness", RenderDebugViewMode.Roughness)]
+    [InlineData("shadow", RenderDebugViewMode.AmbientOcclusion)]
     [InlineData("ao", RenderDebugViewMode.AmbientOcclusion)]
     [InlineData("none", RenderDebugViewMode.None)]
     public void Parse_RunShouldAcceptKnownDebugViews(string debugView, RenderDebugViewMode expected)
@@ -900,6 +901,6 @@ public sealed class EngineCliParserTests
         EngineCliParseResult result = EngineCliParser.Parse(["run", "--project", ".", "--debug-view", "ambient"]);
 
         Assert.False(result.IsSuccess);
-        Assert.Equal("Option '--debug-view' must be one of: none, depth, normals, albedo, roughness, ao.", result.Error);
+        Assert.Equal("Option '--debug-view' must be one of: none, depth, normals, albedo, roughness, shadow, ao.", result.Error);
     }
 }
