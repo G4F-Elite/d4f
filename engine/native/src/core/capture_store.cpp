@@ -17,6 +17,20 @@ constexpr uint8_t kCaptureSemanticAlbedo = 3u;
 constexpr uint8_t kCaptureSemanticShadow = 4u;
 constexpr uint8_t kCaptureSemanticAmbientOcclusion = 5u;
 
+uint32_t ResolveCaptureFormat(uint8_t format_selector) {
+  if (format_selector == 0u ||
+      format_selector == static_cast<uint8_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM)) {
+    return static_cast<uint32_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM);
+  }
+
+  if (format_selector ==
+      static_cast<uint8_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT)) {
+    return static_cast<uint32_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT);
+  }
+
+  return 0u;
+}
+
 bool TryMultiplySize(size_t lhs, size_t rhs, size_t* out_value) {
   if (out_value == nullptr) {
     return false;
@@ -47,6 +61,52 @@ float EncodeUnit(uint32_t value, uint32_t denominator) {
   return static_cast<float>(value) / static_cast<float>(denominator);
 }
 
+uint16_t FloatToHalfBits(float value) {
+  uint32_t bits = 0u;
+  std::memcpy(&bits, &value, sizeof(float));
+
+  const uint32_t sign = (bits >> 16u) & 0x8000u;
+  int32_t exponent = static_cast<int32_t>((bits >> 23u) & 0xFFu) - 127 + 15;
+  uint32_t mantissa = bits & 0x007FFFFFu;
+
+  if (exponent <= 0) {
+    if (exponent < -10) {
+      return static_cast<uint16_t>(sign);
+    }
+
+    mantissa = (mantissa | 0x00800000u) >> (1 - exponent);
+    if ((mantissa & 0x00001000u) != 0u) {
+      mantissa += 0x00002000u;
+    }
+
+    return static_cast<uint16_t>(sign | (mantissa >> 13u));
+  }
+
+  if (exponent >= 31) {
+    if (mantissa == 0u) {
+      return static_cast<uint16_t>(sign | 0x7C00u);
+    }
+
+    mantissa >>= 13u;
+    return static_cast<uint16_t>(sign | 0x7C00u | mantissa |
+                                 (mantissa == 0u ? 1u : 0u));
+  }
+
+  if ((mantissa & 0x00001000u) != 0u) {
+    mantissa += 0x00002000u;
+    if ((mantissa & 0x00800000u) != 0u) {
+      mantissa = 0u;
+      ++exponent;
+      if (exponent >= 31) {
+        return static_cast<uint16_t>(sign | 0x7C00u);
+      }
+    }
+  }
+
+  return static_cast<uint16_t>(sign | (static_cast<uint32_t>(exponent) << 10u) |
+                               (mantissa >> 13u));
+}
+
 }  // namespace
 
 engine_native_status_t CaptureStore::QueueCapture(
@@ -60,8 +120,9 @@ engine_native_status_t CaptureStore::QueueCapture(
 
   *out_request_id = 0u;
 
+  const uint32_t capture_format = ResolveCaptureFormat(request.reserved1);
   if (request.width == 0u || request.height == 0u || request.include_alpha > 1u ||
-      request.reserved1 != 0u || request.reserved2 != 0u ||
+      request.reserved2 != 0u || capture_format == 0u ||
       request.reserved0 > kCaptureSemanticAmbientOcclusion) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
@@ -71,7 +132,12 @@ engine_native_status_t CaptureStore::QueueCapture(
   size_t stride = 0u;
   size_t pixel_bytes = 0u;
 
-  if (!TryMultiplySize(width, 4u, &stride) ||
+  const size_t bytes_per_pixel =
+      capture_format == static_cast<uint32_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT)
+          ? 8u
+          : 4u;
+
+  if (!TryMultiplySize(width, bytes_per_pixel, &stride) ||
       !TryMultiplySize(stride, height, &pixel_bytes)) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
@@ -80,6 +146,7 @@ engine_native_status_t CaptureStore::QueueCapture(
   pending.width = request.width;
   pending.height = request.height;
   pending.stride = static_cast<uint32_t>(stride);
+  pending.format = capture_format;
   pending.polls_until_ready = 1u;
 
   try {
@@ -100,9 +167,6 @@ engine_native_status_t CaptureStore::QueueCapture(
 
   for (uint32_t y = 0u; y < request.height; ++y) {
     for (uint32_t x = 0u; x < request.width; ++x) {
-      const size_t offset = static_cast<size_t>(y) * stride +
-                            static_cast<size_t>(x) * 4u;
-
       uint8_t out_r = clear_r;
       uint8_t out_g = clear_g;
       uint8_t out_b = clear_b;
@@ -159,10 +223,31 @@ engine_native_status_t CaptureStore::QueueCapture(
         }
       }
 
-      pending.pixels[offset] = out_r;
-      pending.pixels[offset + 1u] = out_g;
-      pending.pixels[offset + 2u] = out_b;
-      pending.pixels[offset + 3u] = clear_a;
+      if (capture_format ==
+          static_cast<uint32_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT)) {
+        const size_t offset = static_cast<size_t>(y) * stride +
+                              static_cast<size_t>(x) * 8u;
+        const uint16_t out_channels[4] = {
+            FloatToHalfBits(static_cast<float>(out_r) / 255.0f),
+            FloatToHalfBits(static_cast<float>(out_g) / 255.0f),
+            FloatToHalfBits(static_cast<float>(out_b) / 255.0f),
+            FloatToHalfBits(static_cast<float>(clear_a) / 255.0f),
+        };
+        for (size_t channel_index = 0u; channel_index < 4u; ++channel_index) {
+          const uint16_t channel = out_channels[channel_index];
+          pending.pixels[offset + channel_index * 2u] =
+              static_cast<uint8_t>(channel & 0xFFu);
+          pending.pixels[offset + channel_index * 2u + 1u] =
+              static_cast<uint8_t>((channel >> 8u) & 0xFFu);
+        }
+      } else {
+        const size_t offset = static_cast<size_t>(y) * stride +
+                              static_cast<size_t>(x) * 4u;
+        pending.pixels[offset] = out_r;
+        pending.pixels[offset + 1u] = out_g;
+        pending.pixels[offset + 2u] = out_b;
+        pending.pixels[offset + 3u] = clear_a;
+      }
     }
   }
 
@@ -220,7 +305,7 @@ engine_native_status_t CaptureStore::PollCapture(
   out_result->width = pending.width;
   out_result->height = pending.height;
   out_result->stride = pending.stride;
-  out_result->format = static_cast<uint32_t>(ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM);
+  out_result->format = pending.format;
   out_result->pixels = pixel_copy;
   out_result->pixel_bytes = pixel_bytes;
   *out_is_ready = 1u;

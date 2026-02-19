@@ -140,7 +140,8 @@ typedef struct engine_native_renderer_frame_stats {
 } engine_native_renderer_frame_stats_t;
 
 typedef enum engine_native_capture_format {
-  ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM = 1
+  ENGINE_NATIVE_CAPTURE_FORMAT_RGBA8_UNORM = 1,
+  ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT = 2
 } engine_native_capture_format_t;
 
 #define ENGINE_NATIVE_CAPTURE_SEMANTIC_COLOR 0u

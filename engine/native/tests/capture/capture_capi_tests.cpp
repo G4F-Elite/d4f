@@ -60,6 +60,28 @@ void TestCaptureFlowAndValidation() {
   assert(result.pixel_bytes == 32u);
   assert(result.pixels[3] > 0u);
 
+  assert(capture_free_result(&result) == ENGINE_NATIVE_STATUS_OK);
+  assert(result.pixels == nullptr);
+  assert(result.pixel_bytes == 0u);
+
+  engine_native_capture_request_t request_half = request;
+  request_half.reserved1 = ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT;
+  assert(capture_request(renderer, &request_half, &request_id) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(request_id != 0u);
+
+  assert(capture_poll(request_id, &result, &is_ready) == ENGINE_NATIVE_STATUS_OK);
+  assert(is_ready == 0u);
+  assert(capture_poll(request_id, &result, &is_ready) == ENGINE_NATIVE_STATUS_OK);
+  assert(is_ready == 1u);
+  assert(result.width == 4u);
+  assert(result.height == 2u);
+  assert(result.stride == 32u);
+  assert(result.format == ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT);
+  assert(result.pixels != nullptr);
+  assert(result.pixel_bytes == 64u);
+  assert(result.pixels[1] > 0u || result.pixels[3] > 0u || result.pixels[5] > 0u);
+
   assert(capture_poll(request_id, &result, &is_ready) ==
          ENGINE_NATIVE_STATUS_NOT_FOUND);
   assert(is_ready == 0u);
@@ -89,7 +111,7 @@ void TestCaptureFlowAndValidation() {
   assert(capture_request(renderer, &invalid_request, &request_id) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   invalid_request = request;
-  invalid_request.reserved1 = 1u;
+  invalid_request.reserved1 = 3u;
   assert(capture_request(renderer, &invalid_request, &request_id) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
 
