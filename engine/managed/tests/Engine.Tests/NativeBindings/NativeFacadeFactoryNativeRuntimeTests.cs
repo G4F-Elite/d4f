@@ -216,6 +216,78 @@ public sealed class NativeFacadeFactoryNativeRuntimeTests
     }
 
     [Fact]
+    public void NativeRuntimePhysicsSyncToPhysics_UsesAuthoritativeSnapshotPerCall()
+    {
+        var backend = new FakeNativeInteropApi();
+        var world = new World();
+        var firstEntity = world.CreateEntity();
+        var secondEntity = world.CreateEntity();
+
+        world.AddComponent(
+            firstEntity,
+            new PhysicsBody(
+                new BodyHandle(701),
+                PhysicsBodyType.Dynamic,
+                new PhysicsCollider(
+                    ColliderShapeType.Box,
+                    new Vector3(1.0f, 1.0f, 1.0f),
+                    isTrigger: false,
+                    PhysicsMaterial.Default),
+                new Vector3(1.0f, 0.0f, 0.0f),
+                Quaternion.Identity,
+                new Vector3(1.0f, 0.0f, 0.0f),
+                Vector3.Zero,
+                isActive: true));
+
+        world.AddComponent(
+            secondEntity,
+            new PhysicsBody(
+                new BodyHandle(702),
+                PhysicsBodyType.Dynamic,
+                new PhysicsCollider(
+                    ColliderShapeType.Sphere,
+                    new Vector3(1.0f, 1.0f, 1.0f),
+                    isTrigger: false,
+                    PhysicsMaterial.Default),
+                new Vector3(2.0f, 0.0f, 0.0f),
+                Quaternion.Identity,
+                new Vector3(2.0f, 0.0f, 0.0f),
+                Vector3.Zero,
+                isActive: true));
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+
+        nativeSet.Physics.SyncToPhysics(world);
+
+        Assert.Equal((uint)2, backend.LastPhysicsWriteCount);
+        Assert.Equal(2, backend.LastPhysicsWrites.Length);
+        var foundFirstBody = false;
+        var foundSecondBody = false;
+        foreach (EngineNativeBodyWrite write in backend.LastPhysicsWrites)
+        {
+            if (write.Body == 701u)
+            {
+                foundFirstBody = true;
+            }
+
+            if (write.Body == 702u)
+            {
+                foundSecondBody = true;
+            }
+        }
+
+        Assert.True(foundFirstBody);
+        Assert.True(foundSecondBody);
+
+        world.DestroyEntity(secondEntity);
+        nativeSet.Physics.SyncToPhysics(world);
+
+        Assert.Equal((uint)1, backend.LastPhysicsWriteCount);
+        Assert.Single(backend.LastPhysicsWrites);
+        Assert.Equal((ulong)701, backend.LastPhysicsWrites[0].Body);
+    }
+
+    [Fact]
     public void NativeRuntimePhysicsRaycast_UsesInteropAndMapsHit()
     {
         var backend = new FakeNativeInteropApi

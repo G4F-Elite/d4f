@@ -27,6 +27,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeBodyWrite? LastPhysicsWrite { get; private set; }
 
+    public EngineNativeBodyWrite[] LastPhysicsWrites { get; private set; } = Array.Empty<EngineNativeBodyWrite>();
+
     public EngineNativeBodyRead[] PhysicsReadsToReturn { get; set; } = Array.Empty<EngineNativeBodyRead>();
 
     public EngineNativeRaycastQuery? LastPhysicsRaycastQuery { get; private set; }
@@ -589,6 +591,21 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         LastPhysicsWrite = writeCount > 0 && writes != IntPtr.Zero
             ? Marshal.PtrToStructure<EngineNativeBodyWrite>(writes)
             : null;
+
+        if (writeCount == 0 || writes == IntPtr.Zero)
+        {
+            LastPhysicsWrites = Array.Empty<EngineNativeBodyWrite>();
+            return PhysicsSyncFromWorldStatus;
+        }
+
+        var capturedWrites = new EngineNativeBodyWrite[checked((int)writeCount)];
+        for (var i = 0u; i < writeCount; i++)
+        {
+            var source = writes + checked((int)(i * (uint)Marshal.SizeOf<EngineNativeBodyWrite>()));
+            capturedWrites[i] = Marshal.PtrToStructure<EngineNativeBodyWrite>(source);
+        }
+
+        LastPhysicsWrites = capturedWrites;
         return PhysicsSyncFromWorldStatus;
     }
 

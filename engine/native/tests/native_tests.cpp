@@ -343,6 +343,37 @@ void TestEngineAndSubsystemFlow() {
   assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
          ENGINE_NATIVE_STATUS_INVALID_STATE);
 
+  engine_native_body_write_t trimmed_writes[1]{};
+  trimmed_writes[0] = writes[0];
+  trimmed_writes[0].position[0] = 2.05f;
+  assert(physics_sync_from_world(physics, trimmed_writes, 1u) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(physics_step(physics, 1.0 / 60.0) == ENGINE_NATIVE_STATUS_OK);
+
+  assert(physics_raycast(physics, &capsule_query, &raycast_hit) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(raycast_hit.has_hit == 0u);
+
+  engine_native_overlap_query_t removed_capsule_overlap_query{};
+  removed_capsule_overlap_query.center[0] = 5.0f;
+  removed_capsule_overlap_query.center[1] = 2.0f;
+  removed_capsule_overlap_query.center[2] = 0.0f;
+  removed_capsule_overlap_query.include_triggers = 1u;
+  removed_capsule_overlap_query.shape_type = 1u;
+  removed_capsule_overlap_query.shape_dimensions[0] = 1.0f;
+  removed_capsule_overlap_query.shape_dimensions[1] = 1.0f;
+  removed_capsule_overlap_query.shape_dimensions[2] = 1.0f;
+  overlap_count = 0u;
+  assert(physics_overlap(physics, &removed_capsule_overlap_query, overlap_hits, 1u,
+                         &overlap_count) == ENGINE_NATIVE_STATUS_OK);
+  assert(overlap_count == 0u);
+
+  assert(physics_sync_to_world(physics, reads, 2u, &read_count) ==
+         ENGINE_NATIVE_STATUS_OK);
+  assert(read_count == 1u);
+  assert(reads[0].body == 1001u);
+  assert(std::fabs(reads[0].position[0] - 2.10f) < 0.001f);
+
   assert(physics_sync_from_world(physics, nullptr, 1u) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   engine_native_body_write_t invalid_write[1]{};

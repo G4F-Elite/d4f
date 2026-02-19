@@ -954,6 +954,9 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     return ENGINE_NATIVE_STATUS_INVALID_STATE;
   }
 
+  std::unordered_map<engine_native_resource_handle_t, PhysicsBodyState> next_bodies;
+  next_bodies.reserve(write_count);
+
   for (uint32_t i = 0u; i < write_count; ++i) {
     const engine_native_body_write_t& write = writes[i];
     if (write.body == 0u) {
@@ -989,9 +992,10 @@ engine_native_status_t PhysicsState::SyncFromWorld(
     std::copy_n(write.collider_dimensions, 3, state.collider_dimensions.data());
     state.friction = write.friction;
     state.restitution = write.restitution;
-    bodies_[write.body] = state;
+    next_bodies[write.body] = state;
   }
 
+  bodies_ = std::move(next_bodies);
   synced_from_world_ = true;
   return ENGINE_NATIVE_STATUS_OK;
 }
