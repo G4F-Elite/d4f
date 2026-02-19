@@ -85,6 +85,20 @@ public sealed class NativeRuntimeAudioInteropTests
         Assert.Equal((ulong)17u, backend.LastAudioSetEmitterId);
         Assert.True(backend.LastAudioEmitterParams.HasValue);
         Assert.Equal(emitterParams.Lowpass, backend.LastAudioEmitterParams.Value.Lowpass);
+
+        var busParams = new EngineNativeAudioBusParams
+        {
+            Bus = (byte)EngineNativeAudioBus.Sfx,
+            Muted = 0,
+            Gain = 0.6f,
+            Lowpass = 0.7f,
+            ReverbSend = 0.15f
+        };
+        runtime.SetAudioBusParams(in busParams);
+        Assert.Equal(1, backend.CountCall("audio_set_bus_params"));
+        Assert.True(backend.LastAudioBusParams.HasValue);
+        Assert.Equal(busParams.Bus, backend.LastAudioBusParams.Value.Bus);
+        Assert.Equal(busParams.Gain, backend.LastAudioBusParams.Value.Gain);
     }
 
     [Fact]
@@ -103,6 +117,7 @@ public sealed class NativeRuntimeAudioInteropTests
         Assert.Equal(0, backend.CountCall("audio_create_sound_from_blob"));
         Assert.Equal(0, backend.CountCall("audio_play"));
         Assert.Equal(0, backend.CountCall("audio_set_emitter_params"));
+        Assert.Equal(0, backend.CountCall("audio_set_bus_params"));
     }
 
     [Fact]
@@ -131,5 +146,17 @@ public sealed class NativeRuntimeAudioInteropTests
         InvalidOperationException invalidEmitterEx = Assert.Throws<InvalidOperationException>(() =>
             runtime.PlaySound(sound, in playDesc));
         Assert.Contains("invalid emitter", invalidEmitterEx.Message, StringComparison.OrdinalIgnoreCase);
+
+        backend.AudioSetBusParamsStatus = EngineNativeStatus.InvalidArgument;
+        var busParams = new EngineNativeAudioBusParams
+        {
+            Bus = (byte)EngineNativeAudioBus.Master,
+            Gain = 1f,
+            Lowpass = 1f,
+            ReverbSend = 0f,
+            Muted = 0
+        };
+        NativeCallException busEx = Assert.Throws<NativeCallException>(() => runtime.SetAudioBusParams(in busParams));
+        Assert.Contains("audio_set_bus_params", busEx.Message, StringComparison.Ordinal);
     }
 }

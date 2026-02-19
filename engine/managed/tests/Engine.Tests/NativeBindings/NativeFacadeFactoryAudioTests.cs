@@ -86,6 +86,32 @@ public sealed class NativeFacadeFactoryAudioTests
         Assert.Equal(0x1234UL, backend.LastAudioSetEmitterId);
     }
 
+    [Fact]
+    public void NativeAudioFacade_ShouldForwardBusParametersToNativeInterop()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            AudioSoundHandleToReturn = 1UL,
+            AudioEmitterIdToReturn = 2UL
+        };
+
+        using var nativeSet = NativeFacadeFactory.CreateNativeFacadeSet(backend);
+        nativeSet.Audio.SetBusParameters(new AudioBusParameters(
+            AudioBus.Sfx,
+            Gain: 0.5f,
+            Lowpass: 0.7f,
+            ReverbSend: 0.2f,
+            Muted: true));
+
+        Assert.Equal(1, backend.CountCall("audio_set_bus_params"));
+        Assert.True(backend.LastAudioBusParams.HasValue);
+        Assert.Equal((byte)Engine.NativeBindings.Internal.Interop.EngineNativeAudioBus.Sfx, backend.LastAudioBusParams.Value.Bus);
+        Assert.Equal((byte)1, backend.LastAudioBusParams.Value.Muted);
+        Assert.Equal(0.5f, backend.LastAudioBusParams.Value.Gain);
+        Assert.Equal(0.7f, backend.LastAudioBusParams.Value.Lowpass);
+        Assert.Equal(0.2f, backend.LastAudioBusParams.Value.ReverbSend);
+    }
+
     private static ProceduralSoundRecipe CreateRecipe(uint seed)
     {
         return new ProceduralSoundRecipe(

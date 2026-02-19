@@ -52,4 +52,12 @@ internal sealed partial class NativeRuntime
             _interop.AudioSetEmitterParams(_audio, emitterId, in emitterParams),
             "audio_set_emitter_params");
     }
+
+    public void SetAudioBusParams(in EngineNativeAudioBusParams busParams)
+    {
+        ThrowIfDisposed();
+        NativeStatusGuard.ThrowIfFailed(
+            _interop.AudioSetBusParams(_audio, in busParams),
+            "audio_set_bus_params");
+    }
 }

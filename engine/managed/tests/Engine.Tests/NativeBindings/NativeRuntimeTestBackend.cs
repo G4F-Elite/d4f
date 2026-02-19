@@ -109,6 +109,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
 
     public EngineNativeStatus AudioSetEmitterParamsStatus { get; set; } = EngineNativeStatus.Ok;
 
+    public EngineNativeStatus AudioSetBusParamsStatus { get; set; } = EngineNativeStatus.Ok;
+
     public EngineNativeStatus NetCreateStatus { get; set; } = EngineNativeStatus.Ok;
 
     public EngineNativeStatus NetDestroyStatus { get; set; } = EngineNativeStatus.Ok;
@@ -156,6 +158,8 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
     public EngineNativeListenerDesc? LastAudioListenerDesc { get; private set; }
 
     public EngineNativeEmitterParams? LastAudioEmitterParams { get; private set; }
+
+    public EngineNativeAudioBusParams? LastAudioBusParams { get; private set; }
 
     public string? LastMountedPakPath { get; private set; }
 
@@ -532,6 +536,13 @@ internal sealed class FakeNativeInteropApi : INativeInteropApi
         LastAudioSetEmitterId = emitterId;
         LastAudioEmitterParams = emitterParams;
         return AudioSetEmitterParamsStatus;
+    }
+
+    public EngineNativeStatus AudioSetBusParams(IntPtr audio, in EngineNativeAudioBusParams busParams)
+    {
+        Calls.Add("audio_set_bus_params");
+        LastAudioBusParams = busParams;
+        return AudioSetBusParamsStatus;
     }
 
     public EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net)

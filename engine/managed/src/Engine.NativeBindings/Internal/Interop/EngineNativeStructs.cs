@@ -196,6 +196,18 @@ internal struct EngineNativeEmitterParams
     public float ReverbSend;
 }
 
+[StructLayout(LayoutKind.Sequential)]
+internal struct EngineNativeAudioBusParams
+{
+    public byte Bus;
+    public byte Muted;
+    public byte Reserved0;
+    public byte Reserved1;
+    public float Gain;
+    public float Lowpass;
+    public float ReverbSend;
+}
+
 internal enum EngineNativeNetEventKind : byte
 {
     Connected = 1,

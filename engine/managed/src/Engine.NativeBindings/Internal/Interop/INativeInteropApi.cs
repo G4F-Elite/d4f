@@ -113,6 +113,8 @@ internal interface INativeInteropApi
         ulong emitterId,
         in EngineNativeEmitterParams emitterParams);
 
+    EngineNativeStatus AudioSetBusParams(IntPtr audio, in EngineNativeAudioBusParams busParams);
+
     EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net);
 
     EngineNativeStatus NetDestroy(IntPtr net);

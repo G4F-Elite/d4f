@@ -320,6 +320,9 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             emitterId,
             in emitterParams);
 
+    public EngineNativeStatus AudioSetBusParams(IntPtr audio, in EngineNativeAudioBusParams busParams)
+        => NativeMethods.AudioSetBusParamsHandle(HandleFromToken(audio), in busParams);
+
     public EngineNativeStatus NetCreate(in EngineNativeNetDesc desc, out IntPtr net)
     {
         net = IntPtr.Zero;
@@ -617,6 +620,12 @@ internal sealed partial class DffNativeInteropApi : INativeInteropApi
             ulong audio,
             ulong emitterId,
             in EngineNativeEmitterParams emitterParams);
+
+        [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "audio_set_bus_params_handle")]
+        [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]
+        internal static partial EngineNativeStatus AudioSetBusParamsHandle(
+            ulong audio,
+            in EngineNativeAudioBusParams busParams);
 
         [LibraryImport(EngineNativeConstants.LibraryName, EntryPoint = "net_create_handle")]
         [UnmanagedCallConv(CallConvs = [typeof(CallConvCdecl)])]

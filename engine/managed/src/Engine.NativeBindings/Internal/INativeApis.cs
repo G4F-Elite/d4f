@@ -47,6 +47,8 @@ internal interface INativeAudioApi
     void SetAudioListener(in EngineNativeListenerDesc listenerDesc);
 
     void SetAudioEmitterParams(ulong emitterId, in EngineNativeEmitterParams emitterParams);
+
+    void SetAudioBusParams(in EngineNativeAudioBusParams busParams);
 }
 
 internal interface INativeContentApi

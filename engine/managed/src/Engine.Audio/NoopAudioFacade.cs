@@ -3,6 +3,7 @@ namespace Engine.Audio;
 public sealed class NoopAudioFacade : IAudioFacade
 {
     private readonly Dictionary<AudioEmitterHandle, AudioEmitterParameters> _emitters = new();
+    private readonly Dictionary<AudioBus, AudioBusParameters> _busParameters = new();
     private ulong _nextEmitterId = 1u;
 
     public AudioEmitterHandle Play(ProceduralSoundRecipe recipe, AudioPlayRequest request)
@@ -47,5 +48,11 @@ public sealed class NoopAudioFacade : IAudioFacade
         }
 
         _emitters[emitter] = parameters.Validate();
+    }
+
+    public void SetBusParameters(in AudioBusParameters parameters)
+    {
+        AudioBusParameters validated = parameters.Validate();
+        _busParameters[validated.Bus] = validated;
     }
 }

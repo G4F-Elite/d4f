@@ -245,6 +245,22 @@ public static class NativeFacadeFactory
             _nativeApi.SetAudioEmitterParams(emitter.Value, in nativeParams);
         }
 
+        public void SetBusParameters(in AudioBusParameters parameters)
+        {
+            AudioBusParameters validated = parameters.Validate();
+            var nativeParams = new EngineNativeAudioBusParams
+            {
+                Bus = (byte)MapBus(validated.Bus),
+                Muted = validated.Muted ? (byte)1 : (byte)0,
+                Reserved0 = 0,
+                Reserved1 = 0,
+                Gain = validated.Gain,
+                Lowpass = validated.Lowpass,
+                ReverbSend = validated.ReverbSend
+            };
+            _nativeApi.SetAudioBusParams(in nativeParams);
+        }
+
         private void EnsureKnownEmitter(AudioEmitterHandle emitter)
         {
             if (!emitter.IsValid)

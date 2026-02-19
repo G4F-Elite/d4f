@@ -9,4 +9,6 @@ public interface IAudioFacade
     void SetListener(in ListenerState listener);
 
     void SetEmitterParameters(AudioEmitterHandle emitter, in AudioEmitterParameters parameters);
+
+    void SetBusParameters(in AudioBusParameters parameters);
 }

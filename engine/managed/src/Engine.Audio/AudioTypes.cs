@@ -7,6 +7,39 @@ public readonly record struct AudioEmitterHandle(ulong Value)
 
 public readonly record struct ListenerState(float PositionX, float PositionY, float PositionZ);
 
+public readonly record struct AudioBusParameters(
+    AudioBus Bus,
+    float Gain,
+    float Lowpass,
+    float ReverbSend,
+    bool Muted)
+{
+    public AudioBusParameters Validate()
+    {
+        if (!Enum.IsDefined(Bus))
+        {
+            throw new InvalidDataException($"Unsupported audio bus value: {Bus}.");
+        }
+
+        if (Gain < 0f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(Gain), "Bus gain cannot be negative.");
+        }
+
+        if (Lowpass < 0f || Lowpass > 1f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(Lowpass), "Bus lowpass must be within [0, 1].");
+        }
+
+        if (ReverbSend < 0f || ReverbSend > 1f)
+        {
+            throw new ArgumentOutOfRangeException(nameof(ReverbSend), "Bus reverb send must be within [0, 1].");
+        }
+
+        return this;
+    }
+}
+
 public readonly record struct AudioEmitterParameters(
     float Volume,
     float Pitch,

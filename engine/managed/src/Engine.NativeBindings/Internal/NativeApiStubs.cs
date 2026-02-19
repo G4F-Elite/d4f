@@ -130,6 +130,20 @@ internal sealed class NativeAudioApiStub : INativeAudioApi
             throw new ArgumentOutOfRangeException(nameof(emitterParams), "Emitter params have invalid scalar values.");
         }
     }
+
+    public void SetAudioBusParams(in EngineNativeAudioBusParams busParams)
+    {
+        if (!Enum.IsDefined((EngineNativeAudioBus)busParams.Bus))
+        {
+            throw new InvalidDataException($"Unsupported native audio bus value: {busParams.Bus}.");
+        }
+
+        if (busParams.Gain < 0f || busParams.Lowpass < 0f || busParams.Lowpass > 1f ||
+            busParams.ReverbSend < 0f || busParams.ReverbSend > 1f || busParams.Muted > 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(busParams), "Bus params contain invalid scalar values.");
+        }
+    }
 }
 
 internal sealed class NativeContentApiStub : INativeContentApi
