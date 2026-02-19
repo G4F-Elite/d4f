@@ -1509,6 +1509,60 @@ public sealed class EngineCliDoctorToolChecksTests
     }
 
     [Fact]
+    public void Run_ShouldFailDoctor_WhenArtifactsManifestRequiredFileMissing()
+    {
+        string tempRoot = CreateTempDirectory();
+        try
+        {
+            PrepareDoctorProject(tempRoot);
+            string manifestPath = Path.Combine(tempRoot, "artifacts", "tests", "manifest.json");
+            WriteArtifactsManifest(
+                manifestPath,
+                [
+                    "screenshot",
+                    "screenshot-buffer",
+                    "screenshot-buffer-rgba16f",
+                    "screenshot-buffer-rgba16f-exr",
+                    "roughness",
+                    "roughness-buffer",
+                    "multiplayer-demo",
+                    "net-profile-log",
+                    "multiplayer-snapshot-bin",
+                    "multiplayer-rpc-bin",
+                    "render-stats-log",
+                    "test-host-config",
+                    "runtime-perf-metrics",
+                    "replay"
+                ]);
+            File.Delete(Path.Combine(Path.GetDirectoryName(manifestPath)!, "screenshot-buffer-rgba16f-exr.dat"));
+
+            var runner = new SelectiveDoctorRunner
+            {
+                DotnetExitCode = 0,
+                CmakeExitCode = 0
+            };
+            using var output = new StringWriter();
+            using var error = new StringWriter();
+            var app = new EngineCliApp(output, error, runner);
+
+            int code = app.Run(
+            [
+                "doctor",
+                "--project", tempRoot,
+                "--verify-artifacts-manifest", "true"
+            ]);
+
+            Assert.Equal(1, code);
+            Assert.Contains("Artifacts manifest check failed: missing files for required kinds", error.ToString(), StringComparison.Ordinal);
+            Assert.Contains("screenshot-buffer-rgba16f-exr", error.ToString(), StringComparison.Ordinal);
+        }
+        finally
+        {
+            Directory.Delete(tempRoot, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Run_ShouldFailDoctor_WhenReleaseProofRequiredButMissing()
     {
         string tempRoot = CreateTempDirectory();
@@ -1837,8 +1891,9 @@ public sealed class EngineCliDoctorToolChecksTests
     private static void WriteArtifactsManifest(string filePath, IReadOnlyList<string> kinds)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(filePath)!);
+        string artifactsRoot = Path.GetDirectoryName(filePath)!;
         IEnumerable<string> entries = kinds.Select(
-            static kind => $"{{ \"kind\": \"{kind}\", \"relativePath\": \"x\", \"description\": \"d\" }}");
+            static kind => $"{{ \"kind\": \"{kind}\", \"relativePath\": \"{kind}.dat\", \"description\": \"d\" }}");
         string artifactsJson = string.Join(",\n    ", entries);
         string json =
             $$"""
@@ -1850,6 +1905,12 @@ public sealed class EngineCliDoctorToolChecksTests
             }
             """;
         File.WriteAllText(filePath, json);
+
+        foreach (string kind in kinds)
+        {
+            string artifactPath = Path.Combine(artifactsRoot, $"{kind}.dat");
+            File.WriteAllBytes(artifactPath, [1]);
+        }
     }
 
     private static void WriteReleaseProof(string filePath, bool isSuccess, bool allChecksPassing)

@@ -740,10 +740,13 @@ public sealed partial class EngineCliApp
             }
 
             var kinds = new HashSet<string>(StringComparer.Ordinal);
+            var artifactEntries = new List<(string Kind, string RelativePath)>();
             foreach (JsonElement artifact in artifacts.EnumerateArray())
             {
                 string kind = ReadRequiredString(artifact, "kind", "Artifacts manifest artifact entry");
+                string relativePath = ReadRequiredString(artifact, "relativePath", "Artifacts manifest artifact entry");
                 kinds.Add(kind);
+                artifactEntries.Add((kind, relativePath));
             }
 
             _stdout.WriteLine($"Artifacts manifest: entries={kinds.Count}.");
@@ -774,6 +777,31 @@ public sealed partial class EngineCliApp
             if (missingKinds.Length > 0)
             {
                 failures.Add($"Artifacts manifest check failed: missing required kinds [{string.Join(", ", missingKinds)}].");
+            }
+
+            string manifestDirectory = Path.GetDirectoryName(resolvedPath) ?? projectDirectory;
+            var missingArtifactFiles = new List<string>();
+            foreach (string requiredKind in requiredKinds)
+            {
+                string? relativePath = artifactEntries
+                    .Where(entry => string.Equals(entry.Kind, requiredKind, StringComparison.Ordinal))
+                    .Select(static entry => entry.RelativePath)
+                    .FirstOrDefault();
+                if (relativePath is null)
+                {
+                    continue;
+                }
+
+                string artifactPath = AssetPipelineService.ResolveRelativePath(manifestDirectory, relativePath);
+                if (!File.Exists(artifactPath))
+                {
+                    missingArtifactFiles.Add($"{requiredKind} ({artifactPath})");
+                }
+            }
+
+            if (missingArtifactFiles.Count > 0)
+            {
+                failures.Add($"Artifacts manifest check failed: missing files for required kinds [{string.Join(", ", missingArtifactFiles)}].");
             }
         }
         catch (Exception ex) when (ex is IOException or JsonException or InvalidDataException)
