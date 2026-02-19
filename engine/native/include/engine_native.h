@@ -202,6 +202,16 @@ typedef struct engine_native_emitter_params {
   float reverb_send;
 } engine_native_emitter_params_t;
 
+typedef struct engine_native_audio_bus_params {
+  uint8_t bus;
+  uint8_t muted;
+  uint8_t reserved0;
+  uint8_t reserved1;
+  float gain;
+  float lowpass;
+  float reverb_send;
+} engine_native_audio_bus_params_t;
+
 typedef enum engine_native_net_event_kind {
   ENGINE_NATIVE_NET_EVENT_KIND_CONNECTED = 1,
   ENGINE_NATIVE_NET_EVENT_KIND_DISCONNECTED = 2,
@@ -477,6 +487,10 @@ ENGINE_NATIVE_API engine_native_status_t audio_set_emitter_params(
     uint64_t emitter_id,
     const engine_native_emitter_params_t* params);
 
+ENGINE_NATIVE_API engine_native_status_t audio_set_bus_params(
+    engine_native_audio_t* audio,
+    const engine_native_audio_bus_params_t* params);
+
 ENGINE_NATIVE_API engine_native_status_t net_create(
     const engine_native_net_desc_t* desc,
     engine_native_net_t** out_net);
@@ -660,6 +674,10 @@ ENGINE_NATIVE_API engine_native_status_t audio_set_emitter_params_handle(
     engine_native_audio_handle_t audio,
     uint64_t emitter_id,
     const engine_native_emitter_params_t* params);
+
+ENGINE_NATIVE_API engine_native_status_t audio_set_bus_params_handle(
+    engine_native_audio_handle_t audio,
+    const engine_native_audio_bus_params_t* params);
 
 ENGINE_NATIVE_API engine_native_status_t net_create_handle(
     const engine_native_net_desc_t* desc,

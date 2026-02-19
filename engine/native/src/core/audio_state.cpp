@@ -37,13 +37,6 @@ bool IsValidSoundBlob(const void* data, size_t size) {
 
 }  // namespace
 
-bool AudioState::IsSupportedBus(uint8_t bus) {
-  return bus == ENGINE_NATIVE_AUDIO_BUS_MASTER ||
-         bus == ENGINE_NATIVE_AUDIO_BUS_MUSIC ||
-         bus == ENGINE_NATIVE_AUDIO_BUS_SFX ||
-         bus == ENGINE_NATIVE_AUDIO_BUS_AMBIENCE;
-}
-
 bool AudioState::IsFiniteScalar(float value) {
   return std::isfinite(value);
 }
@@ -199,6 +192,23 @@ engine_native_status_t AudioState::SetEmitterParams(
   std::copy_n(params.velocity, 3u, emitter.velocity.data());
   emitter.lowpass = params.lowpass;
   emitter.reverb_send = params.reverb_send;
+  return ENGINE_NATIVE_STATUS_OK;
+}
+
+engine_native_status_t AudioState::SetBusParams(
+    const engine_native_audio_bus_params_t& params) {
+  if (!IsSupportedBus(params.bus) || params.muted > 1u ||
+      !IsFiniteScalar(params.gain) || params.gain < 0.0f ||
+      !IsValidNormalizedValue(params.lowpass) ||
+      !IsValidNormalizedValue(params.reverb_send)) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  AudioBusState& bus = bus_states_[BusIndex(params.bus)];
+  bus.gain = params.gain;
+  bus.lowpass = params.lowpass;
+  bus.reverb_send = params.reverb_send;
+  bus.muted = params.muted;
   return ENGINE_NATIVE_STATUS_OK;
 }
 

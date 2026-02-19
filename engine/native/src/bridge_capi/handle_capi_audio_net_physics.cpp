@@ -80,6 +80,18 @@ engine_native_status_t audio_set_emitter_params_handle(
   return audio_set_emitter_params(raw_audio, emitter_id, params);
 }
 
+engine_native_status_t audio_set_bus_params_handle(
+    engine_native_audio_handle_t audio,
+    const engine_native_audio_bus_params_t* params) {
+  engine_native_audio_t* raw_audio = nullptr;
+  const engine_native_status_t resolve_status = ResolveAudio(audio, &raw_audio);
+  if (resolve_status != ENGINE_NATIVE_STATUS_OK) {
+    return resolve_status;
+  }
+
+  return audio_set_bus_params(raw_audio, params);
+}
+
 engine_native_status_t net_create_handle(
     const engine_native_net_desc_t* desc,
     engine_native_net_handle_t* out_net) {

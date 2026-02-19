@@ -74,4 +74,18 @@ engine_native_status_t audio_set_emitter_params(
   return audio->state->SetEmitterParams(emitter_id, *params);
 }
 
+engine_native_status_t audio_set_bus_params(
+    engine_native_audio_t* audio,
+    const engine_native_audio_bus_params_t* params) {
+  const engine_native_status_t status = ValidateAudio(audio);
+  if (status != ENGINE_NATIVE_STATUS_OK) {
+    return status;
+  }
+  if (params == nullptr) {
+    return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
+  }
+
+  return audio->state->SetBusParams(*params);
+}
+
 }  // extern "C"

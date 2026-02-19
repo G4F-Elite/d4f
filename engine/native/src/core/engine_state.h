@@ -189,11 +189,22 @@ struct AudioListenerState {
   std::array<float, 3> up{0.0f, 1.0f, 0.0f};
 };
 
+struct AudioBusState {
+  float gain = 1.0f;
+  float lowpass = 1.0f;
+  float reverb_send = 0.0f;
+  uint8_t muted = 0u;
+};
+
 struct AudioBusMixSnapshot {
   float master_gain = 0.0f;
   float music_gain = 0.0f;
   float sfx_gain = 0.0f;
   float ambience_gain = 0.0f;
+  float master_bus_gain = 1.0f;
+  float music_bus_gain = 1.0f;
+  float sfx_bus_gain = 1.0f;
+  float ambience_bus_gain = 1.0f;
   uint32_t active_emitter_count = 0u;
   uint32_t spatialized_emitter_count = 0u;
 };
@@ -213,6 +224,8 @@ class AudioState {
   engine_native_status_t SetEmitterParams(
       uint64_t emitter_id,
       const engine_native_emitter_params_t& params);
+  engine_native_status_t SetBusParams(
+      const engine_native_audio_bus_params_t& params);
 
   size_t sound_count() const { return sounds_.Size(); }
   size_t emitter_count() const { return emitters_.size(); }
@@ -225,11 +238,33 @@ class AudioState {
     return &emitter_it->second;
   }
   const AudioListenerState& listener() const { return listener_; }
+  const AudioBusState& bus_state(uint8_t bus) const {
+    return bus_states_[BusIndex(bus)];
+  }
   float ComputeEmitterGain(const AudioEmitterState& emitter) const;
   AudioBusMixSnapshot BuildMixSnapshot() const;
 
  private:
-  static bool IsSupportedBus(uint8_t bus);
+  static constexpr size_t BusIndex(uint8_t bus) {
+    switch (bus) {
+      case ENGINE_NATIVE_AUDIO_BUS_MUSIC:
+        return 1u;
+      case ENGINE_NATIVE_AUDIO_BUS_SFX:
+        return 2u;
+      case ENGINE_NATIVE_AUDIO_BUS_AMBIENCE:
+        return 3u;
+      case ENGINE_NATIVE_AUDIO_BUS_MASTER:
+      default:
+        return 0u;
+    }
+  }
+
+  static bool IsSupportedBus(uint8_t bus) {
+    return bus == ENGINE_NATIVE_AUDIO_BUS_MASTER ||
+           bus == ENGINE_NATIVE_AUDIO_BUS_MUSIC ||
+           bus == ENGINE_NATIVE_AUDIO_BUS_SFX ||
+           bus == ENGINE_NATIVE_AUDIO_BUS_AMBIENCE;
+  }
   static bool IsFiniteScalar(float value);
   static bool IsFiniteVector(const float* values, size_t count);
   static bool IsValidNormalizedValue(float value);
@@ -238,14 +273,29 @@ class AudioState {
   std::unordered_map<uint64_t, AudioEmitterState> emitters_;
   uint64_t next_emitter_id_ = 1u;
   AudioListenerState listener_;
+  std::array<AudioBusState, 4u> bus_states_{};
 };
 
 inline float AudioState::ComputeEmitterGain(const AudioEmitterState& emitter) const {
-  const float volume = std::max(0.0f, emitter.volume);
-  const float lowpass = std::clamp(emitter.lowpass, 0.0f, 1.0f);
-  const float reverb = std::clamp(emitter.reverb_send, 0.0f, 1.0f);
+  if (!IsSupportedBus(emitter.bus)) {
+    return 0.0f;
+  }
 
-  float gain = volume * lowpass;
+  const AudioBusState& bus = bus_states_[BusIndex(emitter.bus)];
+  if (bus.muted != 0u) {
+    return 0.0f;
+  }
+
+  const float volume = std::max(0.0f, emitter.volume);
+  const float lowpass =
+      std::clamp(emitter.lowpass, 0.0f, 1.0f) * std::clamp(bus.lowpass, 0.0f, 1.0f);
+  const float reverb = std::clamp(
+      emitter.reverb_send + std::clamp(bus.reverb_send, 0.0f, 1.0f),
+      0.0f,
+      1.0f);
+  const float bus_gain = std::max(0.0f, bus.gain);
+
+  float gain = volume * bus_gain * lowpass;
   if (emitter.is_spatialized != 0u) {
     const float dx = emitter.position[0] - listener_.position[0];
     const float dy = emitter.position[1] - listener_.position[1];
@@ -262,6 +312,10 @@ inline float AudioState::ComputeEmitterGain(const AudioEmitterState& emitter) co
 
 inline AudioBusMixSnapshot AudioState::BuildMixSnapshot() const {
   AudioBusMixSnapshot snapshot{};
+  snapshot.master_bus_gain = bus_states_[BusIndex(ENGINE_NATIVE_AUDIO_BUS_MASTER)].gain;
+  snapshot.music_bus_gain = bus_states_[BusIndex(ENGINE_NATIVE_AUDIO_BUS_MUSIC)].gain;
+  snapshot.sfx_bus_gain = bus_states_[BusIndex(ENGINE_NATIVE_AUDIO_BUS_SFX)].gain;
+  snapshot.ambience_bus_gain = bus_states_[BusIndex(ENGINE_NATIVE_AUDIO_BUS_AMBIENCE)].gain;
   for (const auto& pair : emitters_) {
     const AudioEmitterState& emitter = pair.second;
     const float gain = ComputeEmitterGain(emitter);

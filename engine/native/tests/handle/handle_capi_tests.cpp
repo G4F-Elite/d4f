@@ -96,6 +96,14 @@ void TestHandleLifecycleAndSubsystemAccess() {
   listener.up[1] = 1.0f;
   assert(audio_set_listener_handle(audio, &listener) == ENGINE_NATIVE_STATUS_OK);
 
+  engine_native_audio_bus_params_t bus_params{};
+  bus_params.bus = ENGINE_NATIVE_AUDIO_BUS_SFX;
+  bus_params.gain = 0.5f;
+  bus_params.lowpass = 0.8f;
+  bus_params.reverb_send = 0.2f;
+  bus_params.muted = 0u;
+  assert(audio_set_bus_params_handle(audio, &bus_params) == ENGINE_NATIVE_STATUS_OK);
+
   engine_native_net_events_t events{};
   assert(net_pump_handle(net, &events) == ENGINE_NATIVE_STATUS_OK);
 
@@ -103,6 +111,7 @@ void TestHandleLifecycleAndSubsystemAccess() {
 
   assert(renderer_present_handle(renderer) == ENGINE_NATIVE_STATUS_NOT_FOUND);
   assert(audio_set_listener_handle(audio, &listener) == ENGINE_NATIVE_STATUS_NOT_FOUND);
+  assert(audio_set_bus_params_handle(audio, &bus_params) == ENGINE_NATIVE_STATUS_NOT_FOUND);
   assert(net_pump_handle(net, &events) == ENGINE_NATIVE_STATUS_NOT_FOUND);
   assert(engine_destroy_handle(engine) == ENGINE_NATIVE_STATUS_NOT_FOUND);
 }
