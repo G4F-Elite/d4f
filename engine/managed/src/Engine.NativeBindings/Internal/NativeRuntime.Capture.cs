@@ -164,12 +164,12 @@ internal sealed partial class NativeRuntime
     {
         return debugViewMode switch
         {
-            RenderDebugViewMode.Depth => 1,
-            RenderDebugViewMode.Normals => 2,
-            RenderDebugViewMode.Albedo => 3,
-            RenderDebugViewMode.Roughness => 4,
-            RenderDebugViewMode.AmbientOcclusion => 5,
-            _ => 0
+            RenderDebugViewMode.Depth => (byte)EngineNativeCaptureSemantic.Depth,
+            RenderDebugViewMode.Normals => (byte)EngineNativeCaptureSemantic.Normals,
+            RenderDebugViewMode.Albedo => (byte)EngineNativeCaptureSemantic.Albedo,
+            RenderDebugViewMode.Roughness => (byte)EngineNativeCaptureSemantic.Roughness,
+            RenderDebugViewMode.AmbientOcclusion => (byte)EngineNativeCaptureSemantic.AmbientOcclusion,
+            _ => (byte)EngineNativeCaptureSemantic.Color
         };
     }
 }

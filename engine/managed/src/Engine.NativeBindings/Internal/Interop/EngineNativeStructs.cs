@@ -142,6 +142,17 @@ internal struct EngineNativeCaptureResult
     public nuint PixelBytes;
 }
 
+internal enum EngineNativeCaptureSemantic : byte
+{
+    Color = 0,
+    Depth = 1,
+    Normals = 2,
+    Albedo = 3,
+    Shadow = 4,
+    AmbientOcclusion = 5,
+    Roughness = 6
+}
+
 internal enum EngineNativeAudioBus : byte
 {
     Master = 0,

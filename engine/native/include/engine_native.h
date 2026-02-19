@@ -150,6 +150,7 @@ typedef enum engine_native_capture_format {
 #define ENGINE_NATIVE_CAPTURE_SEMANTIC_ALBEDO 3u
 #define ENGINE_NATIVE_CAPTURE_SEMANTIC_SHADOW 4u
 #define ENGINE_NATIVE_CAPTURE_SEMANTIC_AMBIENT_OCCLUSION 5u
+#define ENGINE_NATIVE_CAPTURE_SEMANTIC_ROUGHNESS 6u
 
 typedef struct engine_native_capture_request {
   uint32_t width;

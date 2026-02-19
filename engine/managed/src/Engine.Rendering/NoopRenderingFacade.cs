@@ -163,8 +163,10 @@ public sealed class NoopRenderingFacade : IRenderingFacade, IAdvancedCaptureRend
                 FillAlbedoCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
                 break;
             case RenderDebugViewMode.Roughness:
+                FillRoughnessCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                break;
             case RenderDebugViewMode.AmbientOcclusion:
-                FillShadowCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
+                FillAmbientOcclusionCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
                 break;
             default:
                 FillColorCapture(rgba, (int)width, (int)height, rowStride, widthDenominator, heightDenominator, alpha);
@@ -361,6 +363,57 @@ public sealed class NoopRenderingFacade : IRenderingFacade, IAdvancedCaptureRend
                 rgba[pixelOffset] = value;
                 rgba[pixelOffset + 1] = value;
                 rgba[pixelOffset + 2] = value;
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
+    }
+
+    private static void FillRoughnessCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int pixelOffset = y * rowStride + x * 4;
+                int value = 20 + (x * 200 / widthDenominator) + (y * 35 / heightDenominator);
+                byte roughness = (byte)Math.Clamp(value, 0, 255);
+                rgba[pixelOffset] = roughness;
+                rgba[pixelOffset + 1] = roughness;
+                rgba[pixelOffset + 2] = roughness;
+                rgba[pixelOffset + 3] = alpha;
+            }
+        }
+    }
+
+    private static void FillAmbientOcclusionCapture(
+        byte[] rgba,
+        int width,
+        int height,
+        int rowStride,
+        int widthDenominator,
+        int heightDenominator,
+        byte alpha)
+    {
+        for (int y = 0; y < height; y++)
+        {
+            float uy = (y / (float)heightDenominator) - 0.5f;
+            for (int x = 0; x < width; x++)
+            {
+                float ux = (x / (float)widthDenominator) - 0.5f;
+                float radial = MathF.Sqrt(MathF.Min(1f, ux * ux + uy * uy));
+                float value = Math.Clamp(0.9f - (radial * 1.4f), 0.12f, 0.9f);
+                byte ao = (byte)Math.Clamp((int)MathF.Round(value * 255f), 0, 255);
+                int pixelOffset = y * rowStride + x * 4;
+                rgba[pixelOffset] = ao;
+                rgba[pixelOffset + 1] = ao;
+                rgba[pixelOffset + 2] = ao;
                 rgba[pixelOffset + 3] = alpha;
             }
         }

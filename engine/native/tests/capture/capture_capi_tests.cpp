@@ -66,6 +66,7 @@ void TestCaptureFlowAndValidation() {
 
   engine_native_capture_request_t request_half = request;
   request_half.reserved1 = ENGINE_NATIVE_CAPTURE_FORMAT_RGBA16_FLOAT;
+  request_half.reserved0 = ENGINE_NATIVE_CAPTURE_SEMANTIC_ROUGHNESS;
   assert(capture_request(renderer, &request_half, &request_id) ==
          ENGINE_NATIVE_STATUS_OK);
   assert(request_id != 0u);
@@ -107,7 +108,7 @@ void TestCaptureFlowAndValidation() {
   assert(capture_request(renderer, &invalid_request, &request_id) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   invalid_request = request;
-  invalid_request.reserved0 = 6u;
+  invalid_request.reserved0 = 7u;
   assert(capture_request(renderer, &invalid_request, &request_id) ==
          ENGINE_NATIVE_STATUS_INVALID_ARGUMENT);
   invalid_request = request;

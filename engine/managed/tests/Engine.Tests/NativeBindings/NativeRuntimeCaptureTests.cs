@@ -1,6 +1,7 @@
 using System;
 using Engine.NativeBindings.Internal;
 using Engine.NativeBindings.Internal.Interop;
+using Engine.Rendering;
 using Xunit;
 
 namespace Engine.Tests.NativeBindings;
@@ -141,5 +142,58 @@ public sealed class NativeRuntimeCaptureTests
             9, 10, 11, 12, 13, 14, 15, 16
         ],
             packed);
+    }
+
+    [Fact]
+    public void CaptureFrameRgba16Float_UsesRequestedFormatAndRoughnessSemantic()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            CaptureResultWidthToReturn = 1u,
+            CaptureResultHeightToReturn = 1u,
+            CaptureResultStrideToReturn = 8u,
+            CaptureResultFormatToReturn = (uint)EngineNativeCaptureFormat.Rgba16Float,
+            CapturePixelsToReturn = [1, 0, 2, 0, 3, 0, 255, 59]
+        };
+
+        using var runtime = new NativeRuntime(backend);
+        using var frameArena = runtime.BeginFrame(512, 16);
+        runtime.Submit(new RenderPacket(
+            0,
+            Array.Empty<DrawCommand>(),
+            Array.Empty<UiDrawCommand>(),
+            RenderDebugViewMode.Roughness));
+
+        byte[] rgba16 = runtime.CaptureFrameRgba16Float(1u, 1u, includeAlpha: false);
+
+        Assert.Equal(backend.CapturePixelsToReturn, rgba16);
+        Assert.True(backend.LastCaptureRequest.HasValue);
+        Assert.Equal((byte)0, backend.LastCaptureRequest.Value.IncludeAlpha);
+        Assert.Equal((byte)EngineNativeCaptureFormat.Rgba16Float, backend.LastCaptureRequest.Value.Reserved1);
+        Assert.Equal((byte)EngineNativeCaptureSemantic.Roughness, backend.LastCaptureRequest.Value.Reserved0);
+        Assert.Equal(1, backend.CountCall("capture_free_result"));
+    }
+
+    [Fact]
+    public void CaptureFrameRgba16Float_ThrowsWhenNativeFormatMismatches_AndStillFreesNativeMemory()
+    {
+        var backend = new FakeNativeInteropApi
+        {
+            CaptureResultWidthToReturn = 1u,
+            CaptureResultHeightToReturn = 1u,
+            CaptureResultStrideToReturn = 8u,
+            CaptureResultFormatToReturn = (uint)EngineNativeCaptureFormat.Rgba8Unorm,
+            CapturePixelsToReturn = [1, 2, 3, 4, 5, 6, 7, 8]
+        };
+
+        using var runtime = new NativeRuntime(backend);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => runtime.CaptureFrameRgba16Float(1u, 1u));
+
+        Assert.Contains("Unsupported capture format", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(1, backend.CountCall("capture_request"));
+        Assert.Equal(1, backend.CountCall("capture_poll"));
+        Assert.Equal(1, backend.CountCall("capture_free_result"));
+        Assert.True(backend.CaptureResultFreed);
     }
 }

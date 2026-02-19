@@ -16,6 +16,7 @@ constexpr uint8_t kCaptureSemanticNormals = 2u;
 constexpr uint8_t kCaptureSemanticAlbedo = 3u;
 constexpr uint8_t kCaptureSemanticShadow = 4u;
 constexpr uint8_t kCaptureSemanticAmbientOcclusion = 5u;
+constexpr uint8_t kCaptureSemanticRoughness = 6u;
 
 uint32_t ResolveCaptureFormat(uint8_t format_selector) {
   if (format_selector == 0u ||
@@ -123,7 +124,7 @@ engine_native_status_t CaptureStore::QueueCapture(
   const uint32_t capture_format = ResolveCaptureFormat(request.reserved1);
   if (request.width == 0u || request.height == 0u || request.include_alpha > 1u ||
       request.reserved2 != 0u || capture_format == 0u ||
-      request.reserved0 > kCaptureSemanticAmbientOcclusion) {
+      request.reserved0 > kCaptureSemanticRoughness) {
     return ENGINE_NATIVE_STATUS_INVALID_ARGUMENT;
   }
 
@@ -202,7 +203,7 @@ engine_native_status_t CaptureStore::QueueCapture(
           break;
         }
         case kCaptureSemanticShadow:
-        case kCaptureSemanticAmbientOcclusion: {
+        {
           const bool checker = (((x / 6u) + (y / 6u) + (frame_index % 2u)) % 2u) == 0u;
           const float lit = checker ? 0.62f : 0.18f;
           const float horizon = EncodeUnit(y, height_denominator) * 0.24f;
@@ -210,6 +211,28 @@ engine_native_status_t CaptureStore::QueueCapture(
           out_r = light;
           out_g = light;
           out_b = light;
+          break;
+        }
+        case kCaptureSemanticAmbientOcclusion: {
+          const float ux = EncodeUnit(x, width_denominator) - 0.5f;
+          const float uy = EncodeUnit(y, height_denominator) - 0.5f;
+          const float radial = std::sqrt(std::min(1.0f, ux * ux + uy * uy));
+          const float ao = std::clamp(0.92f - radial * 1.45f, 0.12f, 0.92f);
+          const uint8_t ao_u8 = EncodeColor(ao);
+          out_r = ao_u8;
+          out_g = ao_u8;
+          out_b = ao_u8;
+          break;
+        }
+        case kCaptureSemanticRoughness: {
+          const float ramp_x = EncodeUnit(x, width_denominator);
+          const float ramp_y = EncodeUnit(y, height_denominator);
+          const float roughness = std::clamp(0.08f + ramp_x * 0.78f + ramp_y * 0.14f,
+                                             0.0f, 1.0f);
+          const uint8_t roughness_u8 = EncodeColor(roughness);
+          out_r = roughness_u8;
+          out_g = roughness_u8;
+          out_b = roughness_u8;
           break;
         }
         case kCaptureSemanticColor:
