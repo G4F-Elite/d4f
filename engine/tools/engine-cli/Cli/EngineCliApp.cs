@@ -40,6 +40,7 @@ public sealed partial class EngineCliApp
                 NewCommand cmd => HandleNew(cmd),
                 InitCommand cmd => HandleInit(cmd),
                 BuildCommand cmd => HandleBuild(cmd),
+                UpdateCommand cmd => HandleUpdate(cmd),
                 RunCommand cmd => HandleRun(cmd),
                 BakeCommand cmd => HandleBake(cmd),
                 PreviewCommand cmd => HandlePreview(cmd),

@@ -12,7 +12,7 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal(
-            "Command is required. Available commands: new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.",
+            "Command is required. Available commands: new, init, build, update, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.",
             result.Error);
     }
 
@@ -62,6 +62,43 @@ public sealed class EngineCliParserTests
 
         Assert.False(result.IsSuccess);
         Assert.Equal("Option '--configuration' must be 'Debug' or 'Release'.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldCreateUpdateCommand_WhenArgumentsValid()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse([
+            "update",
+            "--project", "game",
+            "--engine-managed-src", "../engine/managed/src"
+        ]);
+
+        UpdateCommand command = Assert.IsType<UpdateCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("../engine/managed/src", command.EngineManagedSourcePath);
+    }
+
+    [Fact]
+    public void Parse_ShouldFailUpdate_WhenProjectMissing()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse(["update"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("Option '--project' is required for 'update'.", result.Error);
+    }
+
+    [Fact]
+    public void Parse_ShouldAcceptShortEngineManagedSourceAlias_ForUpdate()
+    {
+        EngineCliParseResult result = EngineCliParser.Parse([
+            "update",
+            "-p", "game",
+            "-e", "../engine/managed/src"
+        ]);
+
+        UpdateCommand command = Assert.IsType<UpdateCommand>(result.Command);
+        Assert.Equal("game", command.ProjectDirectory);
+        Assert.Equal("../engine/managed/src", command.EngineManagedSourcePath);
     }
 
     [Fact]

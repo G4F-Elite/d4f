@@ -5,7 +5,7 @@ namespace Engine.Cli;
 
 public static partial class EngineCliParser
 {
-    private const string AvailableCommandsText = "new, init, build, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.";
+    private const string AvailableCommandsText = "new, init, build, update, run, bake, preview, preview audio, preview dump, test, multiplayer demo, multiplayer orchestrate, nfr proof, pack, doctor, api dump.";
     private static readonly HashSet<string> ValidConfigurations = new(StringComparer.OrdinalIgnoreCase)
     {
         "Debug",
@@ -148,6 +148,7 @@ public static partial class EngineCliParser
             "new" => ParseNew(optionsResult),
             "init" => ParseInit(optionsResult),
             "build" => ParseBuild(optionsResult),
+            "update" => ParseUpdate(optionsResult),
             "run" => ParseRun(optionsResult),
             "bake" => ParseBake(optionsResult),
             "preview" => ParsePreview(optionsResult),
@@ -204,6 +205,24 @@ public static partial class EngineCliParser
         }
 
         return EngineCliParseResult.Success(new BuildCommand(project, configuration));
+    }
+
+    private static EngineCliParseResult ParseUpdate(IReadOnlyDictionary<string, string> options)
+    {
+        if (!options.TryGetValue("project", out string? project))
+        {
+            return EngineCliParseResult.Failure("Option '--project' is required for 'update'.");
+        }
+
+        string? engineManagedSourcePath = options.TryGetValue("engine-managed-src", out string? managedSourcePath)
+            ? managedSourcePath
+            : null;
+        if (engineManagedSourcePath is not null && string.IsNullOrWhiteSpace(engineManagedSourcePath))
+        {
+            return EngineCliParseResult.Failure("Option '--engine-managed-src' cannot be empty.");
+        }
+
+        return EngineCliParseResult.Success(new UpdateCommand(project, engineManagedSourcePath));
     }
 
     private static EngineCliParseResult ParseRun(IReadOnlyDictionary<string, string> options)

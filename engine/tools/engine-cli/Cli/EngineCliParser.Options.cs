@@ -67,6 +67,7 @@ public static partial class EngineCliParser
             'p' => "project",
             'm' => "manifest",
             'n' => "name",
+            'e' => "engine-managed-src",
             _ => string.Empty
         };
     }

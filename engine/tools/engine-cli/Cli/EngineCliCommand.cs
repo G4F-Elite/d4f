@@ -16,6 +16,10 @@ public sealed record NewCommand(string Name, string OutputDirectory) : EngineCli
 
 public sealed record BuildCommand(string ProjectDirectory, string Configuration) : EngineCliCommand;
 
+public sealed record UpdateCommand(
+    string ProjectDirectory,
+    string? EngineManagedSourcePath) : EngineCliCommand;
+
 public sealed record RunCommand(string ProjectDirectory, string Configuration, RenderDebugViewMode DebugViewMode) : EngineCliCommand;
 
 public sealed record BakeCommand(
