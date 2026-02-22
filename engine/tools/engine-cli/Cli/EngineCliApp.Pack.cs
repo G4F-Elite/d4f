@@ -29,6 +29,7 @@ public sealed partial class EngineCliApp
         Directory.CreateDirectory(contentDirectory);
 
         File.Copy(baked.OutputPakPath, Path.Combine(contentDirectory, "Game.pak"), overwrite: true);
+        File.Copy(baked.CompiledManifestPath, Path.Combine(contentDirectory, Path.GetFileName(baked.CompiledManifestPath)), overwrite: true);
 
         string? publishProjectPath = ResolvePublishProjectPath(projectDirectory, command.PublishProjectPath);
         if (publishProjectPath is not null)

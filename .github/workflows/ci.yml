@@ -60,12 +60,12 @@ jobs:
         run: |
           if (-not (Test-Path "project.json")) {
             @"
-            {
-              "name": "ci-root",
-              "assetRoot": "assets",
-              "scripts": {}
-            }
-            "@ | Set-Content -Path "project.json" -Encoding UTF8
+{
+  "name": "ci-root",
+  "assetRoot": "assets",
+  "scripts": {}
+}
+"@ | Set-Content -Path "project.json" -Encoding UTF8
           }
 
           if (-not (Test-Path "assets")) {
@@ -74,11 +74,11 @@ jobs:
 
           if (-not (Test-Path "assets/manifest.json")) {
             @"
-            {
-              "version": 1,
-              "assets": []
-            }
-            "@ | Set-Content -Path "assets/manifest.json" -Encoding UTF8
+{
+  "version": 1,
+  "assets": []
+}
+"@ | Set-Content -Path "assets/manifest.json" -Encoding UTF8
           }
 
           if (-not (Test-Path "src")) {
