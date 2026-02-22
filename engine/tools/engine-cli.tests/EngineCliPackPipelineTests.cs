@@ -37,8 +37,8 @@ public sealed class EngineCliPackPipelineTests
                     StringComparison.OrdinalIgnoreCase));
 
             Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "Game.pak")));
+            Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "compiled.manifest.bin")));
             Assert.True(File.Exists(Path.Combine(projectRoot, "dist", "package", "config", "runtime.json")));
-            Assert.False(File.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "compiled.manifest.bin")));
             Assert.False(Directory.Exists(Path.Combine(projectRoot, "dist", "package", "Content", "compiled")));
 
             string runtimeConfigPath = Path.Combine(projectRoot, "dist", "package", "config", "runtime.json");
@@ -98,8 +98,8 @@ public sealed class EngineCliPackPipelineTests
 
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "build.zip")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "App", "dff_native.dll")));
+            Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
             Assert.True(File.Exists(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
-            Assert.False(File.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled.manifest.bin")));
             Assert.False(Directory.Exists(Path.Combine(tempRoot, "dist", "package", "Content", "compiled")));
             using JsonDocument runtimeConfig = JsonDocument.Parse(
                 File.ReadAllText(Path.Combine(tempRoot, "dist", "package", "config", "runtime.json")));
@@ -161,6 +161,7 @@ public sealed class EngineCliPackPipelineTests
             string[] archiveEntries = ListTarGzEntries(archivePath);
             Assert.Contains("App/libdff_native.so", archiveEntries);
             Assert.Contains("Content/Game.pak", archiveEntries);
+            Assert.Contains("Content/compiled.manifest.bin", archiveEntries);
             Assert.Contains("config/runtime.json", archiveEntries);
         }
         finally
